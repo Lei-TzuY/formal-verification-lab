@@ -30,8 +30,12 @@ pub fn render_proposition_expression_report(
         }
     )
     .expect("writing to String cannot fail");
-    writeln!(&mut output, "discovered states: {}", result.discovered_states)
-        .expect("writing to String cannot fail");
+    writeln!(
+        &mut output,
+        "discovered states: {}",
+        result.discovered_states
+    )
+    .expect("writing to String cannot fail");
     writeln!(
         &mut output,
         "explored transitions: {}",
