@@ -3,7 +3,8 @@ use formal_verification_lab::response_examples::{
     request_grant_protocol, unfair_request_grant_protocol,
 };
 use formal_verification_lab::{
-    check_action_temporal, parse_action_temporal, ActionAtom, ActionTemporalSpec, TemporalParseErrorKind,
+    check_action_temporal, parse_action_temporal, ActionAtom, ActionTemporalSpec,
+    TemporalParseErrorKind,
 };
 use std::process::Command;
 
@@ -60,7 +61,10 @@ fn parsed_specs_are_differentially_identical_to_direct_typed_specs() {
         );
     }
 
-    for model in [alternating_pulses().unwrap(), unfair_second_pulse().unwrap()] {
+    for model in [
+        alternating_pulses().unwrap(),
+        unfair_second_pulse().unwrap(),
+    ] {
         let parsed = parse_action_temporal(
             "infinitely-often-a-and-b",
             "infinitely-often(\"pulse-a\",\"pulse-b\")",
@@ -103,10 +107,12 @@ fn parser_reports_deterministic_position_aware_errors() {
         }
     );
 
-    let missing_quote =
-        parse_action_temporal("x", "response(request,\"grant\")").unwrap_err();
+    let missing_quote = parse_action_temporal("x", "response(request,\"grant\")").unwrap_err();
     assert_eq!(missing_quote.position(), 9);
-    assert_eq!(missing_quote.kind(), &TemporalParseErrorKind::ExpectedString);
+    assert_eq!(
+        missing_quote.kind(),
+        &TemporalParseErrorKind::ExpectedString
+    );
 
     let unterminated = parse_action_temporal("x", "response(\"request)").unwrap_err();
     assert_eq!(unterminated.position(), 9);
@@ -135,13 +141,9 @@ fn parser_reports_deterministic_position_aware_errors() {
 #[test]
 fn parser_reuses_typed_semantic_validation() {
     let empty = parse_action_temporal("x", "infinitely-often()").unwrap_err();
-    assert!(matches!(
-        empty.kind(),
-        TemporalParseErrorKind::Semantic(_)
-    ));
+    assert!(matches!(empty.kind(), TemporalParseErrorKind::Semantic(_)));
 
-    let duplicate =
-        parse_action_temporal("x", "infinitely-often(\"tick\",\"tick\")").unwrap_err();
+    let duplicate = parse_action_temporal("x", "infinitely-often(\"tick\",\"tick\")").unwrap_err();
     assert!(matches!(
         duplicate.kind(),
         TemporalParseErrorKind::Semantic(_)
@@ -180,12 +182,7 @@ fn temporal_cli_accepts_user_supplied_formulas() {
     assert!(stdout.contains("obligation: infinitely-often action 'pulse-b'"));
 
     let parse_bad = Command::new(binary)
-        .args([
-            "temporal",
-            "check",
-            "pulses",
-            "eventually(\"pulse-a\")",
-        ])
+        .args(["temporal", "check", "pulses", "eventually(\"pulse-a\")"])
         .output()
         .unwrap();
     assert_eq!(parse_bad.status.code(), Some(2));
