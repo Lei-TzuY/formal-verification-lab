@@ -37,8 +37,11 @@ pub fn render_monitor_report<S: Debug, M: Debug>(
     .expect("writing to String cannot fail");
 
     match &result.counterexample {
-        None => writeln!(&mut output, "counterexample: none (monitor conditions hold)")
-            .expect("writing to String cannot fail"),
+        None => writeln!(
+            &mut output,
+            "counterexample: none (monitor conditions hold)"
+        )
+        .expect("writing to String cannot fail"),
         Some(MonitorCounterexample::Rejecting { condition, trace }) => {
             writeln!(&mut output, "violated condition: {condition}")
                 .expect("writing to String cannot fail");
