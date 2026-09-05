@@ -44,12 +44,12 @@ label "done" "complete"
 fn parser_respects_precedence_grouping_and_canonical_round_trip() {
     let parsed = parse_proposition_expression(r#"not "a" or "b" and ("c" or not "a")"#).unwrap();
     let expected = PropositionExpression::or(
-        PropositionExpression::not(PropositionExpression::atom("a").unwrap()),
+        PropositionExpression::negate(PropositionExpression::atom("a").unwrap()),
         PropositionExpression::and(
             PropositionExpression::atom("b").unwrap(),
             PropositionExpression::or(
                 PropositionExpression::atom("c").unwrap(),
-                PropositionExpression::not(PropositionExpression::atom("a").unwrap()),
+                PropositionExpression::negate(PropositionExpression::atom("a").unwrap()),
             ),
         ),
     );
@@ -86,7 +86,7 @@ fn parser_reports_deterministic_position_aware_errors() {
         PropositionExpressionParseErrorKind::TrailingInput
     ));
 
-    let empty = parse_proposition_expression(r#"""#).unwrap_err();
+    let empty = parse_proposition_expression("\"\"").unwrap_err();
     assert!(matches!(
         empty.kind(),
         PropositionExpressionParseErrorKind::Semantic(PropositionExpressionError::EmptyProposition)
