@@ -123,8 +123,8 @@ fn run_counter_reachability(
     target: impl Fn(&CounterState) -> bool + Send + Sync + 'static,
 ) -> Result<ExitCode, String> {
     let model = bounded_counter().map_err(|error| error.to_string())?;
-    let property = ReachabilityProperty::new(property_name, target)
-        .map_err(|error| error.to_string())?;
+    let property =
+        ReachabilityProperty::new(property_name, target).map_err(|error| error.to_string())?;
     let result = check_reachability(&model, &property).map_err(|error| error.to_string())?;
     print!("{}", render_reachability_report(model.name(), &result));
 
