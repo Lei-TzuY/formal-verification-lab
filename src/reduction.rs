@@ -26,7 +26,10 @@ impl fmt::Display for IndependenceError {
         match self {
             Self::EmptyAction => write!(f, "independence action labels must not be empty"),
             Self::ReflexiveAction { action } => {
-                write!(f, "action '{action}' cannot be declared independent from itself")
+                write!(
+                    f,
+                    "action '{action}' cannot be declared independent from itself"
+                )
             }
         }
     }
@@ -80,8 +83,7 @@ impl IndependenceRelation {
         } else {
             (right, left)
         };
-        self.pairs
-            .contains(&(pair.0.to_owned(), pair.1.to_owned()))
+        self.pairs.contains(&(pair.0.to_owned(), pair.1.to_owned()))
     }
 
     pub fn pair_count(&self) -> usize {
