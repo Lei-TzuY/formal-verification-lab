@@ -110,16 +110,16 @@ where
         if node_by_state.contains_key(initial) {
             continue;
         }
-        match limits.max_states {
-            Some(limit) if nodes.len() >= limit => {
-                return Ok(inconclusive_result(
-                    nodes.len(),
-                    0,
-                    0,
-                    InconclusiveReason::StateLimitReached { limit },
-                ));
-            }
-            _ => {}
+        if let Some(limit) = limits
+            .max_states
+            .filter(|limit| nodes.len() >= *limit)
+        {
+            return Ok(inconclusive_result(
+                nodes.len(),
+                0,
+                0,
+                InconclusiveReason::StateLimitReached { limit },
+            ));
         }
 
         let id = nodes.len();
@@ -160,16 +160,16 @@ where
         let transitions = model.successors(state)?;
 
         for transition in transitions {
-            match limits.max_transitions {
-                Some(limit) if explored_transitions >= limit => {
-                    return Ok(inconclusive_result(
-                        nodes.len(),
-                        checked_states,
-                        explored_transitions,
-                        InconclusiveReason::TransitionLimitReached { limit },
-                    ));
-                }
-                _ => {}
+            if let Some(limit) = limits
+                .max_transitions
+                .filter(|limit| explored_transitions >= *limit)
+            {
+                return Ok(inconclusive_result(
+                    nodes.len(),
+                    checked_states,
+                    explored_transitions,
+                    InconclusiveReason::TransitionLimitReached { limit },
+                ));
             }
             explored_transitions += 1;
 
@@ -177,28 +177,25 @@ where
                 continue;
             }
 
-            match limits.max_depth {
-                Some(limit) if depth >= limit => {
-                    return Ok(inconclusive_result(
-                        nodes.len(),
-                        checked_states,
-                        explored_transitions,
-                        InconclusiveReason::DepthLimitReached { limit },
-                    ));
-                }
-                _ => {}
+            if let Some(limit) = limits.max_depth.filter(|limit| depth >= *limit) {
+                return Ok(inconclusive_result(
+                    nodes.len(),
+                    checked_states,
+                    explored_transitions,
+                    InconclusiveReason::DepthLimitReached { limit },
+                ));
             }
 
-            match limits.max_states {
-                Some(limit) if nodes.len() >= limit => {
-                    return Ok(inconclusive_result(
-                        nodes.len(),
-                        checked_states,
-                        explored_transitions,
-                        InconclusiveReason::StateLimitReached { limit },
-                    ));
-                }
-                _ => {}
+            if let Some(limit) = limits
+                .max_states
+                .filter(|limit| nodes.len() >= *limit)
+            {
+                return Ok(inconclusive_result(
+                    nodes.len(),
+                    checked_states,
+                    explored_transitions,
+                    InconclusiveReason::StateLimitReached { limit },
+                ));
             }
 
             let id = nodes.len();
