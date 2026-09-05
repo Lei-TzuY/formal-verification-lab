@@ -9,6 +9,7 @@ pub mod checker;
 pub mod examples;
 pub mod model;
 pub mod property;
+pub mod recurrence;
 pub mod reduction;
 pub mod report;
 
@@ -22,6 +23,10 @@ pub use property::{
     check_deadlock, check_reachability, DeadlockError, DeadlockProperty, DeadlockResult,
     DeadlockStatus, ReachabilityError, ReachabilityProperty, ReachabilityResult,
     ReachabilityStatus,
+};
+pub use recurrence::{
+    analyze_recurrence, CycleWitness, RecurrenceAnalysis, RecurrenceError,
+    StronglyConnectedComponent,
 };
 pub use reduction::{
     audit_sleep_set_reduction, IndependenceError, IndependenceRelation, ReducedExploration,
