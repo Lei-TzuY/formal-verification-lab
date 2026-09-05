@@ -174,7 +174,7 @@ fn floyd(adjacency: &[[bool; PRODUCT_N]; PRODUCT_N]) -> [[usize; PRODUCT_N]; PRO
     for (from, row) in adjacency.iter().enumerate() {
         for (to, edge) in row.iter().enumerate() {
             if *edge {
-                distance[from][to] = 1;
+                distance[from][to] = distance[from][to].min(1);
             }
         }
     }
@@ -207,7 +207,7 @@ fn avoiding_floyd(
         }
         for (to, edge) in adjacency_row.iter().enumerate() {
             if *edge && !accepts(decode_product(to).1, set) {
-                distance_row[to] = 1;
+                distance_row[to] = distance_row[to].min(1);
             }
         }
     }
@@ -358,6 +358,20 @@ fn buchi_metadata_is_validated() {
         FiniteRunPolicy::IgnoreTerminals,
     )
     .is_err());
+}
+
+#[test]
+fn oracle_shortest_paths_keep_zero_distance_on_self_loops() {
+    let mut adjacency = [[false; PRODUCT_N]; PRODUCT_N];
+    let initial = product_index(0, OracleState::None);
+    adjacency[initial][initial] = true;
+
+    let distance = floyd(&adjacency);
+    assert_eq!(distance[initial][initial], 0);
+
+    let avoiding = avoiding_floyd(&adjacency, 0);
+    assert_eq!(avoiding[initial][initial], 0);
+    assert!(on_avoiding_cycle(initial, 0, &adjacency, &avoiding));
 }
 
 #[test]
