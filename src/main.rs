@@ -33,6 +33,11 @@ use formal_verification_lab::property::{
     ReachabilityStatus,
 };
 use formal_verification_lab::proposition::{check_proposition_property, PropositionPropertySpec};
+use formal_verification_lab::proposition_expr::{
+    check_proposition_expression_property, parse_proposition_expression,
+    PropositionExpressionPropertySpec,
+};
+use formal_verification_lab::proposition_expr_report::render_proposition_expression_report;
 use formal_verification_lab::proposition_report::render_proposition_report;
 use formal_verification_lab::recurrence::analyze_recurrence;
 use formal_verification_lab::reduction::{audit_sleep_set_reduction, IndependenceRelation};
@@ -588,8 +593,11 @@ fn proposition_command(args: &[String]) -> Result<ExitCode, String> {
         [command, path, mode, proposition] if command == "file" => {
             run_proposition_file(path, mode, proposition)
         }
+        [command, path, mode, expression] if command == "expr" => {
+            run_proposition_expression_file(path, mode, expression)
+        }
         [query] => Err(format!(
-            "unknown proposition query '{query}'; expected 'file <path> <reachable|all-eventually> <proposition>'"
+            "unknown proposition query '{query}'; expected 'file <path> <reachable|all-eventually> <proposition>' or 'expr <path> <reachable|all-eventually> <expression>'"
         )),
         _ => Err(usage()),
     }
@@ -613,6 +621,42 @@ fn run_proposition_file(path: &str, mode: &str, proposition: &str) -> Result<Exi
     print!(
         "{}",
         render_proposition_report(document.model().name(), &result)
+    );
+    Ok(match result.status {
+        ExactStateStatus::Satisfied => ExitCode::SUCCESS,
+        ExactStateStatus::Violated => ExitCode::from(11),
+    })
+}
+
+fn run_proposition_expression_file(
+    path: &str,
+    mode: &str,
+    expression: &str,
+) -> Result<ExitCode, String> {
+    let input = fs::read_to_string(path)
+        .map_err(|error| format!("failed to read declarative model '{path}': {error}"))?;
+    let document = parse_declarative_document(&input).map_err(|error| error.to_string())?;
+    let expression = parse_proposition_expression(expression).map_err(|error| error.to_string())?;
+    let spec = match mode {
+        "reachable" => {
+            PropositionExpressionPropertySpec::reachable("cli-proposition-expression", expression)
+        }
+        "all-eventually" => PropositionExpressionPropertySpec::all_eventually(
+            "cli-proposition-expression",
+            expression,
+        ),
+        _ => {
+            return Err(format!(
+                "unknown proposition property mode '{mode}'; expected reachable or all-eventually"
+            ));
+        }
+    }
+    .map_err(|error| error.to_string())?;
+    let result = check_proposition_expression_property(&document, &spec)
+        .map_err(|error| error.to_string())?;
+    print!(
+        "{}",
+        render_proposition_expression_report(document.model().name(), &result)
     );
     Ok(match result.status {
         ExactStateStatus::Satisfied => ExitCode::SUCCESS,
@@ -683,7 +727,7 @@ fn status_exit_code(status: VerificationStatus) -> ExitCode {
 }
 
 fn usage() -> String {
-    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | eventually <counter-three|counter-four|traffic-never> | respond <request-grant|request-grant-unfair|dual-grant|dual-grant-unfair-b> | monitor <session-ok|session-double-open|session-stuck> | buchi <pulses|pulses-unfair|finite-ignore|finite-strict> | temporal <request-grant|request-grant-unfair|pulses|pulses-unfair> | temporal check <request-grant|request-grant-unfair|pulses|pulses-unfair> <expression> | temporal file <path> <expression> | state file <path> <expression> | proposition file <path> <reachable|all-eventually> <proposition>]"
+    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | eventually <counter-three|counter-four|traffic-never> | respond <request-grant|request-grant-unfair|dual-grant|dual-grant-unfair-b> | monitor <session-ok|session-double-open|session-stuck> | buchi <pulses|pulses-unfair|finite-ignore|finite-strict> | temporal <request-grant|request-grant-unfair|pulses|pulses-unfair> | temporal check <request-grant|request-grant-unfair|pulses|pulses-unfair> <expression> | temporal file <path> <expression> | state file <path> <expression> | proposition file <path> <reachable|all-eventually> <proposition> | proposition expr <path> <reachable|all-eventually> <expression>]"
         .to_owned()
 }
 
