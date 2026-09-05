@@ -87,7 +87,10 @@ fn bounded_counter_is_acyclic_with_four_singleton_components() {
     assert_eq!(analysis.explored_transitions, 3);
     assert_eq!(analysis.max_depth_reached, Some(3));
     assert_eq!(analysis.components.len(), 4);
-    assert!(analysis.components.iter().all(|component| !component.cyclic));
+    assert!(analysis
+        .components
+        .iter()
+        .all(|component| !component.cyclic));
     assert!(analysis.first_cycle.is_none());
 }
 
@@ -174,7 +177,13 @@ fn validate_trace_edges(mask: usize, trace: &[formal_verification_lab::TraceStep
     for pair in trace.windows(2) {
         let from = pair[0].state;
         let to = pair[1].state;
-        assert!(has_edge(mask, from, to), "missing edge {from}->{to} mask={mask}");
-        assert_eq!(pair[1].action.as_deref(), Some(format!("{from}->{to}").as_str()));
+        assert!(
+            has_edge(mask, from, to),
+            "missing edge {from}->{to} mask={mask}"
+        );
+        assert_eq!(
+            pair[1].action.as_deref(),
+            Some(format!("{from}->{to}").as_str())
+        );
     }
 }
