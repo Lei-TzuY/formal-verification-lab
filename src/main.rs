@@ -175,12 +175,12 @@ fn run_counter_deadlock(
 
 fn scc_command(args: &[String]) -> Result<ExitCode, String> {
     match args {
-        [example] if example == "counter" => run_recurrence(
-            bounded_counter().map_err(|error| error.to_string())?,
-        ),
-        [example] if example == "traffic-light" => run_recurrence(
-            traffic_light().map_err(|error| error.to_string())?,
-        ),
+        [example] if example == "counter" => {
+            run_recurrence(bounded_counter().map_err(|error| error.to_string())?)
+        }
+        [example] if example == "traffic-light" => {
+            run_recurrence(traffic_light().map_err(|error| error.to_string())?)
+        }
         [example] => Err(format!(
             "unknown SCC example '{example}'; expected counter or traffic-light"
         )),
