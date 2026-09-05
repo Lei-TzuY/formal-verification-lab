@@ -103,7 +103,10 @@ fn product_index(node: usize, monitor: OracleMonitor) -> usize {
 }
 
 fn decode_product(index: usize) -> (usize, OracleMonitor) {
-    (index / MONITOR_STATES, decode_monitor(index % MONITOR_STATES))
+    (
+        index / MONITOR_STATES,
+        decode_monitor(index % MONITOR_STATES),
+    )
 }
 
 fn graph_model(graph_mask: usize, codes: [u8; EDGE_COUNT]) -> TransitionSystem<usize> {
@@ -131,19 +134,15 @@ fn generated_monitor() -> FiniteMonitor<OracleMonitor> {
         "generated-session-monitor",
         OracleMonitor::Idle,
         |state, action| oracle_step(*state, parse_code(action)),
-        vec![RejectCondition::new("legal-order", |state| {
-            *state == OracleMonitor::Rejected
-        })
-        .unwrap()],
+        vec![
+            RejectCondition::new("legal-order", |state| *state == OracleMonitor::Rejected).unwrap(),
+        ],
         vec![ProgressCondition::new("eventually-idle", |state| active(*state)).unwrap()],
     )
     .unwrap()
 }
 
-fn oracle_adjacency(
-    graph_mask: usize,
-    codes: [u8; EDGE_COUNT],
-) -> [[bool; PRODUCT_N]; PRODUCT_N] {
+fn oracle_adjacency(graph_mask: usize, codes: [u8; EDGE_COUNT]) -> [[bool; PRODUCT_N]; PRODUCT_N] {
     let mut adjacency = [[false; PRODUCT_N]; PRODUCT_N];
     for node in 0..N {
         for monitor_index_value in 0..MONITOR_STATES {
@@ -185,9 +184,7 @@ fn floyd(adjacency: &[[bool; PRODUCT_N]; PRODUCT_N]) -> [[usize; PRODUCT_N]; PRO
     distance
 }
 
-fn active_floyd(
-    adjacency: &[[bool; PRODUCT_N]; PRODUCT_N],
-) -> [[usize; PRODUCT_N]; PRODUCT_N] {
+fn active_floyd(adjacency: &[[bool; PRODUCT_N]; PRODUCT_N]) -> [[usize; PRODUCT_N]; PRODUCT_N] {
     let mut distance = [[INF; PRODUCT_N]; PRODUCT_N];
     for (index, row) in distance.iter_mut().enumerate() {
         if active(decode_product(index).1) {
@@ -274,7 +271,8 @@ fn active_terminal_is_progress_terminal() {
     )
     .unwrap();
     let result = check_monitor(&model, &session_monitor().unwrap()).unwrap();
-    let MonitorCounterexample::ProgressTerminal { condition, trace } = result.counterexample.unwrap()
+    let MonitorCounterexample::ProgressTerminal { condition, trace } =
+        result.counterexample.unwrap()
     else {
         panic!("expected progress-terminal witness");
     };
