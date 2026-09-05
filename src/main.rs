@@ -28,14 +28,11 @@ use formal_verification_lab::multi_response_examples::{
     dual_response_protocol, unfair_dual_response_protocol,
 };
 use formal_verification_lab::multi_response_report::render_multi_response_report;
-use formal_verification_lab::{parse_declarative_document, parse_declarative_model};
 use formal_verification_lab::property::{
     check_deadlock, check_reachability, DeadlockProperty, DeadlockStatus, ReachabilityProperty,
     ReachabilityStatus,
 };
-use formal_verification_lab::proposition::{
-    check_proposition_property, PropositionPropertySpec,
-};
+use formal_verification_lab::proposition::{check_proposition_property, PropositionPropertySpec};
 use formal_verification_lab::proposition_report::render_proposition_report;
 use formal_verification_lab::recurrence::analyze_recurrence;
 use formal_verification_lab::reduction::{audit_sleep_set_reduction, IndependenceRelation};
@@ -52,6 +49,7 @@ use formal_verification_lab::temporal::{
 };
 use formal_verification_lab::temporal_parse::parse_action_temporal;
 use formal_verification_lab::temporal_report::render_temporal_report;
+use formal_verification_lab::{parse_declarative_document, parse_declarative_model};
 use std::env;
 use std::fs;
 use std::process::ExitCode;
@@ -597,19 +595,13 @@ fn proposition_command(args: &[String]) -> Result<ExitCode, String> {
     }
 }
 
-fn run_proposition_file(
-    path: &str,
-    mode: &str,
-    proposition: &str,
-) -> Result<ExitCode, String> {
+fn run_proposition_file(path: &str, mode: &str, proposition: &str) -> Result<ExitCode, String> {
     let input = fs::read_to_string(path)
         .map_err(|error| format!("failed to read declarative model '{path}': {error}"))?;
     let document = parse_declarative_document(&input).map_err(|error| error.to_string())?;
     let spec = match mode {
         "reachable" => PropositionPropertySpec::reachable("cli-proposition", proposition),
-        "all-eventually" => {
-            PropositionPropertySpec::all_eventually("cli-proposition", proposition)
-        }
+        "all-eventually" => PropositionPropertySpec::all_eventually("cli-proposition", proposition),
         _ => {
             return Err(format!(
                 "unknown proposition property mode '{mode}'; expected reachable or all-eventually"
