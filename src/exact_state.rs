@@ -290,7 +290,7 @@ impl fmt::Display for ExactStateParseError {
             ExactStateParseErrorKind::UnknownOperator { operator } => {
                 write!(f, "unsupported exact-state operator '{operator}'")
             }
-            ExactStateParseErrorKind::ExpectedOpenParen => write!(f, "expected '('") ,
+            ExactStateParseErrorKind::ExpectedOpenParen => write!(f, "expected '('"),
             ExactStateParseErrorKind::ExpectedString => {
                 write!(f, "expected a double-quoted exact state id")
             }
