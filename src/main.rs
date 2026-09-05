@@ -16,6 +16,11 @@ use formal_verification_lab::reduction::{audit_sleep_set_reduction, Independence
 use formal_verification_lab::report::{
     render_deadlock_report, render_reachability_report, render_recurrence_report, render_report,
 };
+use formal_verification_lab::response::{check_response, ResponseProperty, ResponseStatus};
+use formal_verification_lab::response_examples::{
+    request_grant_protocol, unfair_request_grant_protocol,
+};
+use formal_verification_lab::response_report::render_response_report;
 use std::env;
 use std::process::ExitCode;
 
@@ -45,6 +50,7 @@ fn run(args: Vec<String>) -> Result<ExitCode, String> {
         [command, rest @ ..] if command == "deadlock" => deadlock_command(rest),
         [command, rest @ ..] if command == "scc" => scc_command(rest),
         [command, rest @ ..] if command == "eventually" => eventuality_command(rest),
+        [command, rest @ ..] if command == "respond" => response_command(rest),
         _ => Err(usage()),
     }
 }
@@ -255,6 +261,45 @@ where
     })
 }
 
+fn response_command(args: &[String]) -> Result<ExitCode, String> {
+    let property = ResponseProperty::new(
+        "request-eventually-grant",
+        |action| action == "request",
+        |action| action == "grant",
+    )
+    .map_err(|error| error.to_string())?;
+
+    match args {
+        [query] if query == "request-grant" => run_response(
+            request_grant_protocol().map_err(|error| error.to_string())?,
+            property,
+        ),
+        [query] if query == "request-grant-unfair" => run_response(
+            unfair_request_grant_protocol().map_err(|error| error.to_string())?,
+            property,
+        ),
+        [query] => Err(format!(
+            "unknown response query '{query}'; expected request-grant or request-grant-unfair"
+        )),
+        _ => Err(usage()),
+    }
+}
+
+fn run_response<S>(
+    model: formal_verification_lab::TransitionSystem<S>,
+    property: ResponseProperty,
+) -> Result<ExitCode, String>
+where
+    S: Clone + Eq + std::hash::Hash + std::fmt::Debug,
+{
+    let result = check_response(&model, &property).map_err(|error| error.to_string())?;
+    print!("{}", render_response_report(model.name(), &result));
+    Ok(match result.status {
+        ResponseStatus::Satisfied => ExitCode::SUCCESS,
+        ResponseStatus::Violated => ExitCode::from(7),
+    })
+}
+
 fn parse_limits(args: &[String]) -> Result<ExplorationLimits, String> {
     let mut limits = ExplorationLimits::unbounded();
     let mut index = 0;
@@ -318,7 +363,7 @@ fn status_exit_code(status: VerificationStatus) -> ExitCode {
 }
 
 fn usage() -> String {
-    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | eventually <counter-three|counter-four|traffic-never>]"
+    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | eventually <counter-three|counter-four|traffic-never> | respond <request-grant|request-grant-unfair>]"
         .to_owned()
 }
 

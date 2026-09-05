@@ -226,3 +226,33 @@ jobs:
           grep -Fq "counterexample: INFINITE_CYCLE" <<<"$infinite_output"
           grep -Fq "TrafficLightState { light: Red } [cycle-entry]" <<<"$infinite_output"
           test "$(grep -Fc -- '--advance-->' <<<"$infinite_output")" -eq 3
+      - name: Action response CLI integration test
+        shell: bash
+        run: |
+          satisfied_output="$(cargo run --quiet -- respond request-grant)"
+          printf '%s\n' "$satisfied_output"
+          grep -Fq "model: request-grant" <<<"$satisfied_output"
+          grep -Fq "property: request-eventually-grant" <<<"$satisfied_output"
+          grep -Fq "response: SATISFIED" <<<"$satisfied_output"
+          grep -Fq "model states: 2" <<<"$satisfied_output"
+          grep -Fq "model transitions: 2" <<<"$satisfied_output"
+          grep -Fq "product states: 2" <<<"$satisfied_output"
+          grep -Fq "product transitions: 2" <<<"$satisfied_output"
+          grep -Fq "counterexample: none (every trigger is eventually answered)" <<<"$satisfied_output"
+
+          set +e
+          violated_output="$(cargo run --quiet -- respond request-grant-unfair)"
+          violated_status=$?
+          set -e
+          printf '%s\n' "$violated_output"
+          test "$violated_status" -eq 7
+          grep -Fq "model: request-grant-unfair" <<<"$violated_output"
+          grep -Fq "response: VIOLATED" <<<"$violated_output"
+          grep -Fq "model states: 2" <<<"$violated_output"
+          grep -Fq "model transitions: 3" <<<"$violated_output"
+          grep -Fq "product states: 2" <<<"$violated_output"
+          grep -Fq "product transitions: 3" <<<"$violated_output"
+          grep -Fq "counterexample: PENDING_CYCLE" <<<"$violated_output"
+          grep -Fq -- "--request-->" <<<"$violated_output"
+          grep -Fq "pending: true" <<<"$violated_output"
+          test "$(grep -Fc -- '--wait-->' <<<"$violated_output")" -eq 1
