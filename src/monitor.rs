@@ -313,7 +313,8 @@ where
                     .ok_or(MonitorError::MissingWitness)?;
                 return Ok(result(
                     monitor,
-                    &captured,
+                    captured.discovered_states,
+                    captured.explored_transitions,
                     &product,
                     product_transitions,
                     MonitorCounterexample::Rejecting {
@@ -335,7 +336,8 @@ where
                     .ok_or(MonitorError::MissingWitness)?;
                 return Ok(result(
                     monitor,
-                    &captured,
+                    captured.discovered_states,
+                    captured.explored_transitions,
                     &product,
                     product_transitions,
                     MonitorCounterexample::ProgressTerminal {
@@ -405,7 +407,8 @@ where
         .ok_or(MonitorError::MissingWitness)?;
         return Ok(result(
             monitor,
-            &captured,
+            captured.discovered_states,
+            captured.explored_transitions,
             &product,
             product_transitions,
             MonitorCounterexample::ProgressCycle {
@@ -429,7 +432,8 @@ where
 
 fn result<S, M>(
     monitor: &FiniteMonitor<M>,
-    captured: &crate::recurrence::CapturedGraph<S>,
+    model_states: usize,
+    model_transitions: usize,
     product: &ReachableGraph<MonitorProductState<S, M>>,
     product_transitions: usize,
     counterexample: MonitorCounterexample<S, M>,
@@ -437,8 +441,8 @@ fn result<S, M>(
     MonitorResult {
         monitor: monitor.name.clone(),
         status: MonitorStatus::Violated,
-        model_states: captured.discovered_states,
-        model_transitions: captured.explored_transitions,
+        model_states,
+        model_transitions,
         product_states: product.states.len(),
         product_transitions,
         counterexample: Some(counterexample),
