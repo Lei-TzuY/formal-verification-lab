@@ -30,6 +30,20 @@ pub fn render_report<S: Debug>(model_name: &str, result: &CheckResult<S>) -> Str
         result.explored_transitions
     )
     .expect("writing to String cannot fail");
+    match result.max_depth_reached {
+        Some(depth) => writeln!(&mut output, "max depth reached: {depth}"),
+        None => writeln!(&mut output, "max depth reached: none"),
+    }
+    .expect("writing to String cannot fail");
+
+    writeln!(&mut output, "transitions by action:").expect("writing to String cannot fail");
+    if result.transitions_by_action.is_empty() {
+        writeln!(&mut output, "  (none)").expect("writing to String cannot fail");
+    } else {
+        for (action, count) in &result.transitions_by_action {
+            writeln!(&mut output, "  {action}: {count}").expect("writing to String cannot fail");
+        }
+    }
 
     if let Some(reason) = result.inconclusive_reason {
         match reason {
