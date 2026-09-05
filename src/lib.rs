@@ -29,6 +29,7 @@ pub mod response;
 pub mod response_examples;
 pub mod response_report;
 pub mod temporal;
+pub mod temporal_parse;
 pub mod temporal_report;
 
 pub use buchi::{
@@ -78,5 +79,8 @@ pub use response_report::render_response_report;
 pub use temporal::{
     check_action_temporal, ActionAtom, ActionTemporalSpec, TemporalBackend, TemporalCounterexample,
     TemporalError, TemporalObligation, TemporalResult, TemporalStatus,
+};
+pub use temporal_parse::{
+    parse_action_temporal, TemporalParseError, TemporalParseErrorKind,
 };
 pub use temporal_report::render_temporal_report;
