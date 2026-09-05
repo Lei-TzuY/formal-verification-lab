@@ -114,7 +114,7 @@ pub fn check_reachability<S>(
     property: &ReachabilityProperty<S>,
 ) -> Result<ReachabilityResult<S>, ReachabilityError>
 where
-    S: Clone + Eq + Hash + fmt::Debug,
+    S: Clone + Eq + Hash + fmt::Debug + 'static,
 {
     let target = Arc::clone(&property.target);
     let sentinel = Invariant::new("__reachability_target_not_seen", move |state: &S| {
