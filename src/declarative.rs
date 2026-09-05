@@ -5,27 +5,62 @@ use std::fmt;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DeclarativeModelError {
     MissingModel,
-    DuplicateModel { line: usize },
-    EmptyModelName { line: usize },
+    DuplicateModel {
+        line: usize,
+    },
+    EmptyModelName {
+        line: usize,
+    },
     NoStates,
-    EmptyStateName { line: usize },
-    DuplicateState { line: usize, state: String },
+    EmptyStateName {
+        line: usize,
+    },
+    DuplicateState {
+        line: usize,
+        state: String,
+    },
     NoInitialStates,
-    DuplicateInitial { line: usize, state: String },
-    UnknownInitialState { line: usize, state: String },
-    EmptyAction { line: usize },
-    UnknownEdgeSource { line: usize, state: String },
-    UnknownEdgeTarget { line: usize, state: String },
+    DuplicateInitial {
+        line: usize,
+        state: String,
+    },
+    UnknownInitialState {
+        line: usize,
+        state: String,
+    },
+    EmptyAction {
+        line: usize,
+    },
+    UnknownEdgeSource {
+        line: usize,
+        state: String,
+    },
+    UnknownEdgeTarget {
+        line: usize,
+        state: String,
+    },
     DuplicateEdge {
         line: usize,
         from: String,
         action: String,
         to: String,
     },
-    ExpectedDirective { line: usize, column: usize },
-    UnknownDirective { line: usize, directive: String },
-    ExpectedString { line: usize, column: usize },
-    UnterminatedString { line: usize, column: usize },
+    ExpectedDirective {
+        line: usize,
+        column: usize,
+    },
+    UnknownDirective {
+        line: usize,
+        directive: String,
+    },
+    ExpectedString {
+        line: usize,
+        column: usize,
+    },
+    UnterminatedString {
+        line: usize,
+        column: usize,
+    },
     InvalidEscape {
         line: usize,
         column: usize,
@@ -286,11 +321,12 @@ pub fn parse_declarative_model(
         vec![StateVariable::new("state", "declarative state id")],
         initial_states,
         move |state: &String| {
-            adjacency.get(state).cloned().ok_or_else(|| {
-                ModelError::TransitionGeneration {
+            adjacency
+                .get(state)
+                .cloned()
+                .ok_or_else(|| ModelError::TransitionGeneration {
                     message: format!("state '{state}' is outside the declared model domain"),
-                }
-            })
+                })
         },
         vec![Invariant::new(
             "declared-state-domain",
