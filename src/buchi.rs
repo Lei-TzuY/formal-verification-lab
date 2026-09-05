@@ -1,10 +1,11 @@
 use crate::checker::TraceStep;
 use crate::model::TransitionSystem;
+use crate::product::build_action_product;
 use crate::recurrence::{
     capture_reachable_graph, component_is_cyclic, cycle_witness, induced_graph, shortest_path,
-    strongly_connected_components, ReachableGraph, RecurrenceError, SnapshotEdge,
+    strongly_connected_components, ReachableGraph, RecurrenceError,
 };
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::HashSet;
 use std::fmt;
 use std::hash::Hash;
 use std::sync::Arc;
@@ -257,7 +258,12 @@ where
     A: Clone + Eq + Hash,
 {
     let captured = capture_reachable_graph(model)?;
-    let product = build_product_graph(&captured.graph, automaton);
+    let product = build_action_product(
+        &captured.graph,
+        &automaton.initial,
+        |state, action| (automaton.step)(state, action),
+        |state, automaton| BuchiProductState { state, automaton },
+    );
     let product_transitions = product.outgoing.iter().map(Vec::len).sum();
 
     if automaton.finite_policy == FiniteRunPolicy::RequireAcceptingTerminal {
@@ -409,71 +415,4 @@ fn candidate_key<S, A>(candidate: &CycleCandidate<S, A>) -> (usize, usize, usize
         candidate.acceptance_index,
         candidate.product_entry,
     )
-}
-
-fn build_product_graph<S, A>(
-    graph: &ReachableGraph<S>,
-    automaton: &BuchiAutomaton<A>,
-) -> ReachableGraph<BuchiProductState<S, A>>
-where
-    S: Clone,
-    A: Clone + Eq + Hash,
-{
-    let mut states = Vec::new();
-    let mut outgoing: Vec<Vec<SnapshotEdge>> = Vec::new();
-    let mut initial_ids = Vec::new();
-    let mut ids: HashMap<(usize, A), usize> = HashMap::new();
-    let mut queue = VecDeque::new();
-
-    for &model_id in &graph.initial_ids {
-        let automaton_state = automaton.initial.clone();
-        let key = (model_id, automaton_state.clone());
-        let product_id = if let Some(id) = ids.get(&key).copied() {
-            id
-        } else {
-            let id = states.len();
-            ids.insert(key.clone(), id);
-            states.push(BuchiProductState {
-                state: graph.states[model_id].clone(),
-                automaton: automaton_state,
-            });
-            outgoing.push(Vec::new());
-            queue.push_back(key);
-            id
-        };
-        if !initial_ids.contains(&product_id) {
-            initial_ids.push(product_id);
-        }
-    }
-
-    while let Some((model_id, automaton_state)) = queue.pop_front() {
-        let source = ids[&(model_id, automaton_state.clone())];
-        for edge in &graph.outgoing[model_id] {
-            let next_automaton = (automaton.step)(&automaton_state, &edge.action);
-            let key = (edge.target, next_automaton.clone());
-            let target = if let Some(id) = ids.get(&key).copied() {
-                id
-            } else {
-                let id = states.len();
-                ids.insert(key.clone(), id);
-                states.push(BuchiProductState {
-                    state: graph.states[edge.target].clone(),
-                    automaton: next_automaton,
-                });
-                outgoing.push(Vec::new());
-                queue.push_back(key);
-                id
-            };
-            outgoing[source].push(SnapshotEdge {
-                action: edge.action.clone(),
-                target,
-            });
-        }
-    }
-
-    ReachableGraph {
-        states,
-        outgoing,
-        initial_ids,
-    }
 }
