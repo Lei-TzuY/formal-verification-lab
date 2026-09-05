@@ -10,6 +10,9 @@ pub mod eventuality;
 pub mod eventuality_report;
 pub mod examples;
 pub mod model;
+pub mod monitor;
+pub mod monitor_examples;
+pub mod monitor_report;
 pub mod multi_response;
 pub mod multi_response_examples;
 pub mod multi_response_report;
@@ -32,6 +35,11 @@ pub use eventuality::{
 };
 pub use eventuality_report::render_eventuality_report;
 pub use model::{Invariant, ModelError, StateVariable, Transition, TransitionSystem};
+pub use monitor::{
+    check_monitor, FiniteMonitor, MonitorCounterexample, MonitorError, MonitorProductState,
+    MonitorResult, MonitorStatus, ProgressCondition, RejectCondition,
+};
+pub use monitor_report::render_monitor_report;
 pub use multi_response::{
     check_multi_response, MultiObligationState, MultiResponseCounterexample, MultiResponseError,
     MultiResponseProperty, MultiResponseResult, MultiResponseStatus, ResponseClause,

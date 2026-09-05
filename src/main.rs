@@ -7,6 +7,11 @@ use formal_verification_lab::examples::{
     bounded_counter, buggy_mutex, buggy_peterson_mutex, commuting_counters, peterson_mutex,
     traffic_light, CounterState, TrafficLightState,
 };
+use formal_verification_lab::monitor::{check_monitor, FiniteMonitor, MonitorStatus};
+use formal_verification_lab::monitor_examples::{
+    invalid_double_open_protocol, session_monitor, session_protocol, stuck_committed_protocol,
+};
+use formal_verification_lab::monitor_report::render_monitor_report;
 use formal_verification_lab::multi_response::{
     check_multi_response, MultiResponseProperty, MultiResponseStatus, ResponseClause,
 };
@@ -58,6 +63,7 @@ fn run(args: Vec<String>) -> Result<ExitCode, String> {
         [command, rest @ ..] if command == "scc" => scc_command(rest),
         [command, rest @ ..] if command == "eventually" => eventuality_command(rest),
         [command, rest @ ..] if command == "respond" => response_command(rest),
+        [command, rest @ ..] if command == "monitor" => monitor_command(rest),
         _ => Err(usage()),
     }
 }
@@ -353,6 +359,43 @@ where
     })
 }
 
+fn monitor_command(args: &[String]) -> Result<ExitCode, String> {
+    match args {
+        [query] if query == "session-ok" => run_monitor(
+            session_protocol().map_err(|error| error.to_string())?,
+            session_monitor().map_err(|error| error.to_string())?,
+        ),
+        [query] if query == "session-double-open" => run_monitor(
+            invalid_double_open_protocol().map_err(|error| error.to_string())?,
+            session_monitor().map_err(|error| error.to_string())?,
+        ),
+        [query] if query == "session-stuck" => run_monitor(
+            stuck_committed_protocol().map_err(|error| error.to_string())?,
+            session_monitor().map_err(|error| error.to_string())?,
+        ),
+        [query] => Err(format!(
+            "unknown monitor query '{query}'; expected session-ok, session-double-open, or session-stuck"
+        )),
+        _ => Err(usage()),
+    }
+}
+
+fn run_monitor<S, M>(
+    model: formal_verification_lab::TransitionSystem<S>,
+    monitor: FiniteMonitor<M>,
+) -> Result<ExitCode, String>
+where
+    S: Clone + Eq + std::hash::Hash + std::fmt::Debug,
+    M: Clone + Eq + std::hash::Hash + std::fmt::Debug,
+{
+    let result = check_monitor(&model, &monitor).map_err(|error| error.to_string())?;
+    print!("{}", render_monitor_report(model.name(), &result));
+    Ok(match result.status {
+        MonitorStatus::Satisfied => ExitCode::SUCCESS,
+        MonitorStatus::Violated => ExitCode::from(8),
+    })
+}
+
 fn parse_limits(args: &[String]) -> Result<ExplorationLimits, String> {
     let mut limits = ExplorationLimits::unbounded();
     let mut index = 0;
@@ -416,7 +459,7 @@ fn status_exit_code(status: VerificationStatus) -> ExitCode {
 }
 
 fn usage() -> String {
-    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | eventually <counter-three|counter-four|traffic-never> | respond <request-grant|request-grant-unfair|dual-grant|dual-grant-unfair-b>]"
+    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | eventually <counter-three|counter-four|traffic-never> | respond <request-grant|request-grant-unfair|dual-grant|dual-grant-unfair-b> | monitor <session-ok|session-double-open|session-stuck>]"
         .to_owned()
 }
 
