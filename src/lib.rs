@@ -12,6 +12,8 @@ pub mod checker;
 pub mod declarative;
 pub mod eventuality;
 pub mod eventuality_report;
+pub mod exact_state;
+pub mod exact_state_report;
 pub mod examples;
 mod graph;
 pub mod model;
@@ -49,6 +51,12 @@ pub use eventuality::{
     EventualityResult, EventualityStatus,
 };
 pub use eventuality_report::render_eventuality_report;
+pub use exact_state::{
+    check_exact_state_property, parse_exact_state_property, ExactStateBackend, ExactStateError,
+    ExactStateEvidence, ExactStateParseError, ExactStateParseErrorKind, ExactStatePropertySpec,
+    ExactStateResult, ExactStateStatus,
+};
+pub use exact_state_report::render_exact_state_report;
 pub use model::{Invariant, ModelError, StateVariable, Transition, TransitionSystem};
 pub use monitor::{
     check_monitor, FiniteMonitor, MonitorCounterexample, MonitorError, MonitorProductState,
