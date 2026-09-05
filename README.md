@@ -97,7 +97,15 @@ The shared substrate owns deterministic BFS product discovery, `(model_state_id,
 
 Migration equivalence is executable rather than asserted by inspection: the unchanged M12 **4096-case** finite-monitor oracle and M13 **8192-case** generalized Büchi oracle both exercise the shared builder while independently validating product reachability/accounting, action updates, deterministic witnesses, terminal/cycle semantics, and selection rules. Existing binary-level monitor and Büchi CLI integration tests remain unchanged.
 
-The canonical multi-response engine is deliberately not migrated in M14, keeping this PR bounded to two already independently audited consumers. That remaining third product builder is the next architectural frontier rather than hidden scope inside this milestone.
+### Milestone 15 — response products on the shared substrate
+
+Milestone 15 migrates the canonical multi-response engine onto the same internal action-product constructor. Its control state is the existing `Vec<bool>` pending vector, initialized with every clause clear. The action update is unchanged: for each clause, a matching response clears that clause; otherwise a matching trigger sets it.
+
+`MultiObligationState<S>`, finite pending-terminal precedence, per-clause pending residuals, SCC/lasso analysis, shortest-stem selection, reporting, and CLI behavior remain property-owned and unchanged. Because the M10 single-response API already delegates to the canonical multi-response engine, both single- and multi-class response verification now reach the shared constructor without another compatibility path.
+
+Migration equivalence is again executable: the unchanged M10 **4096-case** single-response oracle and M11 **38,416-case** two-class oracle validate product reachability/accounting, pending updates, finite and infinite failures, clause identity, witnesses, and determinism. M12 and M13 continue exercising the same shared substrate through their independent monitor and Büchi oracles, so the common constructor now has three independently audited temporal consumers.
+
+M15 adds no response semantics, fairness assumptions, public API, or performance claim. Its architectural effect is to eliminate the final duplicated action-driven temporal product BFS while keeping each verification property's acceptance/failure semantics separate.
 
 ## Architecture
 
@@ -105,13 +113,13 @@ The canonical multi-response engine is deliberately not migrated in M14, keeping
 src/model.rs                  transition-system abstraction and validation
 src/builder.rs                typed construction layer
 src/checker.rs                canonical deterministic BFS substrate and bounds
-src/product.rs                shared internal deterministic action-product BFS
+src/product.rs                shared internal action-product BFS for temporal engines
 src/property.rs               existential reachability + deadlock policies
 src/recurrence.rs             one-exploration graph snapshot, induced graphs,
                               SCCs, shortest paths, cycle witnesses
 src/eventuality.rs            universal eventuality over target-cut residuals
-src/multi_response.rs         canonical multi-clause response product engine
-src/response.rs               single-clause compatibility API over that engine
+src/multi_response.rs         multi-clause response semantics over shared product
+src/response.rs               single-clause compatibility API over multi-response
 src/monitor.rs                finite-monitor semantics over shared action product
 src/buchi.rs                  Büchi semantics over shared action product
 src/reduction.rs              experimental sleep-set path + exhaustive audit
@@ -121,7 +129,7 @@ src/main.rs                   CLI/exit-status integration; no model traversal lo
 tests/                        semantic, protocol, generated graph/product oracles
 ```
 
-The original transition relation remains owned by the model plus canonical exploration. Structural and temporal analyses reuse a captured finite labeled graph rather than invoking the model transition function again. M14 additionally centralizes deterministic action-product construction for the monitor and Büchi engines while leaving their property semantics separate.
+The original transition relation remains owned by the model plus canonical exploration. Structural and temporal analyses reuse a captured finite labeled graph rather than invoking the model transition function again. M14–M15 centralize deterministic action-product construction for response, monitor, and Büchi engines while leaving their property semantics separate.
 
 ## Executable examples
 
@@ -177,7 +185,7 @@ cargo test --all-targets --all-features
 
 Coverage includes safety, bounded exploration, Peterson, audited reduction, reachability, deadlock policies, SCC structure, universal eventuality, response products, finite monitor products, and generalized Büchi-style acceptance. Independent generated suites include M9's 4096 eventuality cases, M10's 4096 single-response cases, M11's 38,416 two-class cases, M12's 4096 finite-monitor cases, and M13's 8192 Büchi/finite-policy cases.
 
-M14 changes no property oracle expectations. The unchanged M12 and M13 generated suites act as migration-equivalence gates for the shared action-product substrate, while the complete test command also executes the built `fvlab` binary for M12 and M13 positive/negative CLI paths. The workflow retains direct CLI regression gates for earlier milestones.
+M14–M15 change no property-oracle expectations. The unchanged M10–M13 generated suites act as migration-equivalence gates for the shared action-product substrate, while the complete test command executes the built `fvlab` binary for monitor and Büchi positive/negative paths and the workflow retains direct response CLI regression gates.
 
 ## Trust boundaries and limitations
 
@@ -189,7 +197,7 @@ M14 changes no property oracle expectations. The unchanged M12 and M13 generated
 - M9–M13 have **no fairness semantics**. Enabled responses or accepting actions are not assumed to be scheduled.
 - M9–M13 are not a full LTL/CTL implementation and do not claim temporal-logic parsing, formula compilation, arbitrary nested formulas, or model checking outside the explicitly implemented semantics.
 - The M13 generalized Büchi layer accepts user-defined automata; it does not claim to translate arbitrary LTL into Büchi automata.
-- M14 is an internal architecture consolidation; it adds no new proof semantics and makes no performance claim.
+- M14–M15 are internal architecture consolidations; they add no new proof semantics and make no performance claim.
 - Tarjan SCC discovery currently uses recursive DFS; very deep graphs may motivate a future iterative implementation.
 - Peterson starvation freedom is still not claimed.
 - The sleep-set engine remains experimental and differentially audited, not a standalone trusted POR proof backend.
@@ -198,6 +206,6 @@ M14 changes no property oracle expectations. The unchanged M12 and M13 generated
 
 ## Roadmap
 
-Milestones 1–14 form a coherent explicit-state stack: safety -> bounded honesty -> typed models -> independent graph validation -> audited reduction -> existential reachability -> terminal/deadlock analysis -> recurrent SCC structure -> universal eventuality -> response obligations -> multi-class response composition -> deterministic finite monitors -> explicit generalized Büchi-style acceptance -> shared deterministic action-product construction.
+Milestones 1–15 form a coherent explicit-state stack: safety -> bounded honesty -> typed models -> independent graph validation -> audited reduction -> existential reachability -> terminal/deadlock analysis -> recurrent SCC structure -> universal eventuality -> response obligations -> multi-class response composition -> deterministic finite monitors -> explicit generalized Büchi-style acceptance -> shared deterministic action-product construction across all action-driven temporal engines.
 
-The next high-value architectural slice is **Milestone 15: migrate the canonical multi-response engine onto the shared action-product substrate**. Because the single-response API already delegates to multi-response, that migration would bring M10 and M11 onto the same constructor without introducing a second compatibility path. Acceptance should require the existing 4096 single-response and 38,416 multi-response independent oracles plus executable response CLI regressions to remain unchanged. After all action-driven temporal engines share one product constructor, the project can reassess whether captured graph ownership should move out of `recurrence.rs` into a neutral graph substrate before introducing any narrow typed temporal-property AST or formula-to-automaton frontend.
+The next high-value architectural slice is **Milestone 16: neutral captured-graph substrate**. Generic labeled graph ownership currently lives in `recurrence.rs` even though eventuality, response, monitor, Büchi, and product construction all consume it. M16 should first audit those dependencies, then move only genuinely generic snapshot/path primitives into a neutral internal graph module while leaving SCC/recurrence semantics in `recurrence.rs`. Acceptance must preserve the one-model-capture invariant, deterministic state/edge ordering, shortest-path witnesses, all M8–M13 independent graph/product oracles, and every executable CLI regression. Only after graph ownership is neutral and stable should the project consider a narrow typed temporal-property AST or formula-to-automaton frontend.
