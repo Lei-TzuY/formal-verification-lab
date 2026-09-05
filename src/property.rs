@@ -1,3 +1,4 @@
+use crate::bounded::BoundedOutcome;
 use crate::checker::{
     check, search_with_probes, ExplorationLimits, GraphSearchOutcome, TraceStep, VerificationStatus,
 };
@@ -46,6 +47,18 @@ pub struct ReachabilityResult<S> {
     pub max_depth_reached: Option<usize>,
     /// A shortest transition-count path to a target state when reachable.
     /// The first step has no action because it is an initial state.
+    pub witness: Option<Vec<TraceStep<S>>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BoundedReachabilityResult<S> {
+    pub property: String,
+    pub outcome: BoundedOutcome<ReachabilityStatus>,
+    pub discovered_states: usize,
+    pub checked_states: usize,
+    pub explored_transitions: usize,
+    pub max_depth_reached: Option<usize>,
+    /// Present only when a target has actually been reached before any cutoff.
     pub witness: Option<Vec<TraceStep<S>>>,
 }
 
@@ -153,6 +166,63 @@ where
             witness: None,
         }),
         VerificationStatus::Inconclusive => Err(ReachabilityError::UnexpectedInconclusive),
+    }
+}
+
+/// Evaluate reachability under deterministic resource limits without treating a
+/// cutoff as proof of absence. A target observed before the cutoff remains a
+/// conclusive shortest witness; otherwise only complete exhaustion can return
+/// `Unreachable`.
+pub fn check_reachability_with_limits<S>(
+    model: &TransitionSystem<S>,
+    property: &ReachabilityProperty<S>,
+    limits: ExplorationLimits,
+) -> Result<BoundedReachabilityResult<S>, ReachabilityError>
+where
+    S: Clone + Eq + Hash,
+{
+    let target = Arc::clone(&property.target);
+    let search = search_with_probes(
+        model,
+        limits,
+        move |state| (target)(state).then(|| "reachability-target".to_owned()),
+        |_state, _transitions| None,
+    )?;
+
+    let property_name = property.name.clone();
+    let discovered_states = search.discovered_states;
+    let checked_states = search.checked_states;
+    let explored_transitions = search.explored_transitions;
+    let max_depth_reached = search.max_depth_reached;
+
+    match search.outcome {
+        GraphSearchOutcome::Match { trace, .. } => Ok(BoundedReachabilityResult {
+            property: property_name,
+            outcome: BoundedOutcome::Conclusive(ReachabilityStatus::Reachable),
+            discovered_states,
+            checked_states,
+            explored_transitions,
+            max_depth_reached,
+            witness: Some(trace),
+        }),
+        GraphSearchOutcome::Exhausted => Ok(BoundedReachabilityResult {
+            property: property_name,
+            outcome: BoundedOutcome::Conclusive(ReachabilityStatus::Unreachable),
+            discovered_states,
+            checked_states,
+            explored_transitions,
+            max_depth_reached,
+            witness: None,
+        }),
+        GraphSearchOutcome::Inconclusive(reason) => Ok(BoundedReachabilityResult {
+            property: property_name,
+            outcome: BoundedOutcome::Inconclusive(reason),
+            discovered_states,
+            checked_states,
+            explored_transitions,
+            max_depth_reached,
+            witness: None,
+        }),
     }
 }
 
