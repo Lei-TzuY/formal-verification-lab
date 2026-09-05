@@ -160,8 +160,8 @@ fn run_counter_deadlock(
     allowed_terminal: impl Fn(&CounterState) -> bool + Send + Sync + 'static,
 ) -> Result<ExitCode, String> {
     let model = bounded_counter().map_err(|error| error.to_string())?;
-    let property =
-        DeadlockProperty::new(property_name, allowed_terminal).map_err(|error| error.to_string())?;
+    let property = DeadlockProperty::new(property_name, allowed_terminal)
+        .map_err(|error| error.to_string())?;
     let result = check_deadlock(&model, &property).map_err(|error| error.to_string())?;
     print!("{}", render_deadlock_report(model.name(), &result));
 
