@@ -1,6 +1,9 @@
-use crate::checker::{search_with_probes, ExplorationLimits, GraphSearchOutcome, TraceStep};
-use crate::model::{ModelError, Transition, TransitionSystem};
-use std::collections::{HashMap, HashSet, VecDeque};
+use crate::checker::TraceStep;
+use crate::graph::{
+    capture_reachable_graph, shortest_path, GraphCaptureError, ReachableGraph,
+};
+use crate::model::{ModelError, TransitionSystem};
+use std::collections::HashSet;
 use std::fmt;
 use std::hash::Hash;
 
@@ -73,61 +76,18 @@ impl From<ModelError> for RecurrenceError {
     }
 }
 
-#[derive(Debug, Clone)]
-pub(crate) struct SnapshotEdge {
-    pub(crate) action: String,
-    pub(crate) target: usize,
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct ReachableGraph<S> {
-    pub(crate) states: Vec<S>,
-    pub(crate) outgoing: Vec<Vec<SnapshotEdge>>,
-    pub(crate) initial_ids: Vec<usize>,
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct CapturedReachableGraph<S> {
-    pub(crate) graph: ReachableGraph<S>,
-    pub(crate) discovered_states: usize,
-    pub(crate) explored_transitions: usize,
-    pub(crate) max_depth_reached: Option<usize>,
-}
-
-/// Exhaustively materialize the reachable transition graph once through the
-/// canonical BFS substrate. Higher-level graph analyses reuse this snapshot so
-/// the model transition relation is never re-invoked for the same analysis.
-pub(crate) fn capture_reachable_graph<S>(
-    model: &TransitionSystem<S>,
-) -> Result<CapturedReachableGraph<S>, RecurrenceError>
-where
-    S: Clone + Eq + Hash,
-{
-    let mut captured: Vec<(S, Vec<Transition<S>>)> = Vec::new();
-    let search = search_with_probes(
-        model,
-        ExplorationLimits::unbounded(),
-        |_state| None,
-        |state, transitions| {
-            captured.push((state.clone(), transitions.to_vec()));
-            None
-        },
-    )?;
-
-    if !matches!(search.outcome, GraphSearchOutcome::Exhausted) {
-        return Err(RecurrenceError::UnexpectedInconclusive);
+impl From<GraphCaptureError> for RecurrenceError {
+    fn from(value: GraphCaptureError) -> Self {
+        match value {
+            GraphCaptureError::Model(error) => Self::Model(error),
+            GraphCaptureError::UnexpectedInconclusive => Self::UnexpectedInconclusive,
+            GraphCaptureError::SnapshotTargetMissing => Self::SnapshotTargetMissing,
+        }
     }
-
-    Ok(CapturedReachableGraph {
-        graph: build_graph(model, captured)?,
-        discovered_states: search.discovered_states,
-        explored_transitions: search.explored_transitions,
-        max_depth_reached: search.max_depth_reached,
-    })
 }
 
 /// Exhaustively materialize the reachable transition graph once through the
-/// canonical BFS substrate, then analyze SCC structure without invoking the
+/// neutral graph substrate, then analyze SCC structure without invoking the
 /// model transition relation again.
 pub fn analyze_recurrence<S>(
     model: &TransitionSystem<S>,
@@ -135,7 +95,7 @@ pub fn analyze_recurrence<S>(
 where
     S: Clone + Eq + Hash,
 {
-    let captured = capture_reachable_graph(model)?;
+    let captured = capture_reachable_graph(model).map_err(RecurrenceError::from)?;
     let component_ids = strongly_connected_components(&captured.graph);
     let components = component_ids
         .iter()
@@ -163,111 +123,6 @@ where
         components,
         first_cycle,
     })
-}
-
-fn build_graph<S>(
-    model: &TransitionSystem<S>,
-    captured: Vec<(S, Vec<Transition<S>>)>,
-) -> Result<ReachableGraph<S>, RecurrenceError>
-where
-    S: Clone + Eq + Hash,
-{
-    let states = captured
-        .iter()
-        .map(|(state, _)| state.clone())
-        .collect::<Vec<_>>();
-    let state_to_id = states
-        .iter()
-        .cloned()
-        .enumerate()
-        .map(|(id, state)| (state, id))
-        .collect::<HashMap<_, _>>();
-
-    let outgoing = captured
-        .into_iter()
-        .map(|(_, transitions)| {
-            transitions
-                .into_iter()
-                .map(|transition| {
-                    let target = state_to_id
-                        .get(&transition.next)
-                        .copied()
-                        .ok_or(RecurrenceError::SnapshotTargetMissing)?;
-                    Ok(SnapshotEdge {
-                        action: transition.action,
-                        target,
-                    })
-                })
-                .collect::<Result<Vec<_>, RecurrenceError>>()
-        })
-        .collect::<Result<Vec<_>, RecurrenceError>>()?;
-
-    let mut initial_ids = Vec::new();
-    for initial in model.initial_states() {
-        let id = state_to_id
-            .get(initial)
-            .copied()
-            .ok_or(RecurrenceError::SnapshotTargetMissing)?;
-        if !initial_ids.contains(&id) {
-            initial_ids.push(id);
-        }
-    }
-
-    Ok(ReachableGraph {
-        states,
-        outgoing,
-        initial_ids,
-    })
-}
-
-/// Build a dense graph induced by `included`, preserving original discovery
-/// order for both states and initial roots. Callers are responsible for making
-/// `included` represent the desired reachable subgraph.
-pub(crate) fn induced_graph<S: Clone>(
-    graph: &ReachableGraph<S>,
-    included: &[bool],
-) -> ReachableGraph<S> {
-    assert_eq!(included.len(), graph.states.len());
-
-    let mut old_to_new = vec![None; graph.states.len()];
-    let mut states = Vec::new();
-    for (old_id, state) in graph.states.iter().enumerate() {
-        if included[old_id] {
-            let new_id = states.len();
-            old_to_new[old_id] = Some(new_id);
-            states.push(state.clone());
-        }
-    }
-
-    let outgoing = graph
-        .outgoing
-        .iter()
-        .enumerate()
-        .filter(|(old_id, _)| included[*old_id])
-        .map(|(_, edges)| {
-            edges
-                .iter()
-                .filter_map(|edge| {
-                    old_to_new[edge.target].map(|target| SnapshotEdge {
-                        action: edge.action.clone(),
-                        target,
-                    })
-                })
-                .collect::<Vec<_>>()
-        })
-        .collect::<Vec<_>>();
-
-    let initial_ids = graph
-        .initial_ids
-        .iter()
-        .filter_map(|old_id| old_to_new[*old_id])
-        .collect();
-
-    ReachableGraph {
-        states,
-        outgoing,
-        initial_ids,
-    }
 }
 
 pub(crate) fn strongly_connected_components<S>(graph: &ReachableGraph<S>) -> Vec<Vec<usize>> {
@@ -393,64 +248,4 @@ pub(crate) fn cycle_witness<S: Clone + Eq>(
         stem,
         cycle,
     }))
-}
-
-pub(crate) fn shortest_path<S: Clone>(
-    graph: &ReachableGraph<S>,
-    starts: &[usize],
-    goal: usize,
-    allowed: Option<&HashSet<usize>>,
-) -> Option<Vec<TraceStep<S>>> {
-    let count = graph.states.len();
-    let mut seen = vec![false; count];
-    let mut root = vec![false; count];
-    let mut predecessor: Vec<Option<(usize, String)>> = vec![None; count];
-    let mut queue = VecDeque::new();
-
-    for &start in starts {
-        if allowed.is_some_and(|members| !members.contains(&start)) || seen[start] {
-            continue;
-        }
-        seen[start] = true;
-        root[start] = true;
-        queue.push_back(start);
-    }
-
-    while let Some(node) = queue.pop_front() {
-        if node == goal {
-            break;
-        }
-        for edge in &graph.outgoing[node] {
-            if allowed.is_some_and(|members| !members.contains(&edge.target)) || seen[edge.target] {
-                continue;
-            }
-            seen[edge.target] = true;
-            predecessor[edge.target] = Some((node, edge.action.clone()));
-            queue.push_back(edge.target);
-        }
-    }
-
-    if !seen.get(goal).copied().unwrap_or(false) {
-        return None;
-    }
-
-    let mut reversed = Vec::new();
-    let mut node = goal;
-    loop {
-        if root[node] {
-            reversed.push(TraceStep {
-                action: None,
-                state: graph.states[node].clone(),
-            });
-            break;
-        }
-        let (previous, action) = predecessor[node].clone()?;
-        reversed.push(TraceStep {
-            action: Some(action),
-            state: graph.states[node].clone(),
-        });
-        node = previous;
-    }
-    reversed.reverse();
-    Some(reversed)
 }
