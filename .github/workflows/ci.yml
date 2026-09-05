@@ -99,3 +99,18 @@ jobs:
           grep -Fq -- "--p1:set-turn-->" <<<"$buggy_output"
           grep -Fq -- "--p1:enter-->" <<<"$buggy_output"
           grep -Fq "p0: Critical, p1: Critical" <<<"$buggy_output"
+      - name: Differential reduction CLI audit
+        shell: bash
+        run: |
+          output="$(cargo run --quiet -- reduce commuting-counters)"
+          printf '%s\n' "$output"
+          grep -Fq "model: commuting-counters" <<<"$output"
+          grep -Fq "reduction audit: MATCH" <<<"$output"
+          grep -Fq "independence pairs: 1" <<<"$output"
+          grep -Fq "exhaustive status: SAFE" <<<"$output"
+          grep -Fq "exhaustive states: 9" <<<"$output"
+          grep -Fq "exhaustive transitions: 12" <<<"$output"
+          grep -Fq "reduced status: SAFE" <<<"$output"
+          grep -Fq "reduced states: 9" <<<"$output"
+          grep -Fq "reduced transitions: 8" <<<"$output"
+          grep -Fq "pruned transitions: 4" <<<"$output"
