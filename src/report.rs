@@ -15,8 +15,12 @@ pub fn render_report<S: Debug>(model_name: &str, result: &CheckResult<S>) -> Str
         }
     )
     .expect("writing to String cannot fail");
-    writeln!(&mut output, "discovered states: {}", result.discovered_states)
-        .expect("writing to String cannot fail");
+    writeln!(
+        &mut output,
+        "discovered states: {}",
+        result.discovered_states
+    )
+    .expect("writing to String cannot fail");
     writeln!(&mut output, "checked states: {}", result.checked_states)
         .expect("writing to String cannot fail");
     writeln!(
@@ -27,18 +31,18 @@ pub fn render_report<S: Debug>(model_name: &str, result: &CheckResult<S>) -> Str
     .expect("writing to String cannot fail");
 
     if let Some(counterexample) = &result.counterexample {
-        writeln!(&mut output, "violated invariant: {}", counterexample.invariant)
-            .expect("writing to String cannot fail");
+        writeln!(
+            &mut output,
+            "violated invariant: {}",
+            counterexample.invariant
+        )
+        .expect("writing to String cannot fail");
         writeln!(&mut output, "counterexample:").expect("writing to String cannot fail");
 
         for (index, step) in counterexample.trace.iter().enumerate() {
             match &step.action {
                 None => writeln!(&mut output, "  {index}: {:?} [initial]", step.state),
-                Some(action) => writeln!(
-                    &mut output,
-                    "  {index}: --{action}--> {:?}",
-                    step.state
-                ),
+                Some(action) => writeln!(&mut output, "  {index}: --{action}--> {:?}", step.state),
             }
             .expect("writing to String cannot fail");
         }
