@@ -93,6 +93,41 @@ impl ActionTemporalSpec {
     pub fn name(&self) -> &str {
         &self.name
     }
+
+    /// Render the canonical textual form consumed by the M18 parser.
+    pub fn canonical_expression(&self) -> String {
+        match &self.kind {
+            ActionTemporalKind::Response { trigger, response } => format!(
+                "response({},{})",
+                quote_action(trigger.as_str()),
+                quote_action(response.as_str())
+            ),
+            ActionTemporalKind::AllInfinitelyOften { actions } => format!(
+                "infinitely-often({})",
+                actions
+                    .iter()
+                    .map(|action| quote_action(action.as_str()))
+                    .collect::<Vec<_>>()
+                    .join(",")
+            ),
+        }
+    }
+}
+
+fn quote_action(action: &str) -> String {
+    let mut output = String::from("\"");
+    for ch in action.chars() {
+        match ch {
+            '\\' => output.push_str("\\\\"),
+            '"' => output.push_str("\\\""),
+            '\n' => output.push_str("\\n"),
+            '\r' => output.push_str("\\r"),
+            '\t' => output.push_str("\\t"),
+            _ => output.push(ch),
+        }
+    }
+    output.push('"');
+    output
 }
 
 fn validate_property_name(name: impl Into<String>) -> Result<String, TemporalError> {

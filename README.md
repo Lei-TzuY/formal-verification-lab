@@ -115,6 +115,23 @@ Validation is deterministic: empty property/action names, an empty recurring-act
 
 Differential tests compare typed response against the existing hand-built request/grant backend on both fair and unfair models, and typed recurring actions against the hand-built pulse Büchi automaton on fair, unfair, and finite-ignore models. These tests also compare model/product accounting, verify normalized witnesses, and execute the built `fvlab temporal` binary on positive and negative paths.
 
+### Milestone 18 — textual temporal parser
+
+Milestone 18 adds a deterministic textual surface for exactly the M17 typed subset; it does not add another temporal semantics layer.
+
+`parse_action_temporal(name, expression)` accepts two forms:
+
+- `response("trigger","response")`;
+- `infinitely-often("action"[,"action"...])`.
+
+ASCII whitespace is accepted between tokens. Exact action labels are double quoted and support `\\`, `\"`, `\n`, `\r`, and `\t` escapes. Syntax failures return `TemporalParseError` with UTF-8 byte positions, and unsupported operators are rejected explicitly instead of being interpreted as a broader logic language.
+
+Semantic validation remains single-sourced: parsed action strings and argument lists are handed to the M17 typed constructors, so empty action names/lists, duplicate recurring actions, and property-name validation do not have a parser-specific implementation. `ActionTemporalSpec::canonical_expression()` renders one stable quoted representation for parse/render round trips.
+
+`fvlab temporal check <model> <expression>` now accepts user-supplied expressions for the request/grant and pulse teaching models. Parsed specs then run through `check_action_temporal`, so parser errors use the normal CLI error exit 2 while property violations retain temporal exit 10.
+
+Executable evidence includes parser-to-typed equality, exact verification-result differential tests, escaped-label round trips, deterministic position-aware syntax errors, semantic-validation delegation, and built-binary satisfied/violated/malformed formula paths. M18 does not claim nested formulas, Boolean composition, fairness, general LTL/CTL parsing, or arbitrary formula-to-automaton compilation.
+
 ## Architecture
 
 ```text
@@ -132,6 +149,7 @@ src/response.rs               single-clause compatibility API over multi-respons
 src/monitor.rs                finite-monitor semantics over shared action product
 src/buchi.rs                  Büchi semantics over shared action product
 src/temporal.rs               typed exact-action temporal frontend + backend routing
+src/temporal_parse.rs         textual parser for the typed temporal subset
 src/temporal_report.rs        normalized frontend reporting
 src/reduction.rs              experimental sleep-set path + exhaustive audit
 src/*_report.rs               deterministic analysis-specific reporting
@@ -140,7 +158,7 @@ src/main.rs                   CLI/exit-status integration; no model traversal lo
 tests/                        semantic, protocol, graph/product and frontend tests
 ```
 
-The original transition relation remains owned by the model plus canonical exploration. Structural and temporal analyses reuse a neutral captured finite labeled graph rather than invoking the model transition function again. The typed temporal frontend compiles only to already validated engines; it does not introduce a second model-checking backend.
+The original transition relation remains owned by the model plus canonical exploration. Structural and temporal analyses reuse a neutral captured finite labeled graph rather than invoking the model transition function again. The typed and textual temporal frontends compile only to already validated engines; they do not introduce a second model-checking backend.
 
 ## Executable examples
 
@@ -159,24 +177,28 @@ cargo run -- monitor session-ok
 cargo run -- buchi pulses
 cargo run -- temporal request-grant
 cargo run -- temporal pulses
+cargo run -- temporal check request-grant 'response("request","grant")'
+cargo run -- temporal check pulses 'infinitely-often("pulse-a","pulse-b")'
 ```
 
-### Typed temporal frontend
+### Typed and textual temporal frontend
 
 ```bash
 cargo run -- temporal request-grant
 cargo run -- temporal request-grant-unfair
 cargo run -- temporal pulses
 cargo run -- temporal pulses-unfair
+cargo run -- temporal check request-grant 'response("request","grant")'
+cargo run -- temporal check pulses-unfair 'infinitely-often("pulse-a","pulse-b")'
 ```
 
-`request-grant` and `pulses` satisfy their typed properties. The unfair variants return frontend-level normalized counterexamples and exit with status 10. The existing `respond` and `buchi` commands remain available as direct backend paths for comparison.
+`request-grant` and `pulses` satisfy their typed properties. The unfair variants return frontend-level normalized counterexamples and exit with status 10. User-supplied expressions are parsed into the same typed specs and then use the same backends. The existing `respond` and `buchi` commands remain available as direct backend paths for comparison.
 
 ## CLI exit status
 
 - `0`: successful analysis whose property holds, or successful structural SCC analysis;
 - `1`: safety invariant violation;
-- `2`: malformed CLI/model/analysis error;
+- `2`: malformed CLI/model/analysis/temporal syntax error;
 - `3`: bounded safety exploration is `INCONCLUSIVE`;
 - `4`: existential target is `UNREACHABLE`;
 - `5`: unexpected terminal/deadlock found;
@@ -184,7 +206,7 @@ cargo run -- temporal pulses-unfair
 - `7`: single- or multi-class response property is `VIOLATED`;
 - `8`: deterministic finite monitor verification is `VIOLATED`;
 - `9`: generalized Büchi-style acceptance is `VIOLATED`;
-- `10`: typed temporal frontend property is `VIOLATED`.
+- `10`: typed/textual temporal frontend property is `VIOLATED`.
 
 ## Tests and CI
 
@@ -197,9 +219,9 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo test --all-targets --all-features
 ```
 
-Coverage includes safety, bounded exploration, Peterson, audited reduction, reachability, deadlock policies, SCC structure, universal eventuality, response products, finite monitor products, generalized Büchi-style acceptance, and the typed temporal frontend. Independent generated suites include M8's 512 SCC graphs, M9's 4096 eventuality cases, M10's 4096 single-response cases, M11's 38,416 two-class cases, M12's 4096 finite-monitor cases, and M13's 8192 Büchi/finite-policy cases.
+Coverage includes safety, bounded exploration, Peterson, audited reduction, reachability, deadlock policies, SCC structure, universal eventuality, response products, finite monitor products, generalized Büchi-style acceptance, and typed/textual temporal frontends. Independent generated suites include M8's 512 SCC graphs, M9's 4096 eventuality cases, M10's 4096 single-response cases, M11's 38,416 two-class cases, M12's 4096 finite-monitor cases, and M13's 8192 Büchi/finite-policy cases.
 
-M17 adds differential frontend tests rather than weakening those backend oracles. The complete test command executes built `fvlab` binary paths for the typed frontend as well as the existing integration coverage.
+M17 adds differential frontend tests without weakening backend oracles. M18 adds parser-to-typed/result differential tests, canonical-expression round trips, position-aware error regressions, and user-expression binary integration. The complete test command still executes the unchanged older semantic and CLI coverage.
 
 ## Trust boundaries and limitations
 
@@ -207,13 +229,13 @@ M17 adds differential frontend tests rather than weakening those backend oracles
 - User transition functions and predicates must faithfully encode the intended system/property; the checker cannot prove modeling fidelity or purity.
 - Explicit-state memory grows with the reachable graph. A `k`-clause response monitor may expand a model state into up to `2^k` pending valuations.
 - Response classes remain Boolean obligations, not per-request identity queues.
-- M9–M17 have **no fairness semantics**. Enabled responses or accepting actions are not assumed to be scheduled.
-- The typed M17 frontend supports exact action atoms only. It has no wildcard, Boolean action predicate language, nested temporal operators, temporal negation, or arbitrary formula composition.
+- M9–M18 have **no fairness semantics**. Enabled responses or accepting actions are not assumed to be scheduled.
+- The typed/textual frontend supports exact action atoms only. It has no wildcard, Boolean action predicate language, nested temporal operators, temporal negation, or arbitrary formula composition.
 - `all_infinitely_often` is intentionally an infinite-run-only property; finite terminals are ignored. The frontend does not expose M13's strict finite terminal policy for this form.
-- There is no textual temporal-property parser yet. M17 constructs typed Rust specifications directly.
-- M9–M17 are not a full LTL/CTL implementation and do not claim arbitrary formula parsing/compilation.
+- The textual grammar is deliberately limited to `response(...)` and `infinitely-often(...)`; it is not a general temporal-logic parser.
+- M9–M18 are not a full LTL/CTL implementation and do not claim arbitrary formula parsing/compilation.
 - The M13 generalized Büchi layer accepts user-defined automata; it does not translate arbitrary LTL into Büchi automata.
-- M14–M16 are internal architecture consolidations and make no performance claim. M17 adds frontend capability but no performance claim.
+- M14–M16 are internal architecture consolidations and make no performance claim. M17–M18 add frontend capability but no performance claim.
 - Tarjan SCC discovery currently uses recursive DFS; very deep graphs may motivate a future iterative implementation.
 - Peterson starvation freedom is still not claimed.
 - The sleep-set engine remains experimental and differentially audited, not a standalone trusted POR proof backend.
@@ -222,6 +244,6 @@ M17 adds differential frontend tests rather than weakening those backend oracles
 
 ## Roadmap
 
-Milestones 1–17 form a coherent explicit-state stack: safety -> bounded honesty -> typed models -> independent graph validation -> audited reduction -> existential reachability -> terminal/deadlock analysis -> recurrent SCC structure -> universal eventuality -> response obligations -> multi-class response composition -> deterministic finite monitors -> explicit generalized Büchi-style acceptance -> shared action-product construction -> neutral captured-graph ownership -> typed action-temporal specification.
+Milestones 1–18 form a coherent explicit-state stack: safety -> bounded honesty -> typed models -> independent graph validation -> audited reduction -> existential reachability -> terminal/deadlock analysis -> recurrent SCC structure -> universal eventuality -> response obligations -> multi-class response composition -> deterministic finite monitors -> explicit generalized Büchi-style acceptance -> shared action-product construction -> neutral captured-graph ownership -> typed action-temporal specification -> textual temporal parsing.
 
-The next high-value slice is **Milestone 18: a minimal textual parser for exactly the M17 typed subset**. The parser should add usability, not new semantics: parse a small deterministic grammar into `ActionTemporalSpec`, reuse all existing constructor validation, and route through `check_action_temporal`. Acceptance should require parser-to-typed differential equivalence, precise position-aware errors for malformed/unsupported syntax, round-trip or canonical rendering tests where appropriate, and CLI examples that accept user-supplied formulas rather than fixed example names. Broader temporal operators, fairness, and general LTL/CTL compilation remain out of scope until that textual layer is proven stable.
+The next high-value slice is **Milestone 19: declarative finite labeled-graph model ingestion**. The goal is to let users verify their own small finite models without recompiling Rust: parse one deterministic external model format into the canonical `TransitionSystem`, validate declared states/initial states/labeled edges and references, preserve deterministic edge ordering, and route that model through the existing structural/temporal engines and M18 expression parser. Acceptance should include malformed-reference and duplicate-definition regressions, parse-to-direct-model differential equivalence, deterministic witness/accounting checks, and a binary integration that loads an external model plus a user-supplied temporal expression. M19 should not add new temporal operators, fairness semantics, symbolic state representation, or a second exploration engine.

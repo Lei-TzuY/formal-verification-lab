@@ -41,6 +41,7 @@ use formal_verification_lab::response_report::render_response_report;
 use formal_verification_lab::temporal::{
     check_action_temporal, ActionAtom, ActionTemporalSpec, TemporalStatus,
 };
+use formal_verification_lab::temporal_parse::parse_action_temporal;
 use formal_verification_lab::temporal_report::render_temporal_report;
 use std::env;
 use std::process::ExitCode;
@@ -451,6 +452,9 @@ where
 
 fn temporal_command(args: &[String]) -> Result<ExitCode, String> {
     match args {
+        [command, model, expression] if command == "check" => {
+            run_temporal_expression(model, expression)
+        }
         [query] if query == "request-grant" => run_temporal(
             request_grant_protocol().map_err(|error| error.to_string())?,
             typed_response_spec()?,
@@ -468,9 +472,35 @@ fn temporal_command(args: &[String]) -> Result<ExitCode, String> {
             typed_pulse_spec()?,
         ),
         [query] => Err(format!(
-            "unknown temporal query '{query}'; expected request-grant, request-grant-unfair, pulses, or pulses-unfair"
+            "unknown temporal query '{query}'; expected request-grant, request-grant-unfair, pulses, pulses-unfair, or 'check <model> <expression>'"
         )),
         _ => Err(usage()),
+    }
+}
+
+fn run_temporal_expression(model_name: &str, expression: &str) -> Result<ExitCode, String> {
+    let spec =
+        parse_action_temporal("cli-temporal", expression).map_err(|error| error.to_string())?;
+    match model_name {
+        "request-grant" => run_temporal(
+            request_grant_protocol().map_err(|error| error.to_string())?,
+            spec,
+        ),
+        "request-grant-unfair" => run_temporal(
+            unfair_request_grant_protocol().map_err(|error| error.to_string())?,
+            spec,
+        ),
+        "pulses" => run_temporal(
+            alternating_pulses().map_err(|error| error.to_string())?,
+            spec,
+        ),
+        "pulses-unfair" => run_temporal(
+            unfair_second_pulse().map_err(|error| error.to_string())?,
+            spec,
+        ),
+        _ => Err(format!(
+            "unknown temporal model '{model_name}'; expected request-grant, request-grant-unfair, pulses, or pulses-unfair"
+        )),
     }
 }
 
@@ -572,7 +602,7 @@ fn status_exit_code(status: VerificationStatus) -> ExitCode {
 }
 
 fn usage() -> String {
-    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | eventually <counter-three|counter-four|traffic-never> | respond <request-grant|request-grant-unfair|dual-grant|dual-grant-unfair-b> | monitor <session-ok|session-double-open|session-stuck> | buchi <pulses|pulses-unfair|finite-ignore|finite-strict> | temporal <request-grant|request-grant-unfair|pulses|pulses-unfair>]"
+    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | eventually <counter-three|counter-four|traffic-never> | respond <request-grant|request-grant-unfair|dual-grant|dual-grant-unfair-b> | monitor <session-ok|session-double-open|session-stuck> | buchi <pulses|pulses-unfair|finite-ignore|finite-strict> | temporal <request-grant|request-grant-unfair|pulses|pulses-unfair> | temporal check <request-grant|request-grant-unfair|pulses|pulses-unfair> <expression>]"
         .to_owned()
 }
 
