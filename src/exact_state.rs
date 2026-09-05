@@ -183,9 +183,8 @@ fn check_reachable(
     spec: &ExactStatePropertySpec,
 ) -> Result<ExactStateResult, ExactStateError> {
     let target = spec.target.clone();
-    let property = ReachabilityProperty::new(spec.name.clone(), move |state: &String| {
-        state == &target
-    })?;
+    let property =
+        ReachabilityProperty::new(spec.name.clone(), move |state: &String| state == &target)?;
     let result = check_reachability(model, &property)?;
     let evidence = result
         .witness
@@ -211,9 +210,8 @@ fn check_all_eventually(
     spec: &ExactStatePropertySpec,
 ) -> Result<ExactStateResult, ExactStateError> {
     let target = spec.target.clone();
-    let property = EventualityProperty::new(spec.name.clone(), move |state: &String| {
-        state == &target
-    })?;
+    let property =
+        EventualityProperty::new(spec.name.clone(), move |state: &String| state == &target)?;
     let result = check_eventuality(model, &property)?;
     let evidence = match result.counterexample {
         None => None,
@@ -302,7 +300,7 @@ impl fmt::Display for ExactStateParseError {
             ExactStateParseErrorKind::InvalidEscape { escape } => {
                 write!(f, "unsupported string escape '\\{escape}'")
             }
-            ExactStateParseErrorKind::ExpectedCommaOrClose => write!(f, "expected ',' or ')'") ,
+            ExactStateParseErrorKind::ExpectedCommaOrClose => write!(f, "expected ',' or ')'"),
             ExactStateParseErrorKind::WrongArity {
                 operator,
                 expected,
