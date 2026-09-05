@@ -3,11 +3,43 @@ use std::collections::{HashMap, VecDeque};
 use std::fmt;
 use std::hash::Hash;
 
-/// Whether all discovered reachable states satisfied all safety invariants.
+/// Whether exploration proved safety, found a violation, or stopped before a
+/// proof was complete.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VerificationStatus {
     Safe,
     Violated,
+    Inconclusive,
+}
+
+/// Resource boundary that prevented exhaustive exploration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InconclusiveReason {
+    StateLimitReached { limit: usize },
+    TransitionLimitReached { limit: usize },
+    DepthLimitReached { limit: usize },
+}
+
+/// Optional deterministic bounds for explicit-state exploration.
+///
+/// A limit is only reported when it actually prevents required work. Reaching
+/// an exact bound is therefore still compatible with `Safe` when the reachable
+/// graph is fully exhausted at that bound.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct ExplorationLimits {
+    pub max_states: Option<usize>,
+    pub max_transitions: Option<usize>,
+    pub max_depth: Option<usize>,
+}
+
+impl ExplorationLimits {
+    pub const fn unbounded() -> Self {
+        Self {
+            max_states: None,
+            max_transitions: None,
+            max_depth: None,
+        }
+    }
 }
 
 /// One state in a reconstructed path. `action` is the transition taken from
@@ -33,6 +65,7 @@ pub struct CheckResult<S> {
     pub checked_states: usize,
     pub explored_transitions: usize,
     pub counterexample: Option<Counterexample<S>>,
+    pub inconclusive_reason: Option<InconclusiveReason>,
 }
 
 #[derive(Debug)]
@@ -40,15 +73,32 @@ struct Node<S> {
     state: S,
     predecessor: Option<usize>,
     action: Option<String>,
+    depth: usize,
 }
 
-/// Explore the reachable state graph with deterministic breadth-first search.
+/// Explore the reachable state graph without resource bounds.
+pub fn check<S>(model: &TransitionSystem<S>) -> Result<CheckResult<S>, ModelError>
+where
+    S: Clone + Eq + Hash + fmt::Debug,
+{
+    check_with_limits(model, ExplorationLimits::unbounded())
+}
+
+/// Explore the reachable state graph with deterministic breadth-first search
+/// and optional state, transition, and depth bounds.
 ///
 /// BFS plus predecessor links guarantees that the first reported violating
 /// state has a shortest transition-count path from any initial state. The
 /// ordering of equally short traces follows initial-state order, invariant
 /// order, and successor order supplied by the model.
-pub fn check<S>(model: &TransitionSystem<S>) -> Result<CheckResult<S>, ModelError>
+///
+/// Bounds never imply safety. If a bound prevents examining a required state
+/// or transition, the result is `Inconclusive`. A bound that is reached exactly
+/// after the complete reachable graph has been exhausted still permits `Safe`.
+pub fn check_with_limits<S>(
+    model: &TransitionSystem<S>,
+    limits: ExplorationLimits,
+) -> Result<CheckResult<S>, ModelError>
 where
     S: Clone + Eq + Hash + fmt::Debug,
 {
@@ -60,11 +110,23 @@ where
         if node_by_state.contains_key(initial) {
             continue;
         }
+        if let Some(limit) = limits.max_states {
+            if nodes.len() >= limit {
+                return Ok(inconclusive_result(
+                    nodes.len(),
+                    0,
+                    0,
+                    InconclusiveReason::StateLimitReached { limit },
+                ));
+            }
+        }
+
         let id = nodes.len();
         nodes.push(Node {
             state: initial.clone(),
             predecessor: None,
             action: None,
+            depth: 0,
         });
         node_by_state.insert(initial.clone(), id);
         queue.push_back(id);
@@ -75,6 +137,7 @@ where
 
     while let Some(node_id) = queue.pop_front() {
         checked_states += 1;
+        let depth = nodes[node_id].depth;
         let state = &nodes[node_id].state;
 
         for invariant in model.invariants() {
@@ -88,16 +151,50 @@ where
                         invariant: invariant.name().to_owned(),
                         trace: reconstruct_trace(&nodes, node_id),
                     }),
+                    inconclusive_reason: None,
                 });
             }
         }
 
         let transitions = model.successors(state)?;
-        explored_transitions += transitions.len();
 
         for transition in transitions {
+            if let Some(limit) = limits.max_transitions {
+                if explored_transitions >= limit {
+                    return Ok(inconclusive_result(
+                        nodes.len(),
+                        checked_states,
+                        explored_transitions,
+                        InconclusiveReason::TransitionLimitReached { limit },
+                    ));
+                }
+            }
+            explored_transitions += 1;
+
             if node_by_state.contains_key(&transition.next) {
                 continue;
+            }
+
+            if let Some(limit) = limits.max_depth {
+                if depth >= limit {
+                    return Ok(inconclusive_result(
+                        nodes.len(),
+                        checked_states,
+                        explored_transitions,
+                        InconclusiveReason::DepthLimitReached { limit },
+                    ));
+                }
+            }
+
+            if let Some(limit) = limits.max_states {
+                if nodes.len() >= limit {
+                    return Ok(inconclusive_result(
+                        nodes.len(),
+                        checked_states,
+                        explored_transitions,
+                        InconclusiveReason::StateLimitReached { limit },
+                    ));
+                }
             }
 
             let id = nodes.len();
@@ -106,6 +203,7 @@ where
                 state: transition.next,
                 predecessor: Some(node_id),
                 action: Some(transition.action),
+                depth: depth + 1,
             });
             queue.push_back(id);
         }
@@ -117,7 +215,24 @@ where
         checked_states,
         explored_transitions,
         counterexample: None,
+        inconclusive_reason: None,
     })
+}
+
+fn inconclusive_result<S>(
+    discovered_states: usize,
+    checked_states: usize,
+    explored_transitions: usize,
+    reason: InconclusiveReason,
+) -> CheckResult<S> {
+    CheckResult {
+        status: VerificationStatus::Inconclusive,
+        discovered_states,
+        checked_states,
+        explored_transitions,
+        counterexample: None,
+        inconclusive_reason: Some(reason),
+    }
 }
 
 fn reconstruct_trace<S: Clone>(nodes: &[Node<S>], mut node_id: usize) -> Vec<TraceStep<S>> {
