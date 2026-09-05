@@ -1,5 +1,5 @@
 use crate::model::{ModelError, TransitionSystem};
-use std::collections::{HashMap, VecDeque};
+use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::fmt;
 use std::hash::Hash;
 
@@ -64,6 +64,14 @@ pub struct CheckResult<S> {
     pub discovered_states: usize,
     pub checked_states: usize,
     pub explored_transitions: usize,
+    /// Greatest BFS depth among states actually retained by the search.
+    /// `None` is possible only when a zero-state budget prevents loading even
+    /// the first initial state.
+    pub max_depth_reached: Option<usize>,
+    /// Number of examined transition edges grouped by action label. The map is
+    /// ordered so reports and downstream consumers receive deterministic data.
+    /// Its values always sum to `explored_transitions`.
+    pub transitions_by_action: BTreeMap<String, usize>,
     pub counterexample: Option<Counterexample<S>>,
     pub inconclusive_reason: Option<InconclusiveReason>,
 }
@@ -105,6 +113,8 @@ where
     let mut nodes: Vec<Node<S>> = Vec::new();
     let mut node_by_state: HashMap<S, usize> = HashMap::new();
     let mut queue = VecDeque::new();
+    let mut max_depth_reached = None;
+    let mut transitions_by_action = BTreeMap::new();
 
     for initial in model.initial_states() {
         if node_by_state.contains_key(initial) {
@@ -115,6 +125,8 @@ where
                 nodes.len(),
                 0,
                 0,
+                max_depth_reached,
+                transitions_by_action,
                 InconclusiveReason::StateLimitReached { limit },
             ));
         }
@@ -126,6 +138,7 @@ where
             action: None,
             depth: 0,
         });
+        max_depth_reached = Some(0);
         node_by_state.insert(initial.clone(), id);
         queue.push_back(id);
     }
@@ -145,6 +158,8 @@ where
                     discovered_states: nodes.len(),
                     checked_states,
                     explored_transitions,
+                    max_depth_reached,
+                    transitions_by_action,
                     counterexample: Some(Counterexample {
                         invariant: invariant.name().to_owned(),
                         trace: reconstruct_trace(&nodes, node_id),
@@ -165,10 +180,15 @@ where
                     nodes.len(),
                     checked_states,
                     explored_transitions,
+                    max_depth_reached,
+                    transitions_by_action,
                     InconclusiveReason::TransitionLimitReached { limit },
                 ));
             }
             explored_transitions += 1;
+            *transitions_by_action
+                .entry(transition.action.clone())
+                .or_insert(0) += 1;
 
             if node_by_state.contains_key(&transition.next) {
                 continue;
@@ -179,6 +199,8 @@ where
                     nodes.len(),
                     checked_states,
                     explored_transitions,
+                    max_depth_reached,
+                    transitions_by_action,
                     InconclusiveReason::DepthLimitReached { limit },
                 ));
             }
@@ -188,18 +210,22 @@ where
                     nodes.len(),
                     checked_states,
                     explored_transitions,
+                    max_depth_reached,
+                    transitions_by_action,
                     InconclusiveReason::StateLimitReached { limit },
                 ));
             }
 
             let id = nodes.len();
+            let next_depth = depth + 1;
             node_by_state.insert(transition.next.clone(), id);
             nodes.push(Node {
                 state: transition.next,
                 predecessor: Some(node_id),
                 action: Some(transition.action),
-                depth: depth + 1,
+                depth: next_depth,
             });
+            max_depth_reached = Some(max_depth_reached.map_or(next_depth, |max| max.max(next_depth)));
             queue.push_back(id);
         }
     }
@@ -209,6 +235,8 @@ where
         discovered_states: nodes.len(),
         checked_states,
         explored_transitions,
+        max_depth_reached,
+        transitions_by_action,
         counterexample: None,
         inconclusive_reason: None,
     })
@@ -218,6 +246,8 @@ fn inconclusive_result<S>(
     discovered_states: usize,
     checked_states: usize,
     explored_transitions: usize,
+    max_depth_reached: Option<usize>,
+    transitions_by_action: BTreeMap<String, usize>,
     reason: InconclusiveReason,
 ) -> CheckResult<S> {
     CheckResult {
@@ -225,6 +255,8 @@ fn inconclusive_result<S>(
         discovered_states,
         checked_states,
         explored_transitions,
+        max_depth_reached,
+        transitions_by_action,
         counterexample: None,
         inconclusive_reason: Some(reason),
     }
