@@ -35,6 +35,8 @@ pub mod report;
 pub mod response;
 pub mod response_examples;
 pub mod response_report;
+pub mod safety;
+pub mod safety_report;
 pub mod temporal;
 pub mod temporal_parse;
 pub mod temporal_report;
@@ -103,6 +105,10 @@ pub use response::{
     ResponseResult, ResponseStatus,
 };
 pub use response_report::render_response_report;
+pub use safety::{
+    check_safety_assertion, PropositionSafetySpec, SafetyError, SafetyResult, SafetyStatus,
+};
+pub use safety_report::render_safety_report;
 pub use temporal::{
     check_action_temporal, ActionAtom, ActionTemporalSpec, TemporalBackend, TemporalCounterexample,
     TemporalError, TemporalObligation, TemporalResult, TemporalStatus,
