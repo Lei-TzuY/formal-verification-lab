@@ -1,7 +1,5 @@
 use crate::checker::TraceStep;
-use crate::graph::{
-    capture_reachable_graph, shortest_path, GraphCaptureError, ReachableGraph,
-};
+use crate::graph::{capture_reachable_graph, shortest_path, GraphCaptureError, ReachableGraph};
 use crate::model::{ModelError, TransitionSystem};
 use std::collections::HashSet;
 use std::fmt;
