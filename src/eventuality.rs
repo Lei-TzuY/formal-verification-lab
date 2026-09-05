@@ -160,7 +160,8 @@ where
     let residual_ids = residual_reachable
         .iter()
         .enumerate()
-        .filter_map(|(id, reachable)| reachable.then_some(id))
+        .filter(|(_, reachable)| **reachable)
+        .map(|(id, _)| id)
         .collect::<HashSet<_>>();
 
     if let Some(terminal) = (0..graph.states.len())
