@@ -36,7 +36,9 @@ impl<S> Clone for Invariant<S> {
 
 impl<S> fmt::Debug for Invariant<S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Invariant").field("name", &self.name).finish()
+        f.debug_struct("Invariant")
+            .field("name", &self.name)
+            .finish()
     }
 }
 
@@ -192,7 +194,10 @@ where
 
     pub fn successors(&self, state: &S) -> Result<Vec<Transition<S>>, ModelError> {
         let transitions = (self.transition_relation)(state)?;
-        if transitions.iter().any(|transition| transition.action.trim().is_empty()) {
+        if transitions
+            .iter()
+            .any(|transition| transition.action.trim().is_empty())
+        {
             return Err(ModelError::EmptyTransitionAction);
         }
         Ok(transitions)
