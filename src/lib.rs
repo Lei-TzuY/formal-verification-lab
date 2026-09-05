@@ -26,6 +26,8 @@ pub mod multi_response_report;
 mod product;
 pub mod property;
 pub mod proposition;
+pub mod proposition_expr;
+pub mod proposition_expr_report;
 pub mod proposition_report;
 pub mod recurrence;
 pub mod reduction;
@@ -80,6 +82,13 @@ pub use property::{
 pub use proposition::{
     check_proposition_property, PropositionError, PropositionPropertySpec, PropositionResult,
 };
+pub use proposition_expr::{
+    check_proposition_expression_property, parse_proposition_expression, PropositionExpression,
+    PropositionExpressionError, PropositionExpressionParseError,
+    PropositionExpressionParseErrorKind, PropositionExpressionPropertySpec,
+    PropositionExpressionResult,
+};
+pub use proposition_expr_report::render_proposition_expression_report;
 pub use proposition_report::render_proposition_report;
 pub use recurrence::{
     analyze_recurrence, CycleWitness, RecurrenceAnalysis, RecurrenceError,
