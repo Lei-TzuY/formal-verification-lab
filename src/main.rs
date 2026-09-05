@@ -1,7 +1,11 @@
 use formal_verification_lab::checker::{check_with_limits, ExplorationLimits, VerificationStatus};
+use formal_verification_lab::eventuality::{
+    check_eventuality, EventualityProperty, EventualityStatus,
+};
+use formal_verification_lab::eventuality_report::render_eventuality_report;
 use formal_verification_lab::examples::{
     bounded_counter, buggy_mutex, buggy_peterson_mutex, commuting_counters, peterson_mutex,
-    traffic_light, CounterState,
+    traffic_light, CounterState, TrafficLightState,
 };
 use formal_verification_lab::property::{
     check_deadlock, check_reachability, DeadlockProperty, DeadlockStatus, ReachabilityProperty,
@@ -40,6 +44,7 @@ fn run(args: Vec<String>) -> Result<ExitCode, String> {
         [command, rest @ ..] if command == "reach" => reach_command(rest),
         [command, rest @ ..] if command == "deadlock" => deadlock_command(rest),
         [command, rest @ ..] if command == "scc" => scc_command(rest),
+        [command, rest @ ..] if command == "eventually" => eventuality_command(rest),
         _ => Err(usage()),
     }
 }
@@ -199,6 +204,57 @@ where
     Ok(ExitCode::SUCCESS)
 }
 
+fn eventuality_command(args: &[String]) -> Result<ExitCode, String> {
+    match args {
+        [query] if query == "counter-three" => {
+            let model = bounded_counter().map_err(|error| error.to_string())?;
+            let property = EventualityProperty::new(
+                "all-paths-eventually-three",
+                |state: &CounterState| state.value == 3,
+            )
+            .map_err(|error| error.to_string())?;
+            run_eventuality(model, property)
+        }
+        [query] if query == "counter-four" => {
+            let model = bounded_counter().map_err(|error| error.to_string())?;
+            let property = EventualityProperty::new(
+                "all-paths-eventually-four",
+                |state: &CounterState| state.value == 4,
+            )
+            .map_err(|error| error.to_string())?;
+            run_eventuality(model, property)
+        }
+        [query] if query == "traffic-never" => {
+            let model = traffic_light().map_err(|error| error.to_string())?;
+            let property = EventualityProperty::new(
+                "impossible-traffic-target",
+                |_state: &TrafficLightState| false,
+            )
+            .map_err(|error| error.to_string())?;
+            run_eventuality(model, property)
+        }
+        [query] => Err(format!(
+            "unknown eventuality query '{query}'; expected counter-three, counter-four, or traffic-never"
+        )),
+        _ => Err(usage()),
+    }
+}
+
+fn run_eventuality<S>(
+    model: formal_verification_lab::TransitionSystem<S>,
+    property: EventualityProperty<S>,
+) -> Result<ExitCode, String>
+where
+    S: Clone + Eq + std::hash::Hash + std::fmt::Debug,
+{
+    let result = check_eventuality(&model, &property).map_err(|error| error.to_string())?;
+    print!("{}", render_eventuality_report(model.name(), &result));
+    Ok(match result.status {
+        EventualityStatus::Satisfied => ExitCode::SUCCESS,
+        EventualityStatus::Violated => ExitCode::from(6),
+    })
+}
+
 fn parse_limits(args: &[String]) -> Result<ExplorationLimits, String> {
     let mut limits = ExplorationLimits::unbounded();
     let mut index = 0;
@@ -262,7 +318,7 @@ fn status_exit_code(status: VerificationStatus) -> ExitCode {
 }
 
 fn usage() -> String {
-    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light>]"
+    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | eventually <counter-three|counter-four|traffic-never>]"
         .to_owned()
 }
 
