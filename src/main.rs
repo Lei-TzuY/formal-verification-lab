@@ -7,9 +7,10 @@ use formal_verification_lab::property::{
     check_deadlock, check_reachability, DeadlockProperty, DeadlockStatus, ReachabilityProperty,
     ReachabilityStatus,
 };
+use formal_verification_lab::recurrence::analyze_recurrence;
 use formal_verification_lab::reduction::{audit_sleep_set_reduction, IndependenceRelation};
 use formal_verification_lab::report::{
-    render_deadlock_report, render_reachability_report, render_report,
+    render_deadlock_report, render_reachability_report, render_recurrence_report, render_report,
 };
 use std::env;
 use std::process::ExitCode;
@@ -38,6 +39,7 @@ fn run(args: Vec<String>) -> Result<ExitCode, String> {
         [command, rest @ ..] if command == "reduce" => reduce_command(rest),
         [command, rest @ ..] if command == "reach" => reach_command(rest),
         [command, rest @ ..] if command == "deadlock" => deadlock_command(rest),
+        [command, rest @ ..] if command == "scc" => scc_command(rest),
         _ => Err(usage()),
     }
 }
@@ -171,6 +173,32 @@ fn run_counter_deadlock(
     })
 }
 
+fn scc_command(args: &[String]) -> Result<ExitCode, String> {
+    match args {
+        [example] if example == "counter" => {
+            run_recurrence(bounded_counter().map_err(|error| error.to_string())?)
+        }
+        [example] if example == "traffic-light" => {
+            run_recurrence(traffic_light().map_err(|error| error.to_string())?)
+        }
+        [example] => Err(format!(
+            "unknown SCC example '{example}'; expected counter or traffic-light"
+        )),
+        _ => Err(usage()),
+    }
+}
+
+fn run_recurrence<S>(
+    model: formal_verification_lab::TransitionSystem<S>,
+) -> Result<ExitCode, String>
+where
+    S: Clone + Eq + std::hash::Hash + std::fmt::Debug,
+{
+    let analysis = analyze_recurrence(&model).map_err(|error| error.to_string())?;
+    print!("{}", render_recurrence_report(model.name(), &analysis));
+    Ok(ExitCode::SUCCESS)
+}
+
 fn parse_limits(args: &[String]) -> Result<ExplorationLimits, String> {
     let mut limits = ExplorationLimits::unbounded();
     let mut index = 0;
@@ -234,7 +262,7 @@ fn status_exit_code(status: VerificationStatus) -> ExitCode {
 }
 
 fn usage() -> String {
-    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden>]"
+    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light>]"
         .to_owned()
 }
 

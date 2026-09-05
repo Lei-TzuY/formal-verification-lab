@@ -170,3 +170,27 @@ jobs:
           grep -Fq "explored transitions: 3" <<<"$found_output"
           test "$(grep -Fc -- '--increment-->' <<<"$found_output")" -eq 3
           grep -Fq "CounterState { value: 3 }" <<<"$found_output"
+      - name: SCC recurrence CLI integration test
+        shell: bash
+        run: |
+          acyclic_output="$(cargo run --quiet -- scc counter)"
+          printf '%s\n' "$acyclic_output"
+          grep -Fq "model: bounded-counter" <<<"$acyclic_output"
+          grep -Fq "recurrence: ACYCLIC" <<<"$acyclic_output"
+          grep -Fq "discovered states: 4" <<<"$acyclic_output"
+          grep -Fq "explored transitions: 3" <<<"$acyclic_output"
+          grep -Fq "scc count: 4" <<<"$acyclic_output"
+          grep -Fq "cyclic scc count: 0" <<<"$acyclic_output"
+          grep -Fq "cycle witness: none" <<<"$acyclic_output"
+
+          cyclic_output="$(cargo run --quiet -- scc traffic-light)"
+          printf '%s\n' "$cyclic_output"
+          grep -Fq "model: traffic-light" <<<"$cyclic_output"
+          grep -Fq "recurrence: CYCLIC" <<<"$cyclic_output"
+          grep -Fq "discovered states: 3" <<<"$cyclic_output"
+          grep -Fq "explored transitions: 3" <<<"$cyclic_output"
+          grep -Fq "scc count: 1" <<<"$cyclic_output"
+          grep -Fq "cyclic scc count: 1" <<<"$cyclic_output"
+          grep -Fq "cycle component: 0" <<<"$cyclic_output"
+          grep -Fq "TrafficLightState { light: Red } [initial]" <<<"$cyclic_output"
+          test "$(grep -Fc -- '--advance-->' <<<"$cyclic_output")" -eq 3
