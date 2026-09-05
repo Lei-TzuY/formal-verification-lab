@@ -1,9 +1,7 @@
 use formal_verification_lab::checker::{
     check, check_with_limits, ExplorationLimits, VerificationStatus,
 };
-use formal_verification_lab::examples::{
-    buggy_peterson_mutex, peterson_mutex, PetersonPc, PetersonState,
-};
+use formal_verification_lab::examples::{buggy_peterson_mutex, peterson_mutex, PetersonPc};
 
 #[test]
 fn peterson_exhaustively_proves_mutual_exclusion() {
@@ -64,14 +62,8 @@ fn lost_intent_peterson_variant_has_shortest_mutex_counterexample() {
     );
 
     let final_state = counterexample.trace.last().unwrap().state;
-    assert_eq!(
-        final_state,
-        PetersonState {
-            p0: PetersonPc::Critical,
-            p1: PetersonPc::Critical,
-            ..final_state
-        }
-    );
+    assert_eq!(final_state.p0, PetersonPc::Critical);
+    assert_eq!(final_state.p1, PetersonPc::Critical);
 }
 
 #[test]
