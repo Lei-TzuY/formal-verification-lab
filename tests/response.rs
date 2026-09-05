@@ -116,21 +116,23 @@ fn pending_floyd(
     adjacency: &[[bool; PRODUCT_N]; PRODUCT_N],
 ) -> [[usize; PRODUCT_N]; PRODUCT_N] {
     let mut distance = [[INF; PRODUCT_N]; PRODUCT_N];
-    for index in 0..PRODUCT_N {
+    for (index, row) in distance.iter_mut().enumerate() {
         let (_, pending) = decode_product(index);
         if pending {
-            distance[index][index] = 0;
+            row[index] = 0;
         }
     }
-    for from in 0..PRODUCT_N {
+    for (from, (adjacency_row, distance_row)) in
+        adjacency.iter().zip(distance.iter_mut()).enumerate()
+    {
         let (_, from_pending) = decode_product(from);
         if !from_pending {
             continue;
         }
-        for to in 0..PRODUCT_N {
+        for (to, edge) in adjacency_row.iter().enumerate() {
             let (_, to_pending) = decode_product(to);
-            if to_pending && adjacency[from][to] {
-                distance[from][to] = distance[from][to].min(1);
+            if to_pending && *edge {
+                distance_row[to] = distance_row[to].min(1);
             }
         }
     }
@@ -178,7 +180,10 @@ fn enabled_grant_does_not_save_unfair_wait_cycle() {
     assert!(stem.last().unwrap().state.pending);
     assert!(cycle.iter().all(|step| step.state.pending));
     assert_eq!(cycle.first().unwrap().state, cycle.last().unwrap().state);
-    assert!(cycle.iter().skip(1).all(|step| step.action.as_deref() == Some("wait")));
+    assert!(cycle
+        .iter()
+        .skip(1)
+        .all(|step| step.action.as_deref() == Some("wait")));
 }
 
 #[test]
@@ -350,7 +355,10 @@ fn validate_product_trace(
     for pair in trace.windows(2) {
         let from = &pair[0].state;
         let to = &pair[1].state;
-        let action = pair[1].action.as_deref().expect("non-root trace step has action");
+        let action = pair[1]
+            .action
+            .as_deref()
+            .expect("non-root trace step has action");
         let edge = action_index(action);
         assert_eq!(edge, edge_index(from.state, to.state));
         assert!(has_bit(graph_mask, edge));
