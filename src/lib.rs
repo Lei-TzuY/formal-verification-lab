@@ -25,6 +25,8 @@ pub mod multi_response_examples;
 pub mod multi_response_report;
 mod product;
 pub mod property;
+pub mod proposition;
+pub mod proposition_report;
 pub mod recurrence;
 pub mod reduction;
 pub mod report;
@@ -45,7 +47,9 @@ pub use checker::{
     check, check_with_limits, CheckResult, Counterexample, ExplorationLimits, InconclusiveReason,
     TraceStep, VerificationStatus,
 };
-pub use declarative::{parse_declarative_model, DeclarativeModelError};
+pub use declarative::{
+    parse_declarative_document, parse_declarative_model, DeclarativeDocument, DeclarativeModelError,
+};
 pub use eventuality::{
     check_eventuality, EventualityCounterexample, EventualityError, EventualityProperty,
     EventualityResult, EventualityStatus,
@@ -73,6 +77,10 @@ pub use property::{
     DeadlockStatus, ReachabilityError, ReachabilityProperty, ReachabilityResult,
     ReachabilityStatus,
 };
+pub use proposition::{
+    check_proposition_property, PropositionError, PropositionPropertySpec, PropositionResult,
+};
+pub use proposition_report::render_proposition_report;
 pub use recurrence::{
     analyze_recurrence, CycleWitness, RecurrenceAnalysis, RecurrenceError,
     StronglyConnectedComponent,

@@ -172,13 +172,32 @@ Milestone 20 opens the existing state-based reachability and universal-eventuali
 
 Executable evidence differentially compares frontend results with direct M6/M9 backend calls, preserves shortest reachability witnesses and finite/lasso eventuality evidence, checks canonical parse/render behavior and malformed syntax, and executes the built binary against external declarative model files. M20 adds no Boolean state-expression language, fairness semantics, nested temporal formulas, second traversal engine, or performance claim.
 
+### Milestone 21 — declarative named state propositions
+
+Milestone 21 adds semantic state classes to declarative models without changing the canonical transition graph. A document may attach one proposition to multiple explicit states:
+
+```text
+label "critical-a" "critical"
+label "critical-b" "critical"
+label "done" "complete"
+```
+
+`parse_declarative_document` returns a `DeclarativeDocument` containing the same canonical `TransitionSystem<String>` plus proposition membership metadata. Proposition members preserve label declaration order. `parse_declarative_model` remains the M19 compatibility adapter: it accepts labeled documents and returns only the canonical graph, discarding metadata. Labels never become safety invariants and never alter transitions.
+
+Metadata validation fails closed on empty proposition names, labels that reference undeclared states, and duplicate `(state, proposition)` pairs. `PropositionPropertySpec::reachable` and `PropositionPropertySpec::all_eventually` compile proposition membership to predicates for the existing M6 reachability and M9 universal-eventuality backends. Unknown proposition names fail before backend execution.
+
+`fvlab proposition file <path> <reachable|all-eventually> <proposition>` exposes this path externally. A well-formed proposition property violation reuses state-property exit 11; file/model/metadata/mode/unknown-proposition errors use exit 2. Existing `state file` remains compatible with documents containing labels.
+
+Executable evidence checks proposition membership ordering, M19 graph compatibility, duplicate/unknown metadata rejection, direct-predicate differential equality for multi-state propositions, deterministic shortest positive witnesses, universal-eventuality lasso preservation, unknown-proposition fail-closed behavior, and real external-file proposition/state integration. M21 adds no Boolean proposition composition, state-variable expression language, fairness semantics, CTL/LTL expansion, second traversal engine, or performance claim.
+
 ## Architecture
 
 ```text
 src/model.rs                  transition-system abstraction and validation
 src/builder.rs                typed construction layer
 src/checker.rs                canonical deterministic BFS substrate and bounds
-src/declarative.rs            external finite labeled-graph parser + canonical materialization
+src/declarative.rs            external graph parser, canonical materialization,
+                              proposition metadata ownership
 src/graph.rs                  neutral captured labeled graphs, induced graphs,
                               capture accounting, deterministic shortest paths
 src/product.rs                shared internal action-product BFS for temporal engines
@@ -194,6 +213,8 @@ src/temporal_parse.rs         textual parser for the typed temporal subset
 src/temporal_report.rs        normalized action-temporal frontend reporting
 src/exact_state.rs            typed/textual exact-state frontend + backend routing
 src/exact_state_report.rs     normalized exact-state frontend reporting
+src/proposition.rs            named-proposition predicate frontend + backend routing
+src/proposition_report.rs     normalized proposition frontend reporting
 src/reduction.rs              experimental sleep-set path + exhaustive audit
 src/*_report.rs               deterministic analysis-specific reporting
 src/*_examples.rs             executable teaching models
@@ -201,7 +222,7 @@ src/main.rs                   CLI/file/exit-status integration; no model travers
 tests/                        semantic, protocol, graph/product and frontend tests
 ```
 
-The original transition relation remains owned by the canonical `TransitionSystem` plus canonical exploration. Structural and temporal analyses reuse a neutral captured finite labeled graph rather than invoking separate traversal engines. Typed/textual properties and declarative model files are ingestion layers only: after validation they route into the already audited core.
+The original transition relation remains owned by the canonical `TransitionSystem` plus canonical exploration. Structural and temporal analyses reuse a neutral captured finite labeled graph rather than invoking separate traversal engines. Typed/textual properties, proposition metadata, and declarative model files are ingestion layers only: after validation they route into the already audited core.
 
 ## Executable examples
 
@@ -225,11 +246,13 @@ cargo run -- temporal check pulses 'infinitely-often("pulse-a","pulse-b")'
 cargo run -- temporal file path/to/model.fvl 'response("request","grant")'
 cargo run -- state file path/to/model.fvl 'reachable("done")'
 cargo run -- state file path/to/model.fvl 'all-eventually("done")'
+cargo run -- proposition file path/to/model.fvl reachable critical
+cargo run -- proposition file path/to/model.fvl all-eventually complete
 ```
 
 ### Declarative model file
 
-A minimal file can be written as:
+A labeled file can be written as:
 
 ```text
 model "request-grant"
@@ -238,13 +261,16 @@ state "waiting"
 initial "idle"
 edge "idle" "request" "waiting"
 edge "waiting" "grant" "idle"
+label "waiting" "pending"
+label "idle" "quiescent"
 ```
 
-Then verify action-temporal or exact-state properties without recompiling Rust:
+Then verify action-temporal, exact-state, or proposition properties without recompiling Rust:
 
 ```bash
 cargo run -- temporal file request-grant.fvl 'response("request","grant")'
 cargo run -- state file request-grant.fvl 'reachable("waiting")'
+cargo run -- proposition file request-grant.fvl reachable pending
 ```
 
 ### Typed and textual temporal frontend
@@ -264,7 +290,7 @@ cargo run -- temporal check pulses-unfair 'infinitely-often("pulse-a","pulse-b")
 
 - `0`: successful analysis whose property holds, or successful structural SCC analysis;
 - `1`: safety invariant violation;
-- `2`: malformed CLI/model/file/analysis/property syntax error;
+- `2`: malformed CLI/model/file/analysis/property/metadata error;
 - `3`: bounded safety exploration is `INCONCLUSIVE`;
 - `4`: existential target is `UNREACHABLE`;
 - `5`: unexpected terminal/deadlock found;
@@ -273,7 +299,7 @@ cargo run -- temporal check pulses-unfair 'infinitely-often("pulse-a","pulse-b")
 - `8`: deterministic finite monitor verification is `VIOLATED`;
 - `9`: generalized Büchi-style acceptance is `VIOLATED`;
 - `10`: typed/textual action-temporal frontend property is `VIOLATED`;
-- `11`: exact-state frontend property is `VIOLATED`.
+- `11`: exact-state or proposition frontend state property is `VIOLATED`.
 
 ## Tests and CI
 
@@ -286,25 +312,25 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo test --all-targets --all-features
 ```
 
-Coverage includes safety, bounded exploration, Peterson, audited reduction, reachability, deadlock policies, SCC structure, universal eventuality, response products, finite monitor products, generalized Büchi-style acceptance, typed/textual action-temporal frontends, declarative finite-model ingestion, and the exact-state frontend. Independent generated suites include M8's 512 SCC graphs, M9's 4096 eventuality cases, M10's 4096 single-response cases, M11's 38,416 two-class cases, M12's 4096 finite-monitor cases, and M13's 8192 Büchi/finite-policy cases.
+Coverage includes safety, bounded exploration, Peterson, audited reduction, reachability, deadlock policies, SCC structure, universal eventuality, response products, finite monitor products, generalized Büchi-style acceptance, typed/textual action-temporal frontends, declarative finite-model ingestion, exact-state properties, and named-proposition properties. Independent generated suites include M8's 512 SCC graphs, M9's 4096 eventuality cases, M10's 4096 single-response cases, M11's 38,416 two-class cases, M12's 4096 finite-monitor cases, and M13's 8192 Büchi/finite-policy cases.
 
-M17 adds differential frontend tests without weakening backend oracles. M18 adds parser-to-typed/result differential tests, canonical-expression round trips, position-aware error regressions, and user-expression binary integration. M19 adds parsed-model-to-direct-model differential results, order-preservation and validation regressions, plus real external-file binary integration. M20 adds direct M6/M9 differential comparisons, exact-state parser/round-trip regressions, evidence-preservation checks, and real `state file` binary integration. The complete test command still executes the unchanged older semantic and CLI coverage.
+M17 adds differential frontend tests without weakening backend oracles. M18 adds parser-to-typed/result differential tests, canonical-expression round trips, position-aware error regressions, and user-expression binary integration. M19 adds parsed-model-to-direct-model differential results, order-preservation and validation regressions, plus real external-file binary integration. M20 adds direct M6/M9 differential comparisons, exact-state parser/round-trip regressions, evidence-preservation checks, and real `state file` binary integration. M21 adds proposition-metadata validation, graph-compatibility checks, multi-state direct-predicate differential comparisons, lasso evidence preservation, and real proposition/state-file binary integration. The complete test command still executes the unchanged older semantic and CLI coverage.
 
 ## Trust boundaries and limitations
 
 - Results apply to the finite transition model and its atomic-step assumptions, not automatically to machine code, weak-memory executions, or external distributed systems.
-- User transition functions, declarative graph files, and property predicates/expressions must faithfully encode the intended system/property; the checker cannot prove modeling fidelity.
-- Declarative input is an explicit finite graph, not a programming language, symbolic transition relation, arbitrary state-variable expression language, or safety-assertion language.
-- Exact-state properties match complete string state identifiers only; M20 does not yet provide named state propositions or Boolean proposition composition.
+- User transition functions, declarative graph files, labels, and property predicates/expressions must faithfully encode the intended system/property; the checker cannot prove modeling fidelity.
+- Declarative input is an explicit finite graph plus named state-proposition metadata, not a programming language, symbolic transition relation, arbitrary state-variable expression language, or safety-assertion language.
+- Proposition queries currently target one named proposition at a time; M21 does not provide Boolean proposition composition.
 - Explicit-state memory grows with the reachable graph. A `k`-clause response monitor may expand a model state into up to `2^k` pending valuations.
 - Response classes remain Boolean obligations, not per-request identity queues.
-- M9–M20 have **no fairness semantics**. Enabled responses or accepting actions are not assumed to be scheduled.
+- M9–M21 have **no fairness semantics**. Enabled responses or accepting actions are not assumed to be scheduled.
 - The action-temporal frontend supports exact action atoms only. It has no wildcard, Boolean action predicate language, nested temporal operators, temporal negation, or arbitrary formula composition.
 - `all_infinitely_often` is intentionally an infinite-run-only property; finite terminals are ignored. The frontend does not expose M13's strict finite terminal policy for this form.
 - The textual temporal grammar remains deliberately limited to `response(...)` and `infinitely-often(...)`; it is not a general temporal-logic parser.
-- M9–M20 are not a full LTL/CTL implementation and do not claim arbitrary formula parsing/compilation.
+- M9–M21 are not a full LTL/CTL implementation and do not claim arbitrary formula parsing/compilation.
 - The M13 generalized Büchi layer accepts user-defined automata; it does not translate arbitrary LTL into Büchi automata.
-- M14–M16 are internal architecture consolidations and make no performance claim. M17–M20 add frontend/ingestion capability but no performance claim.
+- M14–M16 are internal architecture consolidations and make no performance claim. M17–M21 add frontend/ingestion capability but no performance claim.
 - Tarjan SCC discovery currently uses recursive DFS; very deep graphs may motivate a future iterative implementation.
 - Peterson starvation freedom is still not claimed.
 - The sleep-set engine remains experimental and differentially audited, not a standalone trusted POR proof backend.
@@ -313,6 +339,6 @@ M17 adds differential frontend tests without weakening backend oracles. M18 adds
 
 ## Roadmap
 
-Milestones 1–20 form a coherent explicit-state stack: safety -> bounded honesty -> typed models -> independent graph validation -> audited reduction -> existential reachability -> terminal/deadlock analysis -> recurrent SCC structure -> universal eventuality -> response obligations -> multi-class response composition -> deterministic finite monitors -> explicit generalized Büchi-style acceptance -> shared action-product construction -> neutral captured-graph ownership -> typed action-temporal specification -> textual temporal parsing -> external declarative finite-model ingestion -> exact-state property specification.
+Milestones 1–21 form a coherent explicit-state stack: safety -> bounded honesty -> typed models -> independent graph validation -> audited reduction -> existential reachability -> terminal/deadlock analysis -> recurrent SCC structure -> universal eventuality -> response obligations -> multi-class response composition -> deterministic finite monitors -> explicit generalized Büchi-style acceptance -> shared action-product construction -> neutral captured-graph ownership -> typed action-temporal specification -> textual temporal parsing -> external declarative finite-model ingestion -> exact-state property specification -> named state propositions.
 
-The next high-value slice is **Milestone 21: declarative named state propositions**. M20 can target a complete state identifier but cannot express semantic classes such as `critical`, `committed`, or `error` when several explicit states share the same proposition. M21 should add proposition metadata to the declarative ingestion layer while preserving M19 compatibility and the canonical `TransitionSystem<String>` as the sole graph semantics. The design should retain proposition ownership outside safety invariants, validate proposition/state references deterministically, and compile proposition-based reachability/eventuality queries to the existing M6/M9 predicate backends. Acceptance should include parsed-metadata/direct-predicate differential equivalence, deterministic duplicate/unknown-reference failures, proposition membership over multiple states, and real external-file CLI integration. Boolean proposition composition, fairness, general CTL/LTL syntax, and a second traversal engine remain out of scope until this metadata layer is proven stable.
+The next high-value slice is **Milestone 22: Boolean proposition expressions**. M21 supplies reusable named state predicates but queries can select only one proposition at a time. M22 should add a deliberately small Boolean predicate algebra over existing proposition names (`not`, `and`, `or` with explicit grouping), parse it deterministically, resolve all proposition references fail-closed against `DeclarativeDocument`, and compile the resulting predicate to the same M6/M9 reachability/eventuality backends. The truth semantics should be validated independently with exhaustive/generated truth-table assignments and differential backend checks, including precedence/grouping, unknown-name diagnostics, canonical rendering or stable AST equality, and real external-file CLI integration. M22 remains a state-predicate frontend only: no new temporal operator, fairness assumption, state-variable arithmetic, general CTL/LTL parser, symbolic backend, or second traversal engine is in scope.
