@@ -407,7 +407,8 @@ fn all_two_node_graphs_actions_and_finite_policies_match_independent_oracle() {
 
                 let mut best_avoiding: Option<(usize, usize)> = None;
                 for (set, avoiding_distance) in avoiding.iter().enumerate() {
-                    for (product, product_distance) in distance[initial].iter().copied().enumerate() {
+                    for (product, product_distance) in distance[initial].iter().copied().enumerate()
+                    {
                         if product_distance >= INF
                             || !on_avoiding_cycle(product, set, &adjacency, avoiding_distance)
                         {
