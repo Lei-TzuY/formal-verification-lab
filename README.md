@@ -48,78 +48,46 @@ The model transition relation is evaluated once. Target states are absorbing for
 
 ### Milestone 10 — action response / leads-to obligations
 
-Milestone 10 adds the action-level property:
+`ResponseProperty` verifies that every trigger action is eventually followed by a response action on every maximal execution. A trigger sets a Boolean obligation pending; a response clears it; if one action matches both predicates, response wins and fulfills the trigger immediately. A finite terminal while pending produces `PENDING_TERMINAL`; a pending recurrent cycle produces `PENDING_CYCLE`.
 
-> **Whenever a trigger action occurs, must a response action eventually follow on every maximal execution?**
-
-`ResponseProperty` exposes one response clause. A trigger sets its obligation pending; a response clears it; if one action matches both predicates, response wins and fulfills that trigger immediately. A finite terminal while pending produces `PENDING_TERMINAL`; a pending recurrent cycle produces `PENDING_CYCLE`.
-
-The model transition relation is evaluated exactly once and the monitor runs over the captured labeled graph. No fairness is assumed: if `grant` is enabled but another transition may be chosen forever, that execution remains a valid violation.
-
-The M10 oracle checks all 16 two-node graph masks × 16 trigger masks × 16 response masks = 4096 combinations against an independently built `(node, pending)` product.
+The model is captured once and the monitor runs over the captured labeled graph. No fairness is assumed. M10 independently checks all 16 two-node graph masks × 16 trigger masks × 16 response masks = 4096 product cases.
 
 ### Milestone 11 — multi-class response monitors
 
-Milestone 11 generalizes response verification from one obligation class to a conjunction of independently named clauses:
+`MultiResponseProperty` composes multiple named `trigger_i -> eventually response_i` clauses in one explicit product `(model_state, pending_bits)`. Each action updates every clause independently.
 
-```text
-request-a -> eventually grant-a
-request-b -> eventually grant-b
-...
-```
+Infinite failure is checked **per clause** by inducing the subgraph where `pending[i] = true`. This avoids the unsound shortcut of treating any cycle containing any pending bit as a violation. Finite pending terminals take precedence; infinite witnesses identify the violated clause and contain a shortest global stem plus a deterministic closed cycle on which that clause stays pending.
 
-`ResponseClause` defines one named trigger/response pair. `MultiResponseProperty` contains one or more uniquely named clauses. `check_multi_response` captures the model once and explores the explicit product
-
-```text
-(model_state, pending[0], pending[1], ..., pending[k-1])
-```
-
-Each action updates every clause independently. For clause `i`, a matching response clears `pending[i]`; otherwise a matching trigger sets it. One action may therefore answer one class while opening another, or affect several classes at once. A same-class trigger+response is still treated as immediate fulfillment.
-
-The important liveness rule is **per clause**, not “any obligation pending.” Infinite failure analysis induces a separate residual graph for each `pending[i] = true` predicate and searches that residual for a cyclic SCC. This prevents a false violation when a cycle merely alternates which class is pending while every individual class is repeatedly answered.
-
-Finite pending terminals still take precedence. Infinite counterexamples name the violated clause, use a shortest global stem to a qualifying per-clause recurrent region, and contain a deterministic closed cycle on which that clause remains pending throughout. There is still no fairness assumption.
-
-The M10 single-clause API is now a compatibility adapter over this same canonical multi-class engine rather than a second response checker.
-
-M11's generated oracle evaluates **38,416** deterministic cases:
-
-- all 16 directed two-node graph masks; and
-- all `7^4 = 2401` semantic assignments for the four possible edges.
-
-The seven edge semantics cover no-op, trigger/response for each class, and cross-class handoff actions that answer one class while triggering the other. The oracle independently constructs the eight possible `(node, A_pending, B_pending)` states, computes product reachability and per-clause pending-only recurrence with Floyd–Warshall, and validates status, product accounting, witness edges, monitor updates, finite-terminal precedence, violated-clause identity, closed per-clause cycles, shortest stems, and deterministic repeated analysis.
+The M10 single-clause API is a compatibility adapter over this canonical engine. M11's independent generated oracle checks 16 graph masks × `7^4` edge-semantics assignments = **38,416** cases.
 
 ### Milestone 12 — deterministic finite monitor products
 
-Milestone 12 promotes temporal checking from special-purpose response bits to a reusable action-driven finite monitor abstraction.
+`FiniteMonitor<M>` promotes temporal checking from special-purpose response bits to a reusable deterministic action-driven monitor. It has one finite initial state, `step(monitor_state, action) -> monitor_state`, named immediate rejecting conditions, and named progress regions.
 
-`FiniteMonitor<M>` contains:
+`check_monitor` captures the model once and explores `(model_state, monitor_state)`. Rejecting states produce shortest traces. A progress region fails when a maximal execution terminates while active or can remain forever in an active cyclic SCC. Failure precedence is rejecting state, progress terminal, then progress cycle. No fairness is assumed.
 
-- one finite initial monitor state;
-- a deterministic update `step(monitor_state, action) -> monitor_state`;
-- zero or more named immediate rejecting conditions; and
-- zero or more named progress-region conditions, with at least one condition required overall.
+The executable session monitor distinguishes a valid `open -> commit -> close` lifecycle, a double-open rejecting trace, and a committed `tick` cycle. M12's independent oracle checks 16 two-node graph masks × `4^4` action assignments = **4096** monitor products.
 
-`check_monitor` captures the model transition graph exactly once and then explores the explicit product
+### Milestone 13 — generalized Büchi-style acceptance
 
-```text
-(model_state, monitor_state)
-```
+Milestone 13 adds explicit generalized Büchi-style acceptance over deterministic user-defined finite action automata.
 
-Rejecting monitor states are safety-style failures and receive deterministic shortest product traces. A progress condition means that its active monitor region may not contain a maximal execution suffix forever. It therefore fails when either:
+`BuchiAutomaton<A>` contains:
 
-- a reachable product terminal lies in that active region; or
-- a reachable cyclic SCC can stay continuously inside that active region forever.
+- one finite initial automaton state;
+- a deterministic action update `step(automaton_state, action) -> automaton_state`;
+- one or more uniquely named acceptance sets `F_i`; and
+- an explicit finite-run policy.
 
-Failure precedence is deterministic: rejecting state, then progress terminal, then progress cycle. Progress cycles use a shortest global stem to a qualifying recurrent region and a deterministic real-edge closed cycle. No fairness assumption is introduced.
+For infinite maximal executions, `check_buchi` requires **every** named acceptance set to be visited infinitely often. For acceptance set `F_i`, an infinite counterexample exists exactly when a reachable product lasso can eventually remain forever in `not F_i`. The checker therefore builds the explicit `(model_state, automaton_state)` product once, induces a separate `not F_i` residual graph for each acceptance set, and searches those residuals for cyclic SCCs.
 
-The executable session monitor keeps explicit protocol history in `Idle`, `Open`, `Committed`, and `Rejected` monitor states. It distinguishes:
+Finite maximal executions are deliberately not given an implicit Büchi interpretation. `FiniteRunPolicy::IgnoreTerminals` applies only the infinite-run acceptance condition. `FiniteRunPolicy::RequireAcceptingTerminal` additionally requires every finite product terminal to belong to every configured acceptance set. Strict finite-terminal failures take precedence over infinite lassos.
 
-- `open -> commit -> close`, which satisfies both ordering and progress;
-- a deliberate double `open`, which reaches `Rejected` and reports `REJECTING_STATE`; and
-- `open -> commit -> tick -> ...`, which remains in the committed progress region and reports `PROGRESS_CYCLE`.
+Infinite witnesses identify the avoided acceptance set and contain a shortest global stem plus a deterministic real-edge closed cycle that never enters that set. No fairness is assumed, so an enabled accepting transition does not save a run that can choose a non-accepting cycle forever.
 
-M12's generated oracle evaluates **4096** monitor products: all 16 directed two-node graph masks × all `4^4 = 256` assignments of `tick/open/commit/close` semantics to the four possible edges. The oracle independently constructs the eight `(node, monitor_state)` product states, computes full and progress-only reachability with Floyd–Warshall, and validates result status, product accounting, monitor updates, rejecting precedence, active terminals, active-only recurrence, real-edge witnesses, shortest rejecting traces, progress stem distance, closed progress cycles, and repeated determinism.
+The executable pulse examples require both `pulse-a` and `pulse-b` infinitely often. The fair alternating protocol satisfies both sets; the unfair variant can take `pulse-a` forever while `pulse-b` remains enabled and therefore yields an acceptance-avoiding lasso for `pulse-b-observed`. A finite quiet run demonstrates the observable difference between the two finite-run policies.
+
+M13's independent generated oracle evaluates **8192** cases: all 16 directed two-node graph masks × all `4^4 = 256` edge-action assignments × both finite-run policies. It independently constructs the eight `(node, automaton_state)` product states, uses Floyd–Warshall for full reachability and per-acceptance-set avoiding reachability, and validates status, product accounting, finite-terminal policy, real-edge witnesses, acceptance-set identity, closed avoiding cycles, stem distances, and repeated determinism.
 
 ## Architecture
 
@@ -133,7 +101,8 @@ src/recurrence.rs             one-exploration graph snapshot, induced graphs,
 src/eventuality.rs            universal eventuality over target-cut residuals
 src/multi_response.rs         canonical multi-clause response product engine
 src/response.rs               single-clause compatibility API over that engine
-src/monitor.rs                generic deterministic finite monitor product engine
+src/monitor.rs                deterministic finite monitor product engine
+src/buchi.rs                  generalized Büchi-style acceptance product engine
 src/reduction.rs              experimental sleep-set path + exhaustive audit
 src/*_report.rs               deterministic analysis-specific reporting
 src/*_examples.rs             executable teaching models
@@ -144,8 +113,6 @@ tests/                        semantic, protocol, generated graph/product oracle
 The original transition relation remains owned by the model plus canonical exploration. Structural and temporal analyses reuse a captured finite labeled graph rather than invoking the model transition function again.
 
 ## Executable examples
-
-Primary commands:
 
 ```bash
 cargo run -- run counter
@@ -159,45 +126,19 @@ cargo run -- eventually counter-three
 cargo run -- respond request-grant
 cargo run -- respond dual-grant
 cargo run -- monitor session-ok
+cargo run -- buchi pulses
 ```
 
-### Universal eventuality
+### Generalized Büchi-style acceptance
 
 ```bash
-cargo run -- eventually counter-three
-cargo run -- eventually counter-four
-cargo run -- eventually traffic-never
+cargo run -- buchi pulses
+cargo run -- buchi pulses-unfair
+cargo run -- buchi finite-ignore
+cargo run -- buchi finite-strict
 ```
 
-These demonstrate `SATISFIED`, finite terminal failure, and infinite cycle failure respectively. Eventuality violations exit 6.
-
-### Single-class response
-
-```bash
-cargo run -- respond request-grant
-cargo run -- respond request-grant-unfair
-```
-
-The first reports `response: SATISFIED`. The unfair variant exits 7 with a `PENDING_CYCLE` even though grant is enabled, because no fairness assumption forces it to be scheduled.
-
-### Multi-class response
-
-```bash
-cargo run -- respond dual-grant
-cargo run -- respond dual-grant-unfair-b
-```
-
-The deterministic dual protocol repeatedly fulfills both classes. The unfair-B variant can remain on `wait-b` forever after `request-b`; it exits 7, identifies `violated clause: class-b`, and prints a cycle whose pending vector keeps class B set.
-
-### Finite monitors
-
-```bash
-cargo run -- monitor session-ok
-cargo run -- monitor session-double-open
-cargo run -- monitor session-stuck
-```
-
-The valid lifecycle reports `monitor verification: SATISFIED`. Double-open exits 8 with `REJECTING_STATE`. The stuck-committed protocol exits 8 with `PROGRESS_CYCLE` and a `tick` cycle whose monitor state remains `Committed`.
+`pulses` satisfies both infinitely-often acceptance sets. `pulses-unfair` exits 9 with `ACCEPTANCE_AVOIDING_CYCLE` for `pulse-b-observed`. The two finite commands run the same finite model under different explicit terminal policies: ignore succeeds, strict exits 9 with `FINITE_TERMINAL`.
 
 ## CLI exit status
 
@@ -209,7 +150,8 @@ The valid lifecycle reports `monitor verification: SATISFIED`. Double-open exits
 - `5`: unexpected terminal/deadlock found;
 - `6`: universal eventuality is `VIOLATED`;
 - `7`: single- or multi-class response property is `VIOLATED`;
-- `8`: deterministic finite monitor verification is `VIOLATED`.
+- `8`: deterministic finite monitor verification is `VIOLATED`;
+- `9`: generalized Büchi-style acceptance is `VIOLATED`.
 
 ## Tests and CI
 
@@ -222,20 +164,21 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo test --all-targets --all-features
 ```
 
-Coverage includes safety, bounded exploration, Peterson, audited reduction, reachability, deadlock policies, SCC structure, universal eventuality, single-class response, multi-class response products, and generic finite monitor products. Generated suites independently cross-check the graph algorithms plus M9's 4096 eventuality cases, M10's 4096 single-response cases, M11's 38,416 two-class product cases, and M12's 4096 finite-monitor product cases.
+Coverage includes safety, bounded exploration, Peterson, audited reduction, reachability, deadlock policies, SCC structure, universal eventuality, response products, finite monitor products, and generalized Büchi-style acceptance. Independent generated suites include M9's 4096 eventuality cases, M10's 4096 single-response cases, M11's 38,416 two-class cases, M12's 4096 finite-monitor cases, and M13's 8192 Büchi/finite-policy cases.
 
-CI's complete test command also executes the built `fvlab` binary through an integration test for all three M12 monitor outcomes, while the workflow retains direct positive/negative CLI gates for the earlier milestones.
+The complete test command also executes the built `fvlab` binary for M12 and M13 positive/negative CLI paths, while the workflow retains direct CLI regression gates for earlier milestones.
 
 ## Trust boundaries and limitations
 
 - Results apply to the finite transition model and its atomic-step assumptions, not automatically to machine code, weak-memory executions, or external distributed systems.
-- User transition functions and state/action predicates must faithfully encode the intended system/property; the checker cannot prove modeling fidelity or purity.
-- Explicit-state memory grows with the reachable graph. A `k`-clause response monitor can in the worst case expand one captured model state into up to `2^k` pending-bit valuations. A finite monitor with `|M|` reachable monitor states has an upper bound of `|S| * |M|` product states before reachability pruning.
-- Each response class is Boolean, not a per-request identity queue. Repeated same-class triggers while already pending do not create distinct identities; a later same-class response discharges that class's outstanding Boolean obligation.
-- M12 monitor transitions are deterministic and action-driven. There is no nondeterministic automaton, epsilon transition, monitor-state minimization, textual property parser, or automatic formula translation.
+- User transition functions and state/action/automaton predicates must faithfully encode the intended system/property; the checker cannot prove modeling fidelity or purity.
+- Explicit-state memory grows with the reachable graph. A `k`-clause response monitor may expand a model state into up to `2^k` pending valuations. Deterministic monitor and Büchi products are bounded by `|S| * |M|` or `|S| * |A|` before reachability pruning.
+- Response classes remain Boolean obligations, not per-request identity queues.
+- M12/M13 automaton transitions are deterministic and action-driven. There is no nondeterministic automaton, epsilon transition, automaton minimization, textual property parser, or automatic formula-to-automaton translation.
+- M9–M13 have **no fairness semantics**. Enabled responses or accepting actions are not assumed to be scheduled.
+- M9–M13 are not a full LTL/CTL implementation and do not claim temporal-logic parsing, formula compilation, arbitrary nested formulas, or model checking outside the explicitly implemented semantics.
+- The M13 generalized Büchi layer accepts user-defined automata; it does not claim to translate arbitrary LTL into Büchi automata.
 - Tarjan SCC discovery currently uses recursive DFS; very deep graphs may motivate a future iterative implementation.
-- M9–M12 have **no fairness semantics**. Enabled responses or progress actions are not assumed to be scheduled.
-- M9–M12 are not a full LTL/CTL implementation and do not claim temporal-logic parsing, Büchi construction from formulas, fairness constraints, or arbitrary nested formulas.
 - Peterson starvation freedom is still not claimed.
 - The sleep-set engine remains experimental and differentially audited, not a standalone trusted POR proof backend.
 - No SAT/SMT, BDDs, symbolic execution, theorem proving, symmetry reduction, disk-backed state storage, parallel exploration, or distributed checking is implemented.
@@ -243,6 +186,6 @@ CI's complete test command also executes the built `fvlab` binary through an int
 
 ## Roadmap
 
-Milestones 1–12 form a coherent explicit-state stack: safety -> bounded honesty -> typed models -> independent graph validation -> audited reduction -> existential reachability -> terminal/deadlock analysis -> recurrent SCC structure -> universal eventuality -> single response obligations -> composed multi-class response obligations -> generic deterministic finite monitor products.
+Milestones 1–13 form a coherent explicit-state stack: safety -> bounded honesty -> typed models -> independent graph validation -> audited reduction -> existential reachability -> terminal/deadlock analysis -> recurrent SCC structure -> universal eventuality -> response obligations -> multi-class response composition -> deterministic finite monitors -> explicit generalized Büchi-style acceptance.
 
-The next architectural frontier should deepen explicit automata semantics rather than add more hard-coded protocol variants. A high-value Milestone 13 is an **explicit Büchi-style acceptance layer over user-defined finite automata**, with deterministic product construction, named acceptance sets, finite/maximal-execution policy made explicit, lasso counterexamples, and an independent generated product oracle. A textual LTL frontend or formula-to-automaton compiler should come only after that automata core is executable and independently validated.
+The next architectural phase should reduce duplicated product-construction machinery and establish one reusable **action-product substrate** for response, finite-monitor, and Büchi analyses before adding a textual temporal language. A high-value Milestone 14 is to extract deterministic product construction, product-state accounting, shortest-stem reconstruction, residual selection, and lasso witness plumbing into a shared internal layer, then prove behavioral equivalence of M10–M13 with differential regression tests. Only after that substrate is stable should a narrow typed temporal-property AST or formula-to-automaton frontend be introduced.

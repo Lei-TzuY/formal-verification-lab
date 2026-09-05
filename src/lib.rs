@@ -4,6 +4,9 @@
 //! from first principles. The semantic core is intentionally independent from
 //! the CLI so it can be reused by tests and future front ends.
 
+pub mod buchi;
+pub mod buchi_examples;
+pub mod buchi_report;
 pub mod builder;
 pub mod checker;
 pub mod eventuality;
@@ -24,6 +27,11 @@ pub mod response;
 pub mod response_examples;
 pub mod response_report;
 
+pub use buchi::{
+    check_buchi, AcceptanceSet, BuchiAutomaton, BuchiCounterexample, BuchiError, BuchiProductState,
+    BuchiResult, BuchiStatus, FiniteRunPolicy,
+};
+pub use buchi_report::render_buchi_report;
 pub use builder::TransitionSystemBuilder;
 pub use checker::{
     check, check_with_limits, CheckResult, Counterexample, ExplorationLimits, InconclusiveReason,

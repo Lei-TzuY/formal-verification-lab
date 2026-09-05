@@ -1,3 +1,8 @@
+use formal_verification_lab::buchi::{check_buchi, BuchiAutomaton, BuchiStatus, FiniteRunPolicy};
+use formal_verification_lab::buchi_examples::{
+    alternating_pulses, finite_quiet_run, pulse_automaton, unfair_second_pulse,
+};
+use formal_verification_lab::buchi_report::render_buchi_report;
 use formal_verification_lab::checker::{check_with_limits, ExplorationLimits, VerificationStatus};
 use formal_verification_lab::eventuality::{
     check_eventuality, EventualityProperty, EventualityStatus,
@@ -64,6 +69,7 @@ fn run(args: Vec<String>) -> Result<ExitCode, String> {
         [command, rest @ ..] if command == "eventually" => eventuality_command(rest),
         [command, rest @ ..] if command == "respond" => response_command(rest),
         [command, rest @ ..] if command == "monitor" => monitor_command(rest),
+        [command, rest @ ..] if command == "buchi" => buchi_command(rest),
         _ => Err(usage()),
     }
 }
@@ -396,6 +402,48 @@ where
     })
 }
 
+fn buchi_command(args: &[String]) -> Result<ExitCode, String> {
+    match args {
+        [query] if query == "pulses" => run_buchi(
+            alternating_pulses().map_err(|error| error.to_string())?,
+            pulse_automaton(FiniteRunPolicy::IgnoreTerminals).map_err(|error| error.to_string())?,
+        ),
+        [query] if query == "pulses-unfair" => run_buchi(
+            unfair_second_pulse().map_err(|error| error.to_string())?,
+            pulse_automaton(FiniteRunPolicy::IgnoreTerminals).map_err(|error| error.to_string())?,
+        ),
+        [query] if query == "finite-ignore" => run_buchi(
+            finite_quiet_run().map_err(|error| error.to_string())?,
+            pulse_automaton(FiniteRunPolicy::IgnoreTerminals).map_err(|error| error.to_string())?,
+        ),
+        [query] if query == "finite-strict" => run_buchi(
+            finite_quiet_run().map_err(|error| error.to_string())?,
+            pulse_automaton(FiniteRunPolicy::RequireAcceptingTerminal)
+                .map_err(|error| error.to_string())?,
+        ),
+        [query] => Err(format!(
+            "unknown Buchi query '{query}'; expected pulses, pulses-unfair, finite-ignore, or finite-strict"
+        )),
+        _ => Err(usage()),
+    }
+}
+
+fn run_buchi<S, A>(
+    model: formal_verification_lab::TransitionSystem<S>,
+    automaton: BuchiAutomaton<A>,
+) -> Result<ExitCode, String>
+where
+    S: Clone + Eq + std::hash::Hash + std::fmt::Debug,
+    A: Clone + Eq + std::hash::Hash + std::fmt::Debug,
+{
+    let result = check_buchi(&model, &automaton).map_err(|error| error.to_string())?;
+    print!("{}", render_buchi_report(model.name(), &result));
+    Ok(match result.status {
+        BuchiStatus::Satisfied => ExitCode::SUCCESS,
+        BuchiStatus::Violated => ExitCode::from(9),
+    })
+}
+
 fn parse_limits(args: &[String]) -> Result<ExplorationLimits, String> {
     let mut limits = ExplorationLimits::unbounded();
     let mut index = 0;
@@ -459,7 +507,7 @@ fn status_exit_code(status: VerificationStatus) -> ExitCode {
 }
 
 fn usage() -> String {
-    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | eventually <counter-three|counter-four|traffic-never> | respond <request-grant|request-grant-unfair|dual-grant|dual-grant-unfair-b> | monitor <session-ok|session-double-open|session-stuck>]"
+    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | eventually <counter-three|counter-four|traffic-never> | respond <request-grant|request-grant-unfair|dual-grant|dual-grant-unfair-b> | monitor <session-ok|session-double-open|session-stuck> | buchi <pulses|pulses-unfair|finite-ignore|finite-strict>]"
         .to_owned()
 }
 
