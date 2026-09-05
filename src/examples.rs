@@ -8,7 +8,10 @@ pub struct CounterState {
 pub fn bounded_counter() -> Result<TransitionSystem<CounterState>, ModelError> {
     TransitionSystem::new(
         "bounded-counter",
-        vec![StateVariable::new("value", "counter value in the range 0..=3")],
+        vec![StateVariable::new(
+            "value",
+            "counter value in the range 0..=3",
+        )],
         vec![CounterState { value: 0 }],
         |state| {
             if state.value < 3 {
@@ -137,7 +140,10 @@ pub fn traffic_light() -> Result<TransitionSystem<TrafficLightState>, ModelError
                 Light::Green => Light::Yellow,
                 Light::Yellow => Light::Red,
             };
-            Ok(vec![Transition::new("advance", TrafficLightState { light })])
+            Ok(vec![Transition::new(
+                "advance",
+                TrafficLightState { light },
+            )])
         },
         vec![Invariant::new(
             "recognized-phase",
