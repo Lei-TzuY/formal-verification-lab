@@ -60,3 +60,30 @@ jobs:
           if grep -Fq "status: SAFE" <<<"$bounded_output"; then
             exit 1
           fi
+      - name: Peterson CLI integration test
+        shell: bash
+        run: |
+          safe_output="$(cargo run --quiet -- run peterson)"
+          printf '%s\n' "$safe_output"
+          grep -Fq "model: peterson-mutex" <<<"$safe_output"
+          grep -Fq "status: SAFE" <<<"$safe_output"
+          grep -Fq "discovered states: 20" <<<"$safe_output"
+          grep -Fq "explored transitions: 34" <<<"$safe_output"
+
+          set +e
+          buggy_output="$(cargo run --quiet -- run peterson-bug)"
+          buggy_status=$?
+          set -e
+
+          printf '%s\n' "$buggy_output"
+          test "$buggy_status" -eq 1
+          grep -Fq "model: peterson-lost-intent" <<<"$buggy_output"
+          grep -Fq "status: VIOLATION" <<<"$buggy_output"
+          grep -Fq "violated invariant: mutual-exclusion" <<<"$buggy_output"
+          grep -Fq -- "--p0:set-flag-->" <<<"$buggy_output"
+          grep -Fq -- "--p0:set-turn-->" <<<"$buggy_output"
+          grep -Fq -- "--p0:enter-->" <<<"$buggy_output"
+          grep -Fq -- "--p1:set-flag-->" <<<"$buggy_output"
+          grep -Fq -- "--p1:set-turn-->" <<<"$buggy_output"
+          grep -Fq -- "--p1:enter-->" <<<"$buggy_output"
+          grep -Fq "p0: Critical, p1: Critical" <<<"$buggy_output"
