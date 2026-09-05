@@ -406,14 +406,14 @@ fn all_two_node_graphs_actions_and_finite_policies_match_independent_oracle() {
                     });
 
                 let mut best_avoiding: Option<(usize, usize)> = None;
-                for set in 0..2 {
-                    for product in 0..PRODUCT_N {
-                        if distance[initial][product] >= INF
-                            || !on_avoiding_cycle(product, set, &adjacency, &avoiding[set])
+                for (set, avoiding_distance) in avoiding.iter().enumerate() {
+                    for (product, product_distance) in distance[initial].iter().copied().enumerate() {
+                        if product_distance >= INF
+                            || !on_avoiding_cycle(product, set, &adjacency, avoiding_distance)
                         {
                             continue;
                         }
-                        let candidate = (distance[initial][product], set);
+                        let candidate = (product_distance, set);
                         if best_avoiding.is_none_or(|current| candidate < current) {
                             best_avoiding = Some(candidate);
                         }
