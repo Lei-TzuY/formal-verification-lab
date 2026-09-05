@@ -24,6 +24,7 @@ use formal_verification_lab::multi_response_examples::{
     dual_response_protocol, unfair_dual_response_protocol,
 };
 use formal_verification_lab::multi_response_report::render_multi_response_report;
+use formal_verification_lab::parse_declarative_model;
 use formal_verification_lab::property::{
     check_deadlock, check_reachability, DeadlockProperty, DeadlockStatus, ReachabilityProperty,
     ReachabilityStatus,
@@ -43,7 +44,6 @@ use formal_verification_lab::temporal::{
 };
 use formal_verification_lab::temporal_parse::parse_action_temporal;
 use formal_verification_lab::temporal_report::render_temporal_report;
-use formal_verification_lab::parse_declarative_model;
 use std::env;
 use std::fs;
 use std::process::ExitCode;
