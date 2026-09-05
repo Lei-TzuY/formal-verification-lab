@@ -376,13 +376,9 @@ pub(crate) fn cycle_witness<S: Clone + Eq>(
     });
 
     if first_internal_edge.target != entry {
-        let return_path = shortest_path(
-            graph,
-            &[first_internal_edge.target],
-            entry,
-            Some(&members),
-        )
-        .ok_or(RecurrenceError::CycleWitnessMissing)?;
+        let return_path =
+            shortest_path(graph, &[first_internal_edge.target], entry, Some(&members))
+                .ok_or(RecurrenceError::CycleWitnessMissing)?;
         cycle.extend(return_path.into_iter().skip(1));
     }
 
