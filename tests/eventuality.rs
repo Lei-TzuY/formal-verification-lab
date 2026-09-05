@@ -114,10 +114,9 @@ fn graph_model(mask: usize) -> TransitionSystem<usize> {
 #[test]
 fn bounded_counter_eventually_reaches_three() {
     let model = bounded_counter().unwrap();
-    let property = EventualityProperty::new("eventually-three", |state: &CounterState| {
-        state.value == 3
-    })
-    .unwrap();
+    let property =
+        EventualityProperty::new("eventually-three", |state: &CounterState| state.value == 3)
+            .unwrap();
     let result = check_eventuality(&model, &property).unwrap();
 
     assert_eq!(result.status, EventualityStatus::Satisfied);
@@ -129,10 +128,9 @@ fn bounded_counter_eventually_reaches_three() {
 #[test]
 fn bounded_counter_missing_target_has_finite_counterexample() {
     let model = bounded_counter().unwrap();
-    let property = EventualityProperty::new("eventually-four", |state: &CounterState| {
-        state.value == 4
-    })
-    .unwrap();
+    let property =
+        EventualityProperty::new("eventually-four", |state: &CounterState| state.value == 4)
+            .unwrap();
     let result = check_eventuality(&model, &property).unwrap();
 
     assert_eq!(result.status, EventualityStatus::Violated);
@@ -201,11 +199,11 @@ fn all_three_node_graphs_and_target_sets_match_independent_oracle() {
     for mask in 0..(1usize << EDGE_COUNT) {
         for target_mask in 0..(1usize << N) {
             let model = graph_model(mask);
-            let property = EventualityProperty::new(
-                format!("target-{target_mask}"),
-                move |state: &usize| target_contains(target_mask, *state),
-            )
-            .unwrap();
+            let property =
+                EventualityProperty::new(format!("target-{target_mask}"), move |state: &usize| {
+                    target_contains(target_mask, *state)
+                })
+                .unwrap();
             let first = check_eventuality(&model, &property).unwrap();
             let second = check_eventuality(&model, &property).unwrap();
             assert_eq!(
