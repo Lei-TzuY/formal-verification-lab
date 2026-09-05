@@ -292,3 +292,44 @@ fn peterson_model(
     })
     .build()
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ProductCounterState {
+    pub left: u8,
+    pub right: u8,
+}
+
+/// Two independent bounded counters. The model deliberately exposes one
+/// action per component so reduction experiments can declare the two action
+/// classes independent without relying on action-name parsing heuristics.
+pub fn commuting_counters() -> Result<TransitionSystem<ProductCounterState>, ModelError> {
+    TransitionSystemBuilder::new("commuting-counters", |state: &ProductCounterState| {
+        let mut next = Vec::new();
+        if state.left < 2 {
+            next.push(Transition::new(
+                "left:increment",
+                ProductCounterState {
+                    left: state.left + 1,
+                    ..*state
+                },
+            ));
+        }
+        if state.right < 2 {
+            next.push(Transition::new(
+                "right:increment",
+                ProductCounterState {
+                    right: state.right + 1,
+                    ..*state
+                },
+            ));
+        }
+        Ok(next)
+    })
+    .state_variable("left", "left counter in 0..=2")
+    .state_variable("right", "right counter in 0..=2")
+    .initial_state(ProductCounterState { left: 0, right: 0 })
+    .safety_invariant("within-bounds", |state: &ProductCounterState| {
+        state.left <= 2 && state.right <= 2
+    })
+    .build()
+}
