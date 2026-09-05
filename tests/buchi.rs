@@ -2,8 +2,9 @@ use formal_verification_lab::buchi_examples::{
     alternating_pulses, finite_quiet_run, pulse_automaton, unfair_second_pulse,
 };
 use formal_verification_lab::{
-    check_buchi, AcceptanceSet, BuchiAutomaton, BuchiCounterexample, BuchiProductState, BuchiStatus,
-    FiniteRunPolicy, Invariant, StateVariable, TraceStep, Transition, TransitionSystem,
+    check_buchi, AcceptanceSet, BuchiAutomaton, BuchiCounterexample, BuchiProductState,
+    BuchiStatus, FiniteRunPolicy, Invariant, StateVariable, TraceStep, Transition,
+    TransitionSystem,
 };
 
 const N: usize = 2;
@@ -267,7 +268,9 @@ fn unfair_execution_reports_second_acceptance_set() {
         panic!("expected acceptance-avoiding lasso");
     };
     assert_eq!(acceptance, "pulse-b-observed");
-    assert!(stem.iter().any(|step| step.action.as_deref() == Some("pulse-a")));
+    assert!(stem
+        .iter()
+        .any(|step| step.action.as_deref() == Some("pulse-a")));
     assert!(cycle.iter().all(|step| {
         !matches!(
             step.state.automaton,
@@ -427,8 +430,7 @@ fn all_two_node_graphs_actions_and_finite_policies_match_independent_oracle() {
                             .filter(|product| {
                                 let (candidate_node, candidate_state) = decode_product(*product);
                                 distance[initial][*product] < INF
-                                    && (0..N)
-                                        .all(|to| !has_edge(graph_mask, candidate_node, to))
+                                    && (0..N).all(|to| !has_edge(graph_mask, candidate_node, to))
                                     && (!accepts(candidate_state, 0)
                                         || !accepts(candidate_state, 1))
                             })
@@ -451,19 +453,12 @@ fn all_two_node_graphs_actions_and_finite_policies_match_independent_oracle() {
                         assert!(avoiding_cycle);
                         validate_trace(graph_mask, codes, &stem);
                         validate_trace(graph_mask, codes, &cycle);
-                        assert!(cycle
-                            .iter()
-                            .all(|step| !accepts(step.state.automaton, set)));
+                        assert!(cycle.iter().all(|step| !accepts(step.state.automaton, set)));
                         assert_eq!(cycle.first().unwrap().state, cycle.last().unwrap().state);
                         assert_eq!(stem.last().unwrap().state, cycle.first().unwrap().state);
                         let entry = &cycle.first().unwrap().state;
                         let product = product_index(entry.state, entry.automaton);
-                        assert!(on_avoiding_cycle(
-                            product,
-                            set,
-                            &adjacency,
-                            &avoiding[set]
-                        ));
+                        assert!(on_avoiding_cycle(product, set, &adjacency, &avoiding[set]));
                         assert_eq!(stem.len() - 1, distance[initial][product]);
                     }
                 }
