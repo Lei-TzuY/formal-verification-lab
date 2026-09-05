@@ -65,10 +65,9 @@ fn reachability_property_names_are_validated() {
 #[test]
 fn bounded_counter_returns_shortest_reachability_witness() {
     let model = bounded_counter().unwrap();
-    let property = ReachabilityProperty::new("reaches-three", |state: &CounterState| {
-        state.value == 3
-    })
-    .unwrap();
+    let property =
+        ReachabilityProperty::new("reaches-three", |state: &CounterState| state.value == 3)
+            .unwrap();
     let result = check_reachability(&model, &property).unwrap();
 
     assert_eq!(result.status, ReachabilityStatus::Reachable);
@@ -95,10 +94,9 @@ fn bounded_counter_returns_shortest_reachability_witness() {
 #[test]
 fn initial_target_has_zero_transition_witness() {
     let model = bounded_counter().unwrap();
-    let property = ReachabilityProperty::new("starts-at-zero", |state: &CounterState| {
-        state.value == 0
-    })
-    .unwrap();
+    let property =
+        ReachabilityProperty::new("starts-at-zero", |state: &CounterState| state.value == 0)
+            .unwrap();
     let result = check_reachability(&model, &property).unwrap();
 
     assert_eq!(result.status, ReachabilityStatus::Reachable);
@@ -113,10 +111,8 @@ fn initial_target_has_zero_transition_witness() {
 #[test]
 fn unreachable_target_requires_exhausting_reachable_graph() {
     let model = bounded_counter().unwrap();
-    let property = ReachabilityProperty::new("reaches-four", |state: &CounterState| {
-        state.value == 4
-    })
-    .unwrap();
+    let property =
+        ReachabilityProperty::new("reaches-four", |state: &CounterState| state.value == 4).unwrap();
     let result = check_reachability(&model, &property).unwrap();
 
     assert_eq!(result.status, ReachabilityStatus::Unreachable);
@@ -140,9 +136,10 @@ fn reachability_query_does_not_abort_on_models_original_safety_invariants() {
                 Ok(Vec::new())
             }
         },
-        vec![Invariant::new("deliberately-false-at-zero", |state: &u8| {
-            *state != 0
-        })],
+        vec![Invariant::new(
+            "deliberately-false-at-zero",
+            |state: &u8| *state != 0,
+        )],
     )
     .unwrap();
     let property = ReachabilityProperty::new("reaches-one", |state: &u8| *state == 1).unwrap();
@@ -157,19 +154,15 @@ fn all_three_node_graphs_match_independent_reachability_oracle() {
     for mask in 0..(1usize << EDGE_COUNT) {
         let distances = shortest_paths_from_zero(mask);
         let model = graph_model(mask);
-        let property = ReachabilityProperty::new("reach-node-two", |state: &usize| *state == 2)
-            .unwrap();
+        let property =
+            ReachabilityProperty::new("reach-node-two", |state: &usize| *state == 2).unwrap();
         let first = check_reachability(&model, &property).unwrap();
         let second = check_reachability(&model, &property).unwrap();
 
         assert_eq!(first, second, "determinism failed for mask={mask}");
 
         if distances[2] < INF {
-            assert_eq!(
-                first.status,
-                ReachabilityStatus::Reachable,
-                "mask={mask}"
-            );
+            assert_eq!(first.status, ReachabilityStatus::Reachable, "mask={mask}");
             let witness = first.witness.expect("reachable target needs witness");
             assert_eq!(witness.len() - 1, distances[2], "mask={mask}");
             assert_eq!(witness.last().unwrap().state, 2, "mask={mask}");
@@ -179,11 +172,7 @@ fn all_three_node_graphs_match_independent_reachability_oracle() {
                 assert!(has_edge(mask, from, to), "missing witness edge mask={mask}");
             }
         } else {
-            assert_eq!(
-                first.status,
-                ReachabilityStatus::Unreachable,
-                "mask={mask}"
-            );
+            assert_eq!(first.status, ReachabilityStatus::Unreachable, "mask={mask}");
             assert!(first.witness.is_none(), "mask={mask}");
             let reachable_count = distances.iter().filter(|distance| **distance < INF).count();
             assert_eq!(first.discovered_states, reachable_count, "mask={mask}");
