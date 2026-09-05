@@ -9,6 +9,7 @@ pub mod buchi_examples;
 pub mod buchi_report;
 pub mod builder;
 pub mod checker;
+pub mod declarative;
 pub mod eventuality;
 pub mod eventuality_report;
 pub mod examples;
@@ -42,6 +43,7 @@ pub use checker::{
     check, check_with_limits, CheckResult, Counterexample, ExplorationLimits, InconclusiveReason,
     TraceStep, VerificationStatus,
 };
+pub use declarative::{parse_declarative_model, DeclarativeModelError};
 pub use eventuality::{
     check_eventuality, EventualityCounterexample, EventualityError, EventualityProperty,
     EventualityResult, EventualityStatus,
