@@ -43,7 +43,9 @@ use formal_verification_lab::temporal::{
 };
 use formal_verification_lab::temporal_parse::parse_action_temporal;
 use formal_verification_lab::temporal_report::render_temporal_report;
+use formal_verification_lab::parse_declarative_model;
 use std::env;
+use std::fs;
 use std::process::ExitCode;
 
 fn main() -> ExitCode {
@@ -452,6 +454,7 @@ where
 
 fn temporal_command(args: &[String]) -> Result<ExitCode, String> {
     match args {
+        [command, path, expression] if command == "file" => run_temporal_file(path, expression),
         [command, model, expression] if command == "check" => {
             run_temporal_expression(model, expression)
         }
@@ -472,10 +475,19 @@ fn temporal_command(args: &[String]) -> Result<ExitCode, String> {
             typed_pulse_spec()?,
         ),
         [query] => Err(format!(
-            "unknown temporal query '{query}'; expected request-grant, request-grant-unfair, pulses, pulses-unfair, or 'check <model> <expression>'"
+            "unknown temporal query '{query}'; expected request-grant, request-grant-unfair, pulses, pulses-unfair, 'check <model> <expression>', or 'file <path> <expression>'"
         )),
         _ => Err(usage()),
     }
+}
+
+fn run_temporal_file(path: &str, expression: &str) -> Result<ExitCode, String> {
+    let input = fs::read_to_string(path)
+        .map_err(|error| format!("failed to read declarative model '{path}': {error}"))?;
+    let model = parse_declarative_model(&input).map_err(|error| error.to_string())?;
+    let spec =
+        parse_action_temporal("cli-temporal", expression).map_err(|error| error.to_string())?;
+    run_temporal(model, spec)
 }
 
 fn run_temporal_expression(model_name: &str, expression: &str) -> Result<ExitCode, String> {
@@ -602,7 +614,7 @@ fn status_exit_code(status: VerificationStatus) -> ExitCode {
 }
 
 fn usage() -> String {
-    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | eventually <counter-three|counter-four|traffic-never> | respond <request-grant|request-grant-unfair|dual-grant|dual-grant-unfair-b> | monitor <session-ok|session-double-open|session-stuck> | buchi <pulses|pulses-unfair|finite-ignore|finite-strict> | temporal <request-grant|request-grant-unfair|pulses|pulses-unfair> | temporal check <request-grant|request-grant-unfair|pulses|pulses-unfair> <expression>]"
+    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | eventually <counter-three|counter-four|traffic-never> | respond <request-grant|request-grant-unfair|dual-grant|dual-grant-unfair-b> | monitor <session-ok|session-double-open|session-stuck> | buchi <pulses|pulses-unfair|finite-ignore|finite-strict> | temporal <request-grant|request-grant-unfair|pulses|pulses-unfair> | temporal check <request-grant|request-grant-unfair|pulses|pulses-unfair> <expression> | temporal file <path> <expression>]"
         .to_owned()
 }
 
