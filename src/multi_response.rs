@@ -91,7 +91,11 @@ impl fmt::Debug for MultiResponseProperty {
             .field("name", &self.name)
             .field(
                 "clauses",
-                &self.clauses.iter().map(|clause| &clause.name).collect::<Vec<_>>(),
+                &self
+                    .clauses
+                    .iter()
+                    .map(|clause| &clause.name)
+                    .collect::<Vec<_>>(),
             )
             .finish()
     }
@@ -315,9 +319,9 @@ where
             component: component.clone(),
         };
 
-        let replace = best.as_ref().is_none_or(|current| {
-            candidate_key(&candidate) < candidate_key(current)
-        });
+        let replace = best
+            .as_ref()
+            .is_none_or(|current| candidate_key(&candidate) < candidate_key(current));
         if replace {
             best = Some(candidate);
         }
