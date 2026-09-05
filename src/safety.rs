@@ -1,7 +1,9 @@
 use crate::checker::TraceStep;
 use crate::declarative::DeclarativeDocument;
+use crate::property::{
+    check_reachability, ReachabilityError, ReachabilityProperty, ReachabilityStatus,
+};
 use crate::proposition_expr::{PropositionExpression, PropositionExpressionError};
-use crate::property::{check_reachability, ReachabilityError, ReachabilityProperty, ReachabilityStatus};
 use std::collections::HashSet;
 use std::fmt;
 
