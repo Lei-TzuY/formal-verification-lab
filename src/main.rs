@@ -1,7 +1,9 @@
 use formal_verification_lab::checker::{check_with_limits, ExplorationLimits, VerificationStatus};
 use formal_verification_lab::examples::{
-    bounded_counter, buggy_mutex, buggy_peterson_mutex, peterson_mutex, traffic_light,
+    bounded_counter, buggy_mutex, buggy_peterson_mutex, commuting_counters, peterson_mutex,
+    traffic_light,
 };
+use formal_verification_lab::reduction::{audit_sleep_set_reduction, IndependenceRelation};
 use formal_verification_lab::report::render_report;
 use std::env;
 use std::process::ExitCode;
@@ -27,6 +29,7 @@ fn run(args: Vec<String>) -> Result<ExitCode, String> {
             Ok(ExitCode::SUCCESS)
         }
         [command, rest @ ..] if command == "run" => run_command(rest),
+        [command, rest @ ..] if command == "reduce" => reduce_command(rest),
         _ => Err(usage()),
     }
 }
@@ -47,9 +50,46 @@ fn run_command(args: &[String]) -> Result<ExitCode, String> {
             buggy_peterson_mutex().map_err(|error| error.to_string())?,
             limits,
         ),
+        "commuting-counters" => run_model(
+            commuting_counters().map_err(|error| error.to_string())?,
+            limits,
+        ),
         _ => Err(format!(
-            "unknown example '{example}'; expected counter, mutex-bug, traffic-light, peterson, or peterson-bug"
+            "unknown example '{example}'; expected counter, mutex-bug, traffic-light, peterson, peterson-bug, or commuting-counters"
         )),
+    }
+}
+
+fn reduce_command(args: &[String]) -> Result<ExitCode, String> {
+    match args {
+        [example] if example == "commuting-counters" => {
+            let model = commuting_counters().map_err(|error| error.to_string())?;
+            let relation = IndependenceRelation::new()
+                .with_pair("left:increment", "right:increment")
+                .map_err(|error| error.to_string())?;
+            let audit = audit_sleep_set_reduction(&model, &relation)
+                .map_err(|error| error.to_string())?;
+
+            println!("model: {}", model.name());
+            println!("reduction audit: MATCH");
+            println!("independence pairs: {}", relation.pair_count());
+            println!("exhaustive status: {}", status_label(audit.exhaustive.status));
+            println!("exhaustive states: {}", audit.exhaustive.discovered_states);
+            println!(
+                "exhaustive transitions: {}",
+                audit.exhaustive.explored_transitions
+            );
+            println!("reduced status: {}", status_label(audit.reduced.status));
+            println!("reduced states: {}", audit.reduced.discovered_states);
+            println!("reduced transitions: {}", audit.reduced.explored_transitions);
+            println!("pruned transitions: {}", audit.reduced.pruned_transitions);
+
+            Ok(status_exit_code(audit.exhaustive.status))
+        }
+        [example] => Err(format!(
+            "unknown reduction example '{example}'; expected commuting-counters"
+        )),
+        _ => Err(usage()),
     }
 }
 
@@ -96,19 +136,30 @@ where
 {
     let result = check_with_limits(&model, limits).map_err(|error| error.to_string())?;
     print!("{}", render_report(model.name(), &result));
+    Ok(status_exit_code(result.status))
+}
 
-    Ok(match result.status {
+fn status_label(status: VerificationStatus) -> &'static str {
+    match status {
+        VerificationStatus::Safe => "SAFE",
+        VerificationStatus::Violated => "VIOLATION",
+        VerificationStatus::Inconclusive => "INCONCLUSIVE",
+    }
+}
+
+fn status_exit_code(status: VerificationStatus) -> ExitCode {
+    match status {
         VerificationStatus::Safe => ExitCode::SUCCESS,
         VerificationStatus::Violated => ExitCode::from(1),
         VerificationStatus::Inconclusive => ExitCode::from(3),
-    })
+    }
 }
 
 fn usage() -> String {
-    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug> [--max-states N] [--max-transitions N] [--max-depth N]]"
+    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters]"
         .to_owned()
 }
 
 fn print_examples() {
-    println!("counter\nmutex-bug\ntraffic-light\npeterson\npeterson-bug");
+    println!("counter\nmutex-bug\ntraffic-light\npeterson\npeterson-bug\ncommuting-counters");
 }
