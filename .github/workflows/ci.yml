@@ -41,3 +41,22 @@ jobs:
           grep -Fq -- "--p2:request-->" <<<"$output"
           grep -Fq -- "--p2:enter-->" <<<"$output"
           grep -Fq "MutexState { p1: Critical, p2: Critical }" <<<"$output"
+      - name: Bounded exploration CLI smoke test
+        shell: bash
+        run: |
+          safe_output="$(cargo run --quiet -- run counter --max-states 4 --max-transitions 3 --max-depth 3)"
+          printf '%s\n' "$safe_output"
+          grep -Fq "status: SAFE" <<<"$safe_output"
+
+          set +e
+          bounded_output="$(cargo run --quiet -- run mutex-bug --max-depth 3)"
+          bounded_status=$?
+          set -e
+
+          printf '%s\n' "$bounded_output"
+          test "$bounded_status" -eq 3
+          grep -Fq "status: INCONCLUSIVE" <<<"$bounded_output"
+          grep -Fq "inconclusive reason: depth limit reached (max 3)" <<<"$bounded_output"
+          if grep -Fq "status: SAFE" <<<"$bounded_output"; then
+            exit 1
+          fi
