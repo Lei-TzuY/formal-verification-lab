@@ -1,0 +1,17 @@
+[package]
+name = "formal-verification-lab"
+version = "0.1.0"
+edition = "2021"
+description = "Educational explicit-state model checking laboratory"
+license = "MIT"
+publish = false
+
+[lib]
+name = "formal_verification_lab"
+path = "src/lib.rs"
+
+[[bin]]
+name = "fvlab"
+path = "src/main.rs"
+
+[dependencies]
