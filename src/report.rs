@@ -98,8 +98,7 @@ pub fn render_reachability_report<S: Debug>(
 ) -> String {
     let mut output = String::new();
     writeln!(&mut output, "model: {model_name}").expect("writing to String cannot fail");
-    writeln!(&mut output, "property: {}", result.property)
-        .expect("writing to String cannot fail");
+    writeln!(&mut output, "property: {}", result.property).expect("writing to String cannot fail");
     writeln!(
         &mut output,
         "reachability: {}",
