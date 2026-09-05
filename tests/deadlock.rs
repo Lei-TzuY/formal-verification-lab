@@ -69,10 +69,11 @@ fn deadlock_property_names_are_validated() {
 #[test]
 fn bounded_counter_legitimate_terminal_is_deadlock_free() {
     let model = bounded_counter().unwrap();
-    let property = DeadlockProperty::new("counter-completion-is-terminal", |state: &CounterState| {
-        state.value == 3
-    })
-    .unwrap();
+    let property =
+        DeadlockProperty::new("counter-completion-is-terminal", |state: &CounterState| {
+            state.value == 3
+        })
+        .unwrap();
     let result = check_deadlock(&model, &property).unwrap();
 
     assert_eq!(result.status, DeadlockStatus::DeadlockFree);
@@ -87,7 +88,10 @@ fn bounded_counter_legitimate_terminal_is_deadlock_free() {
 #[test]
 fn bounded_counter_strict_policy_returns_shortest_deadlock_witness() {
     let model = bounded_counter().unwrap();
-    let property = DeadlockProperty::new("no-terminal-state-is-allowed", |_state: &CounterState| false)
+    let property =
+        DeadlockProperty::new("no-terminal-state-is-allowed", |_state: &CounterState| {
+            false
+        })
         .unwrap();
     let result = check_deadlock(&model, &property).unwrap();
 
