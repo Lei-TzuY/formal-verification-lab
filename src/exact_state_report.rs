@@ -28,8 +28,12 @@ pub fn render_exact_state_report(model_name: &str, result: &ExactStateResult) ->
         }
     )
     .expect("writing to String cannot fail");
-    writeln!(&mut output, "discovered states: {}", result.discovered_states)
-        .expect("writing to String cannot fail");
+    writeln!(
+        &mut output,
+        "discovered states: {}",
+        result.discovered_states
+    )
+    .expect("writing to String cannot fail");
     writeln!(
         &mut output,
         "explored transitions: {}",
@@ -57,11 +61,8 @@ pub fn render_exact_state_report(model_name: &str, result: &ExactStateResult) ->
             render_trace(&mut output, trace, "initial");
         }
         Some(ExactStateEvidence::EventualityInfiniteCounterexample { stem, cycle }) => {
-            writeln!(
-                &mut output,
-                "evidence: EVENTUALITY_INFINITE_COUNTEREXAMPLE"
-            )
-            .expect("writing to String cannot fail");
+            writeln!(&mut output, "evidence: EVENTUALITY_INFINITE_COUNTEREXAMPLE")
+                .expect("writing to String cannot fail");
             writeln!(&mut output, "stem:").expect("writing to String cannot fail");
             render_trace(&mut output, stem, "initial");
             writeln!(&mut output, "cycle:").expect("writing to String cannot fail");
