@@ -19,7 +19,7 @@ fn all_pairs_shortest_paths(mask: usize) -> [[usize; N]; N] {
     for (from, row) in distance.iter_mut().enumerate() {
         for (to, value) in row.iter_mut().enumerate() {
             if has_edge(mask, from, to) {
-                *value = 1;
+                *value = (*value).min(1);
             }
         }
     }
