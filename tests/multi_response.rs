@@ -146,10 +146,7 @@ fn monitor_next(mask: usize, code: u8) -> usize {
     update_bit(after_a, 1, triggers_b(code), responds_b(code))
 }
 
-fn oracle_adjacency(
-    graph_mask: usize,
-    codes: [u8; EDGE_COUNT],
-) -> [[bool; PRODUCT_N]; PRODUCT_N] {
+fn oracle_adjacency(graph_mask: usize, codes: [u8; EDGE_COUNT]) -> [[bool; PRODUCT_N]; PRODUCT_N] {
     let mut adjacency = [[false; PRODUCT_N]; PRODUCT_N];
     for node in 0..N {
         for pending_mask in 0..PENDING_VALUES {
@@ -394,7 +391,10 @@ fn all_two_node_graphs_and_semantic_assignments_match_independent_oracle() {
             match first.counterexample {
                 None => assert!(!expected_violation),
                 Some(MultiResponseCounterexample::Finite { clause, trace }) => {
-                    assert!(has_pending_terminal, "finite witness without terminal oracle");
+                    assert!(
+                        has_pending_terminal,
+                        "finite witness without terminal oracle"
+                    );
                     validate_trace(graph_mask, codes, &trace);
                     let end = &trace.last().unwrap().state;
                     let bit = clause_bit(&clause);
@@ -434,16 +434,16 @@ fn clause_bit(clause: &str) -> usize {
 }
 
 fn pending_mask(pending: &[bool]) -> usize {
-    pending
-        .iter()
-        .enumerate()
-        .fold(0usize, |mask, (bit, value)| {
+    pending.iter().enumerate().fold(
+        0usize,
+        |mask, (bit, value)| {
             if *value {
                 mask | (1usize << bit)
             } else {
                 mask
             }
-        })
+        },
+    )
 }
 
 fn validate_trace(
