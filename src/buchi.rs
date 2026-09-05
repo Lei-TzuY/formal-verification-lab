@@ -1,9 +1,9 @@
 use crate::checker::TraceStep;
+use crate::graph::{capture_reachable_graph, induced_graph, shortest_path, ReachableGraph};
 use crate::model::TransitionSystem;
 use crate::product::build_action_product;
 use crate::recurrence::{
-    capture_reachable_graph, component_is_cyclic, cycle_witness, induced_graph, shortest_path,
-    strongly_connected_components, ReachableGraph, RecurrenceError,
+    component_is_cyclic, cycle_witness, strongly_connected_components, RecurrenceError,
 };
 use std::collections::HashSet;
 use std::fmt;
@@ -257,7 +257,7 @@ where
     S: Clone + Eq + Hash,
     A: Clone + Eq + Hash,
 {
-    let captured = capture_reachable_graph(model)?;
+    let captured = capture_reachable_graph(model).map_err(RecurrenceError::from)?;
     let product = build_action_product(
         &captured.graph,
         &automaton.initial,

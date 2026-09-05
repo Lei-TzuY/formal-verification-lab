@@ -1,8 +1,8 @@
 use crate::checker::TraceStep;
+use crate::graph::{capture_reachable_graph, induced_graph, shortest_path};
 use crate::model::TransitionSystem;
 use crate::recurrence::{
-    capture_reachable_graph, component_is_cyclic, cycle_witness, induced_graph, shortest_path,
-    strongly_connected_components, RecurrenceError,
+    component_is_cyclic, cycle_witness, strongly_connected_components, RecurrenceError,
 };
 use std::collections::{HashSet, VecDeque};
 use std::fmt;
@@ -131,7 +131,7 @@ pub fn check_eventuality<S>(
 where
     S: Clone + Eq + Hash,
 {
-    let captured = capture_reachable_graph(model)?;
+    let captured = capture_reachable_graph(model).map_err(RecurrenceError::from)?;
     let graph = &captured.graph;
     let is_target = graph
         .states

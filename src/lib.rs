@@ -12,6 +12,7 @@ pub mod checker;
 pub mod eventuality;
 pub mod eventuality_report;
 pub mod examples;
+mod graph;
 pub mod model;
 pub mod monitor;
 pub mod monitor_examples;
