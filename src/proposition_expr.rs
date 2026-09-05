@@ -27,7 +27,7 @@ impl PropositionExpression {
         Ok(Self::Atom(proposition))
     }
 
-    pub fn not(expression: Self) -> Self {
+    pub fn negate(expression: Self) -> Self {
         Self::Not(Box::new(expression))
     }
 
@@ -142,9 +142,10 @@ fn resolve_expression(
 ) -> Result<HashMap<String, HashSet<String>>, PropositionExpressionError> {
     let mut references = Vec::new();
     expression.collect_references(&mut references);
+    let mut seen = HashSet::new();
     let mut members = HashMap::new();
     for proposition in references {
-        if members.contains_key(proposition) {
+        if !seen.insert(proposition) {
             continue;
         }
         let states = document.proposition_states(proposition).ok_or_else(|| {
@@ -488,7 +489,7 @@ impl<'a> PropositionExpressionParser<'a> {
     fn parse_unary(&mut self) -> Result<PropositionExpression, PropositionExpressionParseError> {
         self.skip_whitespace();
         if self.consume_keyword("not") {
-            return Ok(PropositionExpression::not(self.parse_unary()?));
+            return Ok(PropositionExpression::negate(self.parse_unary()?));
         }
         self.parse_primary()
     }
