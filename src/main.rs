@@ -8,6 +8,10 @@ use formal_verification_lab::eventuality::{
     check_eventuality, EventualityProperty, EventualityStatus,
 };
 use formal_verification_lab::eventuality_report::render_eventuality_report;
+use formal_verification_lab::exact_state::{
+    check_exact_state_property, parse_exact_state_property, ExactStateStatus,
+};
+use formal_verification_lab::exact_state_report::render_exact_state_report;
 use formal_verification_lab::examples::{
     bounded_counter, buggy_mutex, buggy_peterson_mutex, commuting_counters, peterson_mutex,
     traffic_light, CounterState, TrafficLightState,
@@ -78,6 +82,7 @@ fn run(args: Vec<String>) -> Result<ExitCode, String> {
         [command, rest @ ..] if command == "monitor" => monitor_command(rest),
         [command, rest @ ..] if command == "buchi" => buchi_command(rest),
         [command, rest @ ..] if command == "temporal" => temporal_command(rest),
+        [command, rest @ ..] if command == "state" => state_command(rest),
         _ => Err(usage()),
     }
 }
@@ -551,6 +556,30 @@ where
     })
 }
 
+fn state_command(args: &[String]) -> Result<ExitCode, String> {
+    match args {
+        [command, path, expression] if command == "file" => run_state_file(path, expression),
+        [query] => Err(format!(
+            "unknown state query '{query}'; expected 'file <path> <expression>'"
+        )),
+        _ => Err(usage()),
+    }
+}
+
+fn run_state_file(path: &str, expression: &str) -> Result<ExitCode, String> {
+    let input = fs::read_to_string(path)
+        .map_err(|error| format!("failed to read declarative model '{path}': {error}"))?;
+    let model = parse_declarative_model(&input).map_err(|error| error.to_string())?;
+    let spec =
+        parse_exact_state_property("cli-state", expression).map_err(|error| error.to_string())?;
+    let result = check_exact_state_property(&model, &spec).map_err(|error| error.to_string())?;
+    print!("{}", render_exact_state_report(model.name(), &result));
+    Ok(match result.status {
+        ExactStateStatus::Satisfied => ExitCode::SUCCESS,
+        ExactStateStatus::Violated => ExitCode::from(11),
+    })
+}
+
 fn parse_limits(args: &[String]) -> Result<ExplorationLimits, String> {
     let mut limits = ExplorationLimits::unbounded();
     let mut index = 0;
@@ -614,7 +643,7 @@ fn status_exit_code(status: VerificationStatus) -> ExitCode {
 }
 
 fn usage() -> String {
-    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | eventually <counter-three|counter-four|traffic-never> | respond <request-grant|request-grant-unfair|dual-grant|dual-grant-unfair-b> | monitor <session-ok|session-double-open|session-stuck> | buchi <pulses|pulses-unfair|finite-ignore|finite-strict> | temporal <request-grant|request-grant-unfair|pulses|pulses-unfair> | temporal check <request-grant|request-grant-unfair|pulses|pulses-unfair> <expression> | temporal file <path> <expression>]"
+    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | eventually <counter-three|counter-four|traffic-never> | respond <request-grant|request-grant-unfair|dual-grant|dual-grant-unfair-b> | monitor <session-ok|session-double-open|session-stuck> | buchi <pulses|pulses-unfair|finite-ignore|finite-strict> | temporal <request-grant|request-grant-unfair|pulses|pulses-unfair> | temporal check <request-grant|request-grant-unfair|pulses|pulses-unfair> <expression> | temporal file <path> <expression> | state file <path> <expression>]"
         .to_owned()
 }
 
