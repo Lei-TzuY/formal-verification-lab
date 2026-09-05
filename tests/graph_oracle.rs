@@ -1,4 +1,6 @@
-use formal_verification_lab::checker::{check, check_with_limits, ExplorationLimits, VerificationStatus};
+use formal_verification_lab::checker::{
+    check, check_with_limits, ExplorationLimits, VerificationStatus,
+};
 use formal_verification_lab::model::{Invariant, StateVariable, Transition, TransitionSystem};
 use std::collections::BTreeMap;
 
@@ -73,7 +75,11 @@ fn exhaustive_three_node_graphs_match_independent_reachability_and_accounting_or
             .map(|node| distances[0][*node])
             .max()
             .unwrap();
-        assert_eq!(result.max_depth_reached, Some(expected_depth), "mask={mask}");
+        assert_eq!(
+            result.max_depth_reached,
+            Some(expected_depth),
+            "mask={mask}"
+        );
 
         let mut expected_actions = BTreeMap::new();
         for from in &reachable {
@@ -85,7 +91,10 @@ fn exhaustive_three_node_graphs_match_independent_reachability_and_accounting_or
         }
         let expected_edges: usize = expected_actions.values().sum();
         assert_eq!(result.explored_transitions, expected_edges, "mask={mask}");
-        assert_eq!(result.transitions_by_action, expected_actions, "mask={mask}");
+        assert_eq!(
+            result.transitions_by_action, expected_actions,
+            "mask={mask}"
+        );
         assert_eq!(
             result.transitions_by_action.values().sum::<usize>(),
             result.explored_transitions,
@@ -117,7 +126,10 @@ fn exhaustive_three_node_graphs_match_independent_shortest_counterexample_oracle
             for pair in trace.trace.windows(2) {
                 let from = pair[0].state;
                 let to = pair[1].state;
-                assert!(has_edge(mask, from, to), "trace used missing edge for mask={mask}");
+                assert!(
+                    has_edge(mask, from, to),
+                    "trace used missing edge for mask={mask}"
+                );
                 let expected_action = format!("{from}->{to}");
                 assert_eq!(
                     pair[1].action.as_deref(),
