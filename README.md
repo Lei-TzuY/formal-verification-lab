@@ -107,16 +107,27 @@ Migration equivalence is again executable: the unchanged M10 **4096-case** singl
 
 M15 adds no response semantics, fairness assumptions, public API, or performance claim. Its architectural effect is to eliminate the final duplicated action-driven temporal product BFS while keeping each verification property's acceptance/failure semantics separate.
 
+### Milestone 16 — neutral captured-graph substrate
+
+Milestone 16 moves generic reachable-graph ownership out of the recurrence-specific layer. Internal `graph.rs` now owns the labeled `ReachableGraph`, snapshot edges, canonical model-to-snapshot materialization and accounting, deterministic induced-subgraph construction, and deterministic shortest-path reconstruction.
+
+`recurrence.rs` keeps only recurrence-specific structure: Tarjan SCC decomposition, cyclic-component classification, recurrence cycle witnesses, and the existing public `RecurrenceError` contract. Graph capture failures use an internal `GraphCaptureError` and are mapped back to the existing recurrence error variants, so no new public error surface is introduced.
+
+The shared action-product builder, universal eventuality, response products, finite monitors, and generalized Büchi verification now consume the neutral graph substrate directly rather than treating recurrence as a generic graph facade. The model transition relation is still evaluated once through canonical exhaustive BFS for each captured analysis, and deterministic state/edge ordering is unchanged.
+
+Migration equivalence is enforced by the unchanged M8 **512-graph** SCC oracle, M9 **4096-case** eventuality oracle, M10 **4096-case** single-response oracle, M11 **38,416-case** multi-response oracle, M12 **4096-case** finite-monitor oracle, M13 **8192-case** Büchi oracle, and all binary CLI regressions. M16 adds no proof semantics or performance claim; it establishes a neutral graph/data-flow boundary for later front ends and analyses.
+
 ## Architecture
 
 ```text
 src/model.rs                  transition-system abstraction and validation
 src/builder.rs                typed construction layer
 src/checker.rs                canonical deterministic BFS substrate and bounds
+src/graph.rs                  neutral captured labeled graphs, induced graphs,
+                              capture accounting, deterministic shortest paths
 src/product.rs                shared internal action-product BFS for temporal engines
 src/property.rs               existential reachability + deadlock policies
-src/recurrence.rs             one-exploration graph snapshot, induced graphs,
-                              SCCs, shortest paths, cycle witnesses
+src/recurrence.rs             Tarjan SCCs, cyclic classification, cycle witnesses
 src/eventuality.rs            universal eventuality over target-cut residuals
 src/multi_response.rs         multi-clause response semantics over shared product
 src/response.rs               single-clause compatibility API over multi-response
@@ -129,7 +140,7 @@ src/main.rs                   CLI/exit-status integration; no model traversal lo
 tests/                        semantic, protocol, generated graph/product oracles
 ```
 
-The original transition relation remains owned by the model plus canonical exploration. Structural and temporal analyses reuse a captured finite labeled graph rather than invoking the model transition function again. M14–M15 centralize deterministic action-product construction for response, monitor, and Büchi engines while leaving their property semantics separate.
+The original transition relation remains owned by the model plus canonical exploration. Structural and temporal analyses reuse a neutral captured finite labeled graph rather than invoking the model transition function again. M14–M16 centralize action-product construction and captured-graph ownership while leaving property-specific acceptance/failure semantics separate.
 
 ## Executable examples
 
@@ -183,9 +194,9 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo test --all-targets --all-features
 ```
 
-Coverage includes safety, bounded exploration, Peterson, audited reduction, reachability, deadlock policies, SCC structure, universal eventuality, response products, finite monitor products, and generalized Büchi-style acceptance. Independent generated suites include M9's 4096 eventuality cases, M10's 4096 single-response cases, M11's 38,416 two-class cases, M12's 4096 finite-monitor cases, and M13's 8192 Büchi/finite-policy cases.
+Coverage includes safety, bounded exploration, Peterson, audited reduction, reachability, deadlock policies, SCC structure, universal eventuality, response products, finite monitor products, and generalized Büchi-style acceptance. Independent generated suites include M8's 512 SCC graphs, M9's 4096 eventuality cases, M10's 4096 single-response cases, M11's 38,416 two-class cases, M12's 4096 finite-monitor cases, and M13's 8192 Büchi/finite-policy cases.
 
-M14–M15 change no property-oracle expectations. The unchanged M10–M13 generated suites act as migration-equivalence gates for the shared action-product substrate, while the complete test command executes the built `fvlab` binary for monitor and Büchi positive/negative paths and the workflow retains direct response CLI regression gates.
+M14–M16 change no property-oracle expectations. The unchanged M8–M13 generated suites act as migration-equivalence gates for shared product and neutral graph infrastructure, while the complete test command executes built `fvlab` binary integrations and the workflow retains direct CLI regression gates.
 
 ## Trust boundaries and limitations
 
@@ -197,7 +208,7 @@ M14–M15 change no property-oracle expectations. The unchanged M10–M13 genera
 - M9–M13 have **no fairness semantics**. Enabled responses or accepting actions are not assumed to be scheduled.
 - M9–M13 are not a full LTL/CTL implementation and do not claim temporal-logic parsing, formula compilation, arbitrary nested formulas, or model checking outside the explicitly implemented semantics.
 - The M13 generalized Büchi layer accepts user-defined automata; it does not claim to translate arbitrary LTL into Büchi automata.
-- M14–M15 are internal architecture consolidations; they add no new proof semantics and make no performance claim.
+- M14–M16 are internal architecture consolidations; they add no new proof semantics and make no performance claim.
 - Tarjan SCC discovery currently uses recursive DFS; very deep graphs may motivate a future iterative implementation.
 - Peterson starvation freedom is still not claimed.
 - The sleep-set engine remains experimental and differentially audited, not a standalone trusted POR proof backend.
@@ -206,6 +217,6 @@ M14–M15 change no property-oracle expectations. The unchanged M10–M13 genera
 
 ## Roadmap
 
-Milestones 1–15 form a coherent explicit-state stack: safety -> bounded honesty -> typed models -> independent graph validation -> audited reduction -> existential reachability -> terminal/deadlock analysis -> recurrent SCC structure -> universal eventuality -> response obligations -> multi-class response composition -> deterministic finite monitors -> explicit generalized Büchi-style acceptance -> shared deterministic action-product construction across all action-driven temporal engines.
+Milestones 1–16 form a coherent explicit-state stack: safety -> bounded honesty -> typed models -> independent graph validation -> audited reduction -> existential reachability -> terminal/deadlock analysis -> recurrent SCC structure -> universal eventuality -> response obligations -> multi-class response composition -> deterministic finite monitors -> explicit generalized Büchi-style acceptance -> shared deterministic action-product construction -> neutral captured-graph ownership.
 
-The next high-value architectural slice is **Milestone 16: neutral captured-graph substrate**. Generic labeled graph ownership currently lives in `recurrence.rs` even though eventuality, response, monitor, Büchi, and product construction all consume it. M16 should first audit those dependencies, then move only genuinely generic snapshot/path primitives into a neutral internal graph module while leaving SCC/recurrence semantics in `recurrence.rs`. Acceptance must preserve the one-model-capture invariant, deterministic state/edge ordering, shortest-path witnesses, all M8–M13 independent graph/product oracles, and every executable CLI regression. Only after graph ownership is neutral and stable should the project consider a narrow typed temporal-property AST or formula-to-automaton frontend.
+The next high-value architectural slice should move from infrastructure consolidation back to executable specification capability: a **narrow typed temporal-property frontend** that compiles a deliberately small, explicitly documented property subset into the already validated monitor/Büchi backends. It should not claim full LTL/CTL. Acceptance should require differential equivalence against hand-built existing M9–M13 properties, deterministic diagnostics for unsupported combinations, and end-to-end CLI examples that prove the frontend actually reaches the existing verification engines. Only after that typed layer is stable should textual parsing or broader formula compilation be considered.
