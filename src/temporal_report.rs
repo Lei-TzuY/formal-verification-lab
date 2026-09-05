@@ -44,11 +44,11 @@ pub fn render_temporal_report<S: Debug>(model_name: &str, result: &TemporalResul
     .expect("writing to String cannot fail");
 
     match &result.counterexample {
-        None => writeln!(&mut output, "counterexample: none")
-            .expect("writing to String cannot fail"),
+        None => {
+            writeln!(&mut output, "counterexample: none").expect("writing to String cannot fail")
+        }
         Some(TemporalCounterexample::Finite { obligation, trace }) => {
-            writeln!(&mut output, "counterexample: FINITE")
-                .expect("writing to String cannot fail");
+            writeln!(&mut output, "counterexample: FINITE").expect("writing to String cannot fail");
             render_obligation(&mut output, obligation);
             writeln!(&mut output, "trace:").expect("writing to String cannot fail");
             render_trace(&mut output, trace, "initial");
