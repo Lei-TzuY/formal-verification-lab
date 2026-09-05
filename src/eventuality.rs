@@ -1,5 +1,9 @@
-use crate::checker::TraceStep;
-use crate::graph::{capture_reachable_graph, induced_graph, shortest_path};
+use crate::bounded::BoundedOutcome;
+use crate::checker::{ExplorationLimits, TraceStep};
+use crate::graph::{
+    capture_reachable_graph, capture_reachable_graph_with_limits, induced_graph, shortest_path,
+    GraphCaptureCompletion, ReachableGraph,
+};
 use crate::model::TransitionSystem;
 use crate::recurrence::{
     component_is_cyclic, cycle_witness, strongly_connected_components, RecurrenceError,
@@ -81,6 +85,17 @@ pub struct EventualityResult<S> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BoundedEventualityResult<S> {
+    pub property: String,
+    pub outcome: BoundedOutcome<EventualityStatus>,
+    pub discovered_states: usize,
+    pub checked_states: usize,
+    pub explored_transitions: usize,
+    pub max_depth_reached: Option<usize>,
+    pub counterexample: Option<EventualityCounterexample<S>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EventualityError {
     EmptyPropertyName,
     Graph(RecurrenceError),
@@ -132,7 +147,81 @@ where
     S: Clone + Eq + Hash,
 {
     let captured = capture_reachable_graph(model).map_err(RecurrenceError::from)?;
-    let graph = &captured.graph;
+    let known_terminal = captured
+        .graph
+        .outgoing
+        .iter()
+        .map(Vec::is_empty)
+        .collect::<Vec<_>>();
+    let counterexample = find_counterexample(&captured.graph, &known_terminal, property)?;
+
+    Ok(EventualityResult {
+        property: property.name.clone(),
+        status: if counterexample.is_some() {
+            EventualityStatus::Violated
+        } else {
+            EventualityStatus::Satisfied
+        },
+        discovered_states: captured.discovered_states,
+        explored_transitions: captured.explored_transitions,
+        max_depth_reached: captured.max_depth_reached,
+        counterexample,
+    })
+}
+
+/// Check universal eventuality under deterministic resource limits.
+///
+/// A real target-free terminal or closed target-free cycle already present in
+/// the justified graph prefix is a conclusive violation even if exploration
+/// later hits a resource limit. In contrast, satisfaction requires complete
+/// exploration of the relevant finite graph; an incomplete prefix with no
+/// counterexample is therefore `Inconclusive`.
+pub fn check_eventuality_with_limits<S>(
+    model: &TransitionSystem<S>,
+    property: &EventualityProperty<S>,
+    limits: ExplorationLimits,
+) -> Result<BoundedEventualityResult<S>, EventualityError>
+where
+    S: Clone + Eq + Hash,
+{
+    let captured = capture_reachable_graph_with_limits(model, limits)
+        .map_err(RecurrenceError::from)?;
+    let counterexample = find_counterexample(&captured.graph, &captured.known_terminal, property)?;
+    let outcome = if counterexample.is_some() {
+        BoundedOutcome::Conclusive(EventualityStatus::Violated)
+    } else {
+        match captured.completion {
+            GraphCaptureCompletion::Complete => {
+                BoundedOutcome::Conclusive(EventualityStatus::Satisfied)
+            }
+            GraphCaptureCompletion::Inconclusive(reason) => BoundedOutcome::Inconclusive(reason),
+        }
+    };
+
+    Ok(BoundedEventualityResult {
+        property: property.name.clone(),
+        outcome,
+        discovered_states: captured.discovered_states,
+        checked_states: captured.checked_states,
+        explored_transitions: captured.explored_transitions,
+        max_depth_reached: captured.max_depth_reached,
+        counterexample,
+    })
+}
+
+fn find_counterexample<S>(
+    graph: &ReachableGraph<S>,
+    known_terminal: &[bool],
+    property: &EventualityProperty<S>,
+) -> Result<Option<EventualityCounterexample<S>>, EventualityError>
+where
+    S: Clone + Eq + Hash,
+{
+    if graph.states.is_empty() {
+        return Ok(None);
+    }
+    debug_assert_eq!(known_terminal.len(), graph.states.len());
+
     let is_target = graph
         .states
         .iter()
@@ -164,19 +253,12 @@ where
         .map(|(id, _)| id)
         .collect::<HashSet<_>>();
 
-    if let Some(terminal) =
-        (0..graph.states.len()).find(|id| residual_reachable[*id] && graph.outgoing[*id].is_empty())
+    if let Some(terminal) = (0..graph.states.len())
+        .find(|id| residual_reachable[*id] && known_terminal[*id])
     {
         let trace = shortest_path(graph, &graph.initial_ids, terminal, Some(&residual_ids))
             .ok_or(EventualityError::MissingFiniteWitness)?;
-        return Ok(EventualityResult {
-            property: property.name.clone(),
-            status: EventualityStatus::Violated,
-            discovered_states: captured.discovered_states,
-            explored_transitions: captured.explored_transitions,
-            max_depth_reached: captured.max_depth_reached,
-            counterexample: Some(EventualityCounterexample::Finite { trace }),
-        });
+        return Ok(Some(EventualityCounterexample::Finite { trace }));
     }
 
     let residual = induced_graph(graph, &residual_reachable);
@@ -188,25 +270,11 @@ where
     {
         let witness = cycle_witness(&residual, component_index, component)?
             .ok_or(EventualityError::MissingCycleWitness)?;
-        return Ok(EventualityResult {
-            property: property.name.clone(),
-            status: EventualityStatus::Violated,
-            discovered_states: captured.discovered_states,
-            explored_transitions: captured.explored_transitions,
-            max_depth_reached: captured.max_depth_reached,
-            counterexample: Some(EventualityCounterexample::Infinite {
-                stem: witness.stem,
-                cycle: witness.cycle,
-            }),
-        });
+        return Ok(Some(EventualityCounterexample::Infinite {
+            stem: witness.stem,
+            cycle: witness.cycle,
+        }));
     }
 
-    Ok(EventualityResult {
-        property: property.name.clone(),
-        status: EventualityStatus::Satisfied,
-        discovered_states: captured.discovered_states,
-        explored_transitions: captured.explored_transitions,
-        max_depth_reached: captured.max_depth_reached,
-        counterexample: None,
-    })
+    Ok(None)
 }
