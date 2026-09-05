@@ -53,11 +53,7 @@ fn direct_request_grant(name: &str, unfair: bool) -> TransitionSystem<String> {
 }
 
 fn response_spec() -> formal_verification_lab::ActionTemporalSpec {
-    parse_action_temporal(
-        "request-eventually-grant",
-        r#"response("request","grant")"#,
-    )
-    .unwrap()
+    parse_action_temporal("request-eventually-grant", r#"response("request","grant")"#).unwrap()
 }
 
 #[test]
@@ -90,10 +86,7 @@ edge "a" "first" "b"
 fn parsed_models_are_differentially_identical_to_direct_models() {
     for (text, direct) in [
         (FAIR_MODEL, direct_request_grant("direct-fair", false)),
-        (
-            UNFAIR_MODEL,
-            direct_request_grant("direct-unfair", true),
-        ),
+        (UNFAIR_MODEL, direct_request_grant("direct-unfair", true)),
     ] {
         let parsed = parse_declarative_model(text).unwrap();
         assert_eq!(
@@ -186,10 +179,8 @@ fn declarative_syntax_errors_are_position_aware_and_semantic_names_are_checked()
         DeclarativeModelError::UnterminatedString { line: 1, column: 7 }
     );
 
-    let invalid_escape = parse_declarative_model(
-        "model \"m\"\nstate \"a\\q\"\ninitial \"a\"\n",
-    )
-    .unwrap_err();
+    let invalid_escape =
+        parse_declarative_model("model \"m\"\nstate \"a\\q\"\ninitial \"a\"\n").unwrap_err();
     assert_eq!(
         invalid_escape,
         DeclarativeModelError::InvalidEscape {
@@ -216,7 +207,10 @@ fn temp_model_path(label: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    std::env::temp_dir().join(format!("fvlab-{label}-{}-{nonce}.model", std::process::id()))
+    std::env::temp_dir().join(format!(
+        "fvlab-{label}-{}-{nonce}.model",
+        std::process::id()
+    ))
 }
 
 #[test]
@@ -229,12 +223,7 @@ fn temporal_cli_loads_external_models_and_user_expressions() {
 
     let expression = r#"response("request","grant")"#;
     let fair = Command::new(binary)
-        .args([
-            "temporal",
-            "file",
-            fair_path.to_str().unwrap(),
-            expression,
-        ])
+        .args(["temporal", "file", fair_path.to_str().unwrap(), expression])
         .output()
         .unwrap();
     assert!(fair.status.success());
