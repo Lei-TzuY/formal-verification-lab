@@ -217,8 +217,7 @@ fn strongly_connected_components<S>(snapshot: &ReachableSnapshot<S>) -> Vec<Vec<
                 state.lowlink[node] = state.lowlink[node].min(state.lowlink[target]);
             } else if state.on_stack[target] {
                 state.lowlink[node] = state.lowlink[node].min(
-                    state.index[target]
-                        .expect("a node on the Tarjan stack has an assigned index"),
+                    state.index[target].expect("a node on the Tarjan stack has an assigned index"),
                 );
             }
         }
