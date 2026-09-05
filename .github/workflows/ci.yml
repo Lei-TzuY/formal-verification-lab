@@ -47,6 +47,8 @@ jobs:
           safe_output="$(cargo run --quiet -- run counter --max-states 4 --max-transitions 3 --max-depth 3)"
           printf '%s\n' "$safe_output"
           grep -Fq "status: SAFE" <<<"$safe_output"
+          grep -Fq "max depth reached: 3" <<<"$safe_output"
+          grep -Fq "  increment: 3" <<<"$safe_output"
 
           set +e
           bounded_output="$(cargo run --quiet -- run mutex-bug --max-depth 3)"
@@ -56,6 +58,7 @@ jobs:
           printf '%s\n' "$bounded_output"
           test "$bounded_status" -eq 3
           grep -Fq "status: INCONCLUSIVE" <<<"$bounded_output"
+          grep -Fq "max depth reached: 3" <<<"$bounded_output"
           grep -Fq "inconclusive reason: depth limit reached (max 3)" <<<"$bounded_output"
           if grep -Fq "status: SAFE" <<<"$bounded_output"; then
             exit 1
@@ -69,6 +72,15 @@ jobs:
           grep -Fq "status: SAFE" <<<"$safe_output"
           grep -Fq "discovered states: 20" <<<"$safe_output"
           grep -Fq "explored transitions: 34" <<<"$safe_output"
+          grep -Fq "max depth reached: 6" <<<"$safe_output"
+          grep -Fq "  p0:enter: 2" <<<"$safe_output"
+          grep -Fq "  p0:exit: 3" <<<"$safe_output"
+          grep -Fq "  p0:set-flag: 6" <<<"$safe_output"
+          grep -Fq "  p0:set-turn: 6" <<<"$safe_output"
+          grep -Fq "  p1:enter: 2" <<<"$safe_output"
+          grep -Fq "  p1:exit: 3" <<<"$safe_output"
+          grep -Fq "  p1:set-flag: 6" <<<"$safe_output"
+          grep -Fq "  p1:set-turn: 6" <<<"$safe_output"
 
           set +e
           buggy_output="$(cargo run --quiet -- run peterson-bug)"
