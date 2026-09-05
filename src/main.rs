@@ -67,13 +67,16 @@ fn reduce_command(args: &[String]) -> Result<ExitCode, String> {
             let relation = IndependenceRelation::new()
                 .with_pair("left:increment", "right:increment")
                 .map_err(|error| error.to_string())?;
-            let audit = audit_sleep_set_reduction(&model, &relation)
-                .map_err(|error| error.to_string())?;
+            let audit =
+                audit_sleep_set_reduction(&model, &relation).map_err(|error| error.to_string())?;
 
             println!("model: {}", model.name());
             println!("reduction audit: MATCH");
             println!("independence pairs: {}", relation.pair_count());
-            println!("exhaustive status: {}", status_label(audit.exhaustive.status));
+            println!(
+                "exhaustive status: {}",
+                status_label(audit.exhaustive.status)
+            );
             println!("exhaustive states: {}", audit.exhaustive.discovered_states);
             println!(
                 "exhaustive transitions: {}",
@@ -81,7 +84,10 @@ fn reduce_command(args: &[String]) -> Result<ExitCode, String> {
             );
             println!("reduced status: {}", status_label(audit.reduced.status));
             println!("reduced states: {}", audit.reduced.discovered_states);
-            println!("reduced transitions: {}", audit.reduced.explored_transitions);
+            println!(
+                "reduced transitions: {}",
+                audit.reduced.explored_transitions
+            );
             println!("pruned transitions: {}", audit.reduced.pruned_transitions);
 
             Ok(status_exit_code(audit.exhaustive.status))
