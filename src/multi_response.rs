@@ -1,10 +1,11 @@
 use crate::checker::TraceStep;
 use crate::model::TransitionSystem;
+use crate::product::build_action_product;
 use crate::recurrence::{
     capture_reachable_graph, component_is_cyclic, cycle_witness, induced_graph, shortest_path,
-    strongly_connected_components, ReachableGraph, RecurrenceError, SnapshotEdge,
+    strongly_connected_components, ReachableGraph, RecurrenceError,
 };
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::HashSet;
 use std::fmt;
 use std::hash::Hash;
 use std::sync::Arc;
@@ -251,7 +252,23 @@ where
     S: Clone + Eq + Hash,
 {
     let captured = capture_reachable_graph(model)?;
-    let product = build_product_graph(&captured.graph, property);
+    let initial_pending = vec![false; property.clauses.len()];
+    let product = build_action_product(
+        &captured.graph,
+        &initial_pending,
+        |pending, action| {
+            let mut next_pending = pending.clone();
+            for (index, clause) in property.clauses.iter().enumerate() {
+                if (clause.response)(action) {
+                    next_pending[index] = false;
+                } else if (clause.trigger)(action) {
+                    next_pending[index] = true;
+                }
+            }
+            next_pending
+        },
+        |state, pending| MultiObligationState { state, pending },
+    );
     let product_transitions = product.outgoing.iter().map(Vec::len).sum();
 
     for (terminal, state) in product.states.iter().enumerate() {
@@ -383,76 +400,4 @@ fn candidate_key<S>(candidate: &InfiniteCandidate<S>) -> (usize, usize, usize) {
         candidate.clause_index,
         candidate.product_entry,
     )
-}
-
-fn build_product_graph<S: Clone>(
-    graph: &ReachableGraph<S>,
-    property: &MultiResponseProperty,
-) -> ReachableGraph<MultiObligationState<S>> {
-    let clause_count = property.clauses.len();
-    let mut states = Vec::new();
-    let mut outgoing: Vec<Vec<SnapshotEdge>> = Vec::new();
-    let mut initial_ids = Vec::new();
-    let mut ids: HashMap<(usize, Vec<bool>), usize> = HashMap::new();
-    let mut queue = VecDeque::new();
-
-    for &model_id in &graph.initial_ids {
-        let pending = vec![false; clause_count];
-        let key = (model_id, pending.clone());
-        let product_id = if let Some(id) = ids.get(&key).copied() {
-            id
-        } else {
-            let id = states.len();
-            ids.insert(key.clone(), id);
-            states.push(MultiObligationState {
-                state: graph.states[model_id].clone(),
-                pending,
-            });
-            outgoing.push(Vec::new());
-            queue.push_back(key);
-            id
-        };
-        if !initial_ids.contains(&product_id) {
-            initial_ids.push(product_id);
-        }
-    }
-
-    while let Some((model_id, pending)) = queue.pop_front() {
-        let source = ids[&(model_id, pending.clone())];
-        for edge in &graph.outgoing[model_id] {
-            let mut next_pending = pending.clone();
-            for (index, clause) in property.clauses.iter().enumerate() {
-                if (clause.response)(&edge.action) {
-                    next_pending[index] = false;
-                } else if (clause.trigger)(&edge.action) {
-                    next_pending[index] = true;
-                }
-            }
-
-            let key = (edge.target, next_pending.clone());
-            let target = if let Some(id) = ids.get(&key).copied() {
-                id
-            } else {
-                let id = states.len();
-                ids.insert(key.clone(), id);
-                states.push(MultiObligationState {
-                    state: graph.states[edge.target].clone(),
-                    pending: next_pending,
-                });
-                outgoing.push(Vec::new());
-                queue.push_back(key);
-                id
-            };
-            outgoing[source].push(SnapshotEdge {
-                action: edge.action.clone(),
-                target,
-            });
-        }
-    }
-
-    ReachableGraph {
-        states,
-        outgoing,
-        initial_ids,
-    }
 }
