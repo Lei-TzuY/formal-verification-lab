@@ -20,7 +20,8 @@ pub use checker::{
 pub use model::{Invariant, ModelError, StateVariable, Transition, TransitionSystem};
 pub use property::{
     check_deadlock, check_reachability, DeadlockError, DeadlockProperty, DeadlockResult,
-    DeadlockStatus, ReachabilityError, ReachabilityProperty, ReachabilityResult, ReachabilityStatus,
+    DeadlockStatus, ReachabilityError, ReachabilityProperty, ReachabilityResult,
+    ReachabilityStatus,
 };
 pub use reduction::{
     audit_sleep_set_reduction, IndependenceError, IndependenceRelation, ReducedExploration,
