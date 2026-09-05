@@ -114,3 +114,31 @@ jobs:
           grep -Fq "reduced states: 9" <<<"$output"
           grep -Fq "reduced transitions: 8" <<<"$output"
           grep -Fq "pruned transitions: 4" <<<"$output"
+      - name: Reachability property CLI integration test
+        shell: bash
+        run: |
+          reachable_output="$(cargo run --quiet -- reach counter-three)"
+          printf '%s\n' "$reachable_output"
+          grep -Fq "model: bounded-counter" <<<"$reachable_output"
+          grep -Fq "property: reaches-three" <<<"$reachable_output"
+          grep -Fq "reachability: REACHABLE" <<<"$reachable_output"
+          grep -Fq "discovered states: 4" <<<"$reachable_output"
+          grep -Fq "checked states: 4" <<<"$reachable_output"
+          grep -Fq "explored transitions: 3" <<<"$reachable_output"
+          grep -Fq "max depth reached: 3" <<<"$reachable_output"
+          test "$(grep -Fc -- '--increment-->' <<<"$reachable_output")" -eq 3
+          grep -Fq "CounterState { value: 3 }" <<<"$reachable_output"
+
+          set +e
+          unreachable_output="$(cargo run --quiet -- reach counter-four)"
+          unreachable_status=$?
+          set -e
+
+          printf '%s\n' "$unreachable_output"
+          test "$unreachable_status" -eq 4
+          grep -Fq "property: reaches-four" <<<"$unreachable_output"
+          grep -Fq "reachability: UNREACHABLE" <<<"$unreachable_output"
+          grep -Fq "discovered states: 4" <<<"$unreachable_output"
+          grep -Fq "checked states: 4" <<<"$unreachable_output"
+          grep -Fq "explored transitions: 3" <<<"$unreachable_output"
+          grep -Fq "witness: none (reachable graph exhausted)" <<<"$unreachable_output"

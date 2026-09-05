@@ -192,6 +192,31 @@ where
         &self.invariants
     }
 
+    /// Build an internal view over the same transition graph with a different
+    /// invariant set. Property engines use this to reuse the canonical BFS
+    /// checker instead of implementing a second traversal semantics.
+    pub(crate) fn with_replaced_invariants(
+        &self,
+        name: impl Into<String>,
+        invariants: Vec<Invariant<S>>,
+    ) -> Result<Self, ModelError> {
+        let name = name.into();
+        validate_metadata(
+            &name,
+            &self.state_variables,
+            &self.initial_states,
+            &invariants,
+        )?;
+
+        Ok(Self {
+            name,
+            state_variables: self.state_variables.clone(),
+            initial_states: self.initial_states.clone(),
+            transition_relation: Arc::clone(&self.transition_relation),
+            invariants,
+        })
+    }
+
     pub fn successors(&self, state: &S) -> Result<Vec<Transition<S>>, ModelError> {
         let transitions = (self.transition_relation)(state)?;
         if transitions

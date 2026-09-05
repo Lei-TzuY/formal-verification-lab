@@ -1,10 +1,13 @@
 use formal_verification_lab::checker::{check_with_limits, ExplorationLimits, VerificationStatus};
 use formal_verification_lab::examples::{
     bounded_counter, buggy_mutex, buggy_peterson_mutex, commuting_counters, peterson_mutex,
-    traffic_light,
+    traffic_light, CounterState,
+};
+use formal_verification_lab::property::{
+    check_reachability, ReachabilityProperty, ReachabilityStatus,
 };
 use formal_verification_lab::reduction::{audit_sleep_set_reduction, IndependenceRelation};
-use formal_verification_lab::report::render_report;
+use formal_verification_lab::report::{render_reachability_report, render_report};
 use std::env;
 use std::process::ExitCode;
 
@@ -30,6 +33,7 @@ fn run(args: Vec<String>) -> Result<ExitCode, String> {
         }
         [command, rest @ ..] if command == "run" => run_command(rest),
         [command, rest @ ..] if command == "reduce" => reduce_command(rest),
+        [command, rest @ ..] if command == "reach" => reach_command(rest),
         _ => Err(usage()),
     }
 }
@@ -99,6 +103,37 @@ fn reduce_command(args: &[String]) -> Result<ExitCode, String> {
     }
 }
 
+fn reach_command(args: &[String]) -> Result<ExitCode, String> {
+    match args {
+        [query] if query == "counter-three" => {
+            run_counter_reachability("reaches-three", |state| state.value == 3)
+        }
+        [query] if query == "counter-four" => {
+            run_counter_reachability("reaches-four", |state| state.value == 4)
+        }
+        [query] => Err(format!(
+            "unknown reachability query '{query}'; expected counter-three or counter-four"
+        )),
+        _ => Err(usage()),
+    }
+}
+
+fn run_counter_reachability(
+    property_name: &str,
+    target: impl Fn(&CounterState) -> bool + Send + Sync + 'static,
+) -> Result<ExitCode, String> {
+    let model = bounded_counter().map_err(|error| error.to_string())?;
+    let property =
+        ReachabilityProperty::new(property_name, target).map_err(|error| error.to_string())?;
+    let result = check_reachability(&model, &property).map_err(|error| error.to_string())?;
+    print!("{}", render_reachability_report(model.name(), &result));
+
+    Ok(match result.status {
+        ReachabilityStatus::Reachable => ExitCode::SUCCESS,
+        ReachabilityStatus::Unreachable => ExitCode::from(4),
+    })
+}
+
 fn parse_limits(args: &[String]) -> Result<ExplorationLimits, String> {
     let mut limits = ExplorationLimits::unbounded();
     let mut index = 0;
@@ -162,7 +197,7 @@ fn status_exit_code(status: VerificationStatus) -> ExitCode {
 }
 
 fn usage() -> String {
-    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters]"
+    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four>]"
         .to_owned()
 }
 

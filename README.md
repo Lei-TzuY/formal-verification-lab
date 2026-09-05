@@ -2,7 +2,7 @@
 
 A serious educational laboratory for building formal-methods machinery from first principles.
 
-The project currently implements a small **explicit-state safety model checker** in Rust. It is intentionally not a wrapper around an existing model checker, and it is not presented as production-grade verification software.
+The project implements a small **explicit-state formal-verification laboratory** in Rust. It is not a wrapper around an existing model checker and is not presented as production-grade verification software.
 
 ## Implemented milestones
 
@@ -10,7 +10,7 @@ The project currently implements a small **explicit-state safety model checker**
 
 A model is a finite-state transition system with named state-variable metadata, one or more concrete initial states, an ordered labeled transition relation, and named safety invariants. Concrete state identity is defined by Rust `Eq + Hash`.
 
-The canonical checker performs deterministic breadth-first search. It terminates on finite cyclic state spaces, checks invariants in deterministic order, and stores predecessor/action links so the first reachable invariant violation reconstructs a deterministic shortest transition-count counterexample.
+The canonical checker performs deterministic breadth-first search (BFS). It terminates on finite cyclic state spaces, checks invariants in deterministic order, and stores predecessor/action links so the first reachable invariant violation reconstructs a deterministic shortest transition-count counterexample.
 
 ### Milestone 2: bounded exploration with explicit incompleteness
 
@@ -26,7 +26,7 @@ Exact numeric bounds can still produce `SAFE` when they do not block required wo
 
 ### Milestone 3: typed model construction and Peterson mutual exclusion
 
-`TransitionSystemBuilder<S>` is a thin typed construction layer that always materializes the same canonical `TransitionSystem<S>` and therefore reuses canonical validation and checker semantics.
+`TransitionSystemBuilder<S>` is a thin typed construction layer that materializes the same canonical `TransitionSystem<S>` and therefore reuses canonical validation and checker semantics.
 
 The first nontrivial consumer is a two-process Peterson mutual-exclusion model with explicit program counters, intent flags, and shared `turn`. The correct model exhaustively reaches 20 states and examines 34 transition edges while satisfying `mutual-exclusion`. A controlled lost-intent variant produces a reproducible six-transition counterexample ending with both processes in `Critical`.
 
@@ -38,18 +38,32 @@ The checker is independently cross-checked across all 512 directed graphs on thr
 
 ### Milestone 5: differential sleep-set reduction audit
 
-Milestone 5 introduces an **experimental reduction layer without promoting it to a trusted proof backend**.
+Milestone 5 adds an **experimental reduction layer without promoting it to a trusted proof backend**.
 
-`IndependenceRelation` is an explicit symmetric relation over complete action labels. No independence is inferred from prefixes or naming conventions. `audit_sleep_set_reduction` performs two executions:
+`IndependenceRelation` is an explicit symmetric relation over complete action labels. `audit_sleep_set_reduction` always runs both the canonical exhaustive checker and an experimental deterministic sleep-set DFS. The audit succeeds only when their verification statuses agree. A mismatch returns `ReductionAuditError::SemanticMismatch`; reduced search cannot overwrite exhaustive proof evidence.
 
-1. the canonical exhaustive checker, which remains the authority;
-2. an experimental deterministic depth-first sleep-set exploration using the supplied relation.
+The `commuting-counters` product model provides a genuinely commuting pair (`left:increment`, `right:increment`). With that relation the experiment preserves `SAFE` while reducing examined transition edges from 12 to 8 and recording 4 sleep-set prunes. A deliberately false independence declaration has its own regression and must fail closed. These are graph-work counts, not performance benchmarks.
 
-The audit succeeds only when both executions agree on verification status. A mismatch returns `ReductionAuditError::SemanticMismatch`; the reduced result is not allowed to overwrite or substitute for exhaustive proof evidence.
+### Milestone 6: existential reachability properties
 
-This fail-closed rule is deliberate because a user can declare a false independence relation. The regression suite contains such a model: exhaustive exploration reaches a violation, the intentionally unsound relation lets the reduced search miss it, and the audit must reject the experiment as a mismatch.
+Milestone 6 expands property expressiveness with a deliberately narrow query:
 
-A separate `commuting-counters` product model supplies a genuinely commuting pair of actions (`left:increment`, `right:increment`). With that explicit relation, the current experiment preserves `SAFE` while reducing examined transition edges from 12 to 8 and recording 4 sleep-set prunes. These are graph-work counts, not a performance benchmark.
+> **Does at least one reachable state satisfy a target predicate?**
+
+`ReachabilityProperty<S>` names a target predicate and `check_reachability` returns either:
+
+- `REACHABLE` with a deterministic shortest transition-count witness; or
+- `UNREACHABLE` only after the finite reachable graph has been exhaustively explored.
+
+The property engine does **not** implement a second graph traversal. Internally it creates a derived view over the same transition relation with one sentinel invariant that holds until the target is seen, then delegates to the canonical BFS checker. A target hit is therefore the canonical checker's first sentinel-invariant violation and inherits its shortest-path and deterministic-order guarantees.
+
+The derived-model hook is `pub(crate)` rather than public API. It reuses the same model metadata validation and the same transition-relation `Arc`; reachability is an additional interpretation over an existing transition graph, not an alternate execution semantics.
+
+Reachability queries intentionally replace the model's safety invariants while evaluating the target. This means a query answers graph reachability independently of whether the original model is safe. Safety and reachability remain separate properties.
+
+The reachability suite again exhaustively enumerates all 512 directed three-node graphs. An independent Floyd–Warshall oracle validates target reachability, shortest witness length, witness-edge validity, unreachable-state exhaustion counts, and repeated-run determinism.
+
+This milestone is **not** full LTL/CTL and does not claim universal eventuality, fairness, progress, or liveness. `UNREACHABLE` means no target state exists in the exhaustively explored finite reachable graph.
 
 ## Architecture
 
@@ -57,14 +71,16 @@ A separate `commuting-counters` product model supplies a genuinely commuting pai
 src/model.rs      canonical transition-system abstraction and validation
 src/builder.rs    thin typed construction layer
 src/checker.rs    canonical deterministic BFS, bounds, diagnostics, traces
+src/property.rs   reachability queries encoded through the canonical checker
 src/reduction.rs  opt-in experimental sleep-set exploration + exhaustive audit
 src/examples.rs   executable teaching models and concurrent/product examples
-src/report.rs     deterministic line-oriented checker reports
-src/main.rs       CLI and option parsing; no transition-system semantics
-tests/            semantic, builder, protocol, graph-oracle, reduction coverage
+src/report.rs     deterministic checker and property reports
+src/main.rs       CLI and option parsing; no graph traversal semantics
+tests/            semantic, builder, protocol, graph-oracle, reduction,
+                  and reachability coverage
 ```
 
-The canonical safety semantics remain in `model` + `checker`. The reduction module consumes those models but does not modify default `check()` / `check_with_limits()` behavior.
+The canonical graph semantics remain in `model` + `checker`. Property and reduction layers consume those models without changing default `check()` / `check_with_limits()` behavior.
 
 ## Executable examples
 
@@ -103,24 +119,14 @@ The correct finite model is `SAFE` at 20 states / 34 examined edges / maximum BF
 
 ### Commuting product and reduction audit
 
-Canonical exhaustive run:
-
 ```bash
 cargo run -- run commuting-counters
-```
-
-Differential reduction experiment:
-
-```bash
 cargo run -- reduce commuting-counters
 ```
 
-The reduction command prints both exhaustive and reduced status/counts. It exits successfully only after the audit confirms matching status; this CLI surface is an experiment/audit, not a standalone proof command.
-
-Expected stable markers include:
+The reduction audit reports matching exhaustive/reduced status and the stable exploration counts:
 
 ```text
-reduction audit: MATCH
 exhaustive states: 9
 exhaustive transitions: 12
 reduced states: 9
@@ -128,16 +134,39 @@ reduced transitions: 8
 pruned transitions: 4
 ```
 
+### Reachability witnesses and exhaustive absence
+
+A reachable target:
+
+```bash
+cargo run -- reach counter-three
+```
+
+The command reports `reachability: REACHABLE`, exits 0, and prints the shortest three-transition witness from counter value 0 to value 3.
+
+An absent target:
+
+```bash
+cargo run -- reach counter-four
+```
+
+The finite counter can only reach 0 through 3. The command therefore exhausts all four reachable states, reports `reachability: UNREACHABLE`, prints `witness: none (reachable graph exhausted)`, and exits 4.
+
 ## CLI exit status
 
-For canonical `run` commands:
+Canonical `run` commands:
 
 - `0`: exhaustive result is `SAFE`;
 - `1`: invariant `VIOLATION` with a counterexample;
-- `2`: malformed CLI input or model/exploration/audit error;
+- `2`: malformed CLI input or model/exploration/audit/property error;
 - `3`: bounded canonical exploration is `INCONCLUSIVE`.
 
-`reduce commuting-counters` currently uses the authoritative exhaustive result's success/violation exit status and treats differential mismatch as an error (exit 2).
+Reachability commands:
+
+- `0`: target is `REACHABLE` and a shortest witness is available;
+- `4`: target is `UNREACHABLE` after exhaustive finite-state exploration.
+
+`reduce commuting-counters` uses the authoritative exhaustive result's success/violation exit status and treats differential mismatch as an error (exit 2).
 
 ## Tests
 
@@ -158,39 +187,45 @@ Coverage includes:
 - deterministic exploration diagnostics;
 - typed-builder delegation to canonical model validation;
 - correct and deliberately broken Peterson models;
-- all 512 three-node directed graphs against an independent shortest-path oracle;
-- explicit independence-relation validation and symmetry;
-- an empty relation degenerating to unpruned exploration;
-- a commuting product where the experimental sleep set reduces examined edges;
-- an intentionally false independence declaration that must fail closed with `SemanticMismatch`.
+- all 512 three-node directed graphs against an independent shortest-path oracle for canonical BFS;
+- explicit reduction independence validation, positive edge reduction, and fail-closed semantic mismatch;
+- reachability property-name validation;
+- zero-transition initial-state reachability witnesses;
+- deterministic shortest reachability witnesses;
+- unreachable targets requiring full reachable-graph exhaustion;
+- reachability queries remaining independent of original safety invariants;
+- all 512 three-node directed graphs independently cross-checking reachability and witness semantics.
 
-CI additionally exercises the canonical violation path, bounded-inconclusive path, Peterson proof/counterexample paths, diagnostic markers, and the real `reduce commuting-counters` CLI audit.
+CI additionally exercises canonical violation, bounded-inconclusive, Peterson, reduction-audit, reachable-property, and unreachable-property paths through the real CLI.
 
-## Model and reduction trust boundaries
+## Trust boundaries
 
-Canonical model construction rejects malformed metadata and empty transition labels. The checker propagates transition-generation errors. It still cannot prove that a user transition function is pure, finite, deterministic, or a faithful representation of an external implementation.
+Canonical model construction rejects malformed metadata and empty transition labels. The checker propagates transition-generation errors. It cannot prove that a user transition function is pure, finite, deterministic, or faithful to an external implementation.
 
-Reduction declarations have an even narrower trust boundary: an `IndependenceRelation` is a **claim supplied by the model author**, not something established from action strings. Milestone 5 therefore keeps exhaustive checking in the loop and rejects any observed status mismatch. The current reduced engine must not be used by itself to assert safety.
+Reduction declarations are model-author claims; M5 therefore retains exhaustive checking as authority and rejects observed status mismatch.
+
+Reachability predicates are also user-supplied Rust functions. M6 proves only whether such a predicate is encountered in the finite explicit transition graph represented by the model. It does not infer real-world liveness or implementation behavior from that result.
 
 ## Limitations
 
 - explicit-state memory grows with retained reachable states;
-- safety invariants only; Peterson liveness/starvation freedom is not claimed;
+- safety plus existential state reachability only; no universal eventuality or general temporal logic;
+- Peterson liveness/starvation freedom is not claimed;
 - protocol results apply to the finite model and its atomic-step assumptions, not arbitrary machine code or weak-memory executions;
 - resource limits do not interrupt a successor function while it is building one state's transition vector;
 - reduction statistics are state/edge accounting, not controlled performance benchmarks;
 - the sleep-set engine is experimental and differentially audited, not a standalone trusted POR backend;
-- no LTL/CTL, fairness, Büchi automata, SAT/SMT, BDDs, symbolic execution, theorem proving, symmetry reduction, disk-backed storage, parallel search, or distributed checking;
+- no LTL/CTL parser, fairness, Büchi automata, SAT/SMT, BDDs, symbolic execution, theorem proving, symmetry reduction, disk-backed storage, parallel search, or distributed checking;
 - deterministic traces require deterministic successor ordering from the model.
 
 ## Roadmap
 
-Milestones 1–5 now cover canonical explicit-state safety checking, honest bounded outcomes, typed construction, a real concurrent protocol, independent BFS validation, and a fail-closed partial-order reduction experiment.
+Milestones 1–6 now cover deterministic explicit-state safety, honest bounded outcomes, typed construction, a real concurrent protocol, independent BFS validation, fail-closed reduction experiments, and existential reachability with shortest witnesses.
 
-The next architectural promotion should deepen **property expressiveness** rather than farming more reduction examples. The highest-value candidate is a small temporal-property vertical slice:
+The next highest-value property frontier is **deadlock/terminal-state analysis** rather than immediately claiming full temporal logic:
 
-1. define a deliberately narrow temporal property such as reachability/eventual-state existence or invariant-plus-deadlock detection with precise finite-state semantics;
-2. keep safety checking backward-compatible and avoid claiming full LTL/CTL before an actual parser/automaton implementation exists;
-3. add executable counterexample/witness semantics and deterministic reporting;
-4. validate the property engine against independent graph oracles/generated finite models;
-5. only then consider Büchi/LTL machinery or a trusted standalone POR path with stronger independence evidence.
+1. define deadlock precisely as a reachable state with no enabled outgoing transition, keeping legitimate terminal states distinguishable through an explicit predicate or policy;
+2. return a deterministic shortest witness to a reachable deadlock when one exists;
+3. prove deadlock absence only after exhaustive finite-state exploration;
+4. cross-check deadlock detection against independently generated finite-graph out-degree oracles;
+5. integrate the property into CLI/reporting before considering broader temporal operators, fairness, Büchi/LTL machinery, or stronger standalone POR claims.

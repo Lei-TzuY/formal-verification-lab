@@ -8,6 +8,7 @@ pub mod builder;
 pub mod checker;
 pub mod examples;
 pub mod model;
+pub mod property;
 pub mod reduction;
 pub mod report;
 
@@ -17,6 +18,10 @@ pub use checker::{
     TraceStep, VerificationStatus,
 };
 pub use model::{Invariant, ModelError, StateVariable, Transition, TransitionSystem};
+pub use property::{
+    check_reachability, ReachabilityError, ReachabilityProperty, ReachabilityResult,
+    ReachabilityStatus,
+};
 pub use reduction::{
     audit_sleep_set_reduction, IndependenceError, IndependenceRelation, ReducedExploration,
     ReductionAudit, ReductionAuditError,
