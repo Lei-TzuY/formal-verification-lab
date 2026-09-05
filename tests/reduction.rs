@@ -1,7 +1,7 @@
 use formal_verification_lab::examples::commuting_counters;
 use formal_verification_lab::{
-    audit_sleep_set_reduction, IndependenceError, IndependenceRelation, Invariant, ReductionAuditError,
-    StateVariable, Transition, TransitionSystem, VerificationStatus,
+    audit_sleep_set_reduction, IndependenceError, IndependenceRelation, Invariant,
+    ReductionAuditError, StateVariable, Transition, TransitionSystem, VerificationStatus,
 };
 
 #[test]
@@ -51,8 +51,14 @@ fn empty_independence_relation_degenerates_to_unpruned_exploration() {
     let audit = audit_sleep_set_reduction(&model, &IndependenceRelation::new()).unwrap();
 
     assert_eq!(audit.exhaustive.status, audit.reduced.status);
-    assert_eq!(audit.exhaustive.discovered_states, audit.reduced.discovered_states);
-    assert_eq!(audit.exhaustive.explored_transitions, audit.reduced.explored_transitions);
+    assert_eq!(
+        audit.exhaustive.discovered_states,
+        audit.reduced.discovered_states
+    );
+    assert_eq!(
+        audit.exhaustive.explored_transitions,
+        audit.reduced.explored_transitions
+    );
     assert_eq!(audit.reduced.pruned_transitions, 0);
 }
 
