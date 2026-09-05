@@ -89,6 +89,38 @@ M11's generated oracle evaluates **38,416** deterministic cases:
 
 The seven edge semantics cover no-op, trigger/response for each class, and cross-class handoff actions that answer one class while triggering the other. The oracle independently constructs the eight possible `(node, A_pending, B_pending)` states, computes product reachability and per-clause pending-only recurrence with Floyd–Warshall, and validates status, product accounting, witness edges, monitor updates, finite-terminal precedence, violated-clause identity, closed per-clause cycles, shortest stems, and deterministic repeated analysis.
 
+### Milestone 12 — deterministic finite monitor products
+
+Milestone 12 promotes temporal checking from special-purpose response bits to a reusable action-driven finite monitor abstraction.
+
+`FiniteMonitor<M>` contains:
+
+- one finite initial monitor state;
+- a deterministic update `step(monitor_state, action) -> monitor_state`;
+- zero or more named immediate rejecting conditions; and
+- zero or more named progress-region conditions, with at least one condition required overall.
+
+`check_monitor` captures the model transition graph exactly once and then explores the explicit product
+
+```text
+(model_state, monitor_state)
+```
+
+Rejecting monitor states are safety-style failures and receive deterministic shortest product traces. A progress condition means that its active monitor region may not contain a maximal execution suffix forever. It therefore fails when either:
+
+- a reachable product terminal lies in that active region; or
+- a reachable cyclic SCC can stay continuously inside that active region forever.
+
+Failure precedence is deterministic: rejecting state, then progress terminal, then progress cycle. Progress cycles use a shortest global stem to a qualifying recurrent region and a deterministic real-edge closed cycle. No fairness assumption is introduced.
+
+The executable session monitor keeps explicit protocol history in `Idle`, `Open`, `Committed`, and `Rejected` monitor states. It distinguishes:
+
+- `open -> commit -> close`, which satisfies both ordering and progress;
+- a deliberate double `open`, which reaches `Rejected` and reports `REJECTING_STATE`; and
+- `open -> commit -> tick -> ...`, which remains in the committed progress region and reports `PROGRESS_CYCLE`.
+
+M12's generated oracle evaluates **4096** monitor products: all 16 directed two-node graph masks × all `4^4 = 256` assignments of `tick/open/commit/close` semantics to the four possible edges. The oracle independently constructs the eight `(node, monitor_state)` product states, computes full and progress-only reachability with Floyd–Warshall, and validates result status, product accounting, monitor updates, rejecting precedence, active terminals, active-only recurrence, real-edge witnesses, shortest rejecting traces, progress stem distance, closed progress cycles, and repeated determinism.
+
 ## Architecture
 
 ```text
@@ -101,6 +133,7 @@ src/recurrence.rs             one-exploration graph snapshot, induced graphs,
 src/eventuality.rs            universal eventuality over target-cut residuals
 src/multi_response.rs         canonical multi-clause response product engine
 src/response.rs               single-clause compatibility API over that engine
+src/monitor.rs                generic deterministic finite monitor product engine
 src/reduction.rs              experimental sleep-set path + exhaustive audit
 src/*_report.rs               deterministic analysis-specific reporting
 src/*_examples.rs             executable teaching models
@@ -125,6 +158,7 @@ cargo run -- scc traffic-light
 cargo run -- eventually counter-three
 cargo run -- respond request-grant
 cargo run -- respond dual-grant
+cargo run -- monitor session-ok
 ```
 
 ### Universal eventuality
@@ -155,6 +189,16 @@ cargo run -- respond dual-grant-unfair-b
 
 The deterministic dual protocol repeatedly fulfills both classes. The unfair-B variant can remain on `wait-b` forever after `request-b`; it exits 7, identifies `violated clause: class-b`, and prints a cycle whose pending vector keeps class B set.
 
+### Finite monitors
+
+```bash
+cargo run -- monitor session-ok
+cargo run -- monitor session-double-open
+cargo run -- monitor session-stuck
+```
+
+The valid lifecycle reports `monitor verification: SATISFIED`. Double-open exits 8 with `REJECTING_STATE`. The stuck-committed protocol exits 8 with `PROGRESS_CYCLE` and a `tick` cycle whose monitor state remains `Committed`.
+
 ## CLI exit status
 
 - `0`: successful analysis whose property holds, or successful structural SCC analysis;
@@ -164,7 +208,8 @@ The deterministic dual protocol repeatedly fulfills both classes. The unfair-B v
 - `4`: existential target is `UNREACHABLE`;
 - `5`: unexpected terminal/deadlock found;
 - `6`: universal eventuality is `VIOLATED`;
-- `7`: single- or multi-class response property is `VIOLATED`.
+- `7`: single- or multi-class response property is `VIOLATED`;
+- `8`: deterministic finite monitor verification is `VIOLATED`.
 
 ## Tests and CI
 
@@ -177,19 +222,20 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo test --all-targets --all-features
 ```
 
-Coverage includes safety, bounded exploration, Peterson, audited reduction, reachability, deadlock policies, SCC structure, universal eventuality, single-class response, and multi-class response products. Generated suites independently cross-check the graph algorithms plus M9's 4096 eventuality cases, M10's 4096 single-response cases, and M11's 38,416 two-class product cases.
+Coverage includes safety, bounded exploration, Peterson, audited reduction, reachability, deadlock policies, SCC structure, universal eventuality, single-class response, multi-class response products, and generic finite monitor products. Generated suites independently cross-check the graph algorithms plus M9's 4096 eventuality cases, M10's 4096 single-response cases, M11's 38,416 two-class product cases, and M12's 4096 finite-monitor product cases.
 
-CI additionally executes real CLI gates for every milestone, including positive and negative single- and multi-class response paths.
+CI's complete test command also executes the built `fvlab` binary through an integration test for all three M12 monitor outcomes, while the workflow retains direct positive/negative CLI gates for the earlier milestones.
 
 ## Trust boundaries and limitations
 
 - Results apply to the finite transition model and its atomic-step assumptions, not automatically to machine code, weak-memory executions, or external distributed systems.
 - User transition functions and state/action predicates must faithfully encode the intended system/property; the checker cannot prove modeling fidelity or purity.
-- Explicit-state memory grows with the reachable graph. A `k`-clause response monitor can in the worst case expand one captured model state into up to `2^k` pending-bit valuations, for an upper bound of `|S| * 2^k` product states before reachability pruning.
+- Explicit-state memory grows with the reachable graph. A `k`-clause response monitor can in the worst case expand one captured model state into up to `2^k` pending-bit valuations. A finite monitor with `|M|` reachable monitor states has an upper bound of `|S| * |M|` product states before reachability pruning.
 - Each response class is Boolean, not a per-request identity queue. Repeated same-class triggers while already pending do not create distinct identities; a later same-class response discharges that class's outstanding Boolean obligation.
+- M12 monitor transitions are deterministic and action-driven. There is no nondeterministic automaton, epsilon transition, monitor-state minimization, textual property parser, or automatic formula translation.
 - Tarjan SCC discovery currently uses recursive DFS; very deep graphs may motivate a future iterative implementation.
-- M9–M11 have **no fairness semantics**. Enabled responses are not assumed to be scheduled.
-- M9–M11 are not a full LTL/CTL implementation and do not claim temporal-logic parsing, Büchi automata, fairness constraints, or arbitrary nested formulas.
+- M9–M12 have **no fairness semantics**. Enabled responses or progress actions are not assumed to be scheduled.
+- M9–M12 are not a full LTL/CTL implementation and do not claim temporal-logic parsing, Büchi construction from formulas, fairness constraints, or arbitrary nested formulas.
 - Peterson starvation freedom is still not claimed.
 - The sleep-set engine remains experimental and differentially audited, not a standalone trusted POR proof backend.
 - No SAT/SMT, BDDs, symbolic execution, theorem proving, symmetry reduction, disk-backed state storage, parallel exploration, or distributed checking is implemented.
@@ -197,6 +243,6 @@ CI additionally executes real CLI gates for every milestone, including positive 
 
 ## Roadmap
 
-Milestones 1–11 form a coherent explicit-state stack: safety -> bounded honesty -> typed models -> independent graph validation -> audited reduction -> existential reachability -> terminal/deadlock analysis -> recurrent SCC structure -> universal eventuality -> single response obligations -> composed multi-class response obligations.
+Milestones 1–12 form a coherent explicit-state stack: safety -> bounded honesty -> typed models -> independent graph validation -> audited reduction -> existential reachability -> terminal/deadlock analysis -> recurrent SCC structure -> universal eventuality -> single response obligations -> composed multi-class response obligations -> generic deterministic finite monitor products.
 
-The next architectural frontier should stop adding special-case response variants and introduce a small **explicit finite monitor automaton** abstraction. A high-value Milestone 12 would compose a user-defined deterministic monitor state with the captured model graph, define accepting/rejecting or recurrence conditions explicitly, preserve deterministic counterexamples, and validate monitor-product semantics with an independent generated oracle. That would create a principled bridge toward richer temporal properties without prematurely claiming a full textual LTL/CTL frontend or fairness framework.
+The next architectural frontier should deepen explicit automata semantics rather than add more hard-coded protocol variants. A high-value Milestone 13 is an **explicit Büchi-style acceptance layer over user-defined finite automata**, with deterministic product construction, named acceptance sets, finite/maximal-execution policy made explicit, lasso counterexamples, and an independent generated product oracle. A textual LTL frontend or formula-to-automaton compiler should come only after that automata core is executable and independently validated.
