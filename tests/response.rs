@@ -112,9 +112,7 @@ fn floyd(adjacency: &[[bool; PRODUCT_N]; PRODUCT_N]) -> [[usize; PRODUCT_N]; PRO
     distance
 }
 
-fn pending_floyd(
-    adjacency: &[[bool; PRODUCT_N]; PRODUCT_N],
-) -> [[usize; PRODUCT_N]; PRODUCT_N] {
+fn pending_floyd(adjacency: &[[bool; PRODUCT_N]; PRODUCT_N]) -> [[usize; PRODUCT_N]; PRODUCT_N] {
     let mut distance = [[INF; PRODUCT_N]; PRODUCT_N];
     for (index, row) in distance.iter_mut().enumerate() {
         let (_, pending) = decode_product(index);
@@ -303,35 +301,20 @@ fn all_two_node_graph_and_action_classifications_match_product_oracle() {
                     None => assert!(!expected_violation),
                     Some(ResponseCounterexample::Finite { trace }) => {
                         assert!(has_pending_terminal);
-                        validate_product_trace(
-                            graph_mask,
-                            trigger_mask,
-                            response_mask,
-                            &trace,
-                        );
+                        validate_product_trace(graph_mask, trigger_mask, response_mask, &trace);
                         let end = &trace.last().unwrap().state;
                         assert!(end.pending);
-                        assert!((0..N).all(|to| {
-                            !has_bit(graph_mask, edge_index(end.state, to))
-                        }));
+                        assert!(
+                            (0..N).all(|to| { !has_bit(graph_mask, edge_index(end.state, to)) })
+                        );
                         let product = product_index(end.state, end.pending);
                         assert_eq!(trace.len() - 1, distance[initial][product]);
                     }
                     Some(ResponseCounterexample::Infinite { stem, cycle }) => {
                         assert!(!has_pending_terminal, "finite failures take precedence");
                         assert!(has_pending_cycle);
-                        validate_product_trace(
-                            graph_mask,
-                            trigger_mask,
-                            response_mask,
-                            &stem,
-                        );
-                        validate_product_trace(
-                            graph_mask,
-                            trigger_mask,
-                            response_mask,
-                            &cycle,
-                        );
+                        validate_product_trace(graph_mask, trigger_mask, response_mask, &stem);
+                        validate_product_trace(graph_mask, trigger_mask, response_mask, &cycle);
                         assert!(cycle.iter().all(|step| step.state.pending));
                         assert_eq!(cycle.first().unwrap().state, cycle.last().unwrap().state);
                         assert_eq!(stem.last().unwrap().state, cycle.first().unwrap().state);
