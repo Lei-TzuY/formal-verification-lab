@@ -4,7 +4,10 @@ use crate::buchi::{
 use crate::checker::TraceStep;
 use std::fmt::{Debug, Write};
 
-pub fn render_buchi_report<S: Debug, A: Debug>(model_name: &str, result: &BuchiResult<S, A>) -> String {
+pub fn render_buchi_report<S: Debug, A: Debug>(
+    model_name: &str,
+    result: &BuchiResult<S, A>,
+) -> String {
     let mut output = String::new();
     writeln!(&mut output, "model: {model_name}").expect("writing to String cannot fail");
     writeln!(&mut output, "Buchi automaton: {}", result.automaton)
@@ -31,12 +34,20 @@ pub fn render_buchi_report<S: Debug, A: Debug>(model_name: &str, result: &BuchiR
         .expect("writing to String cannot fail");
     writeln!(&mut output, "model states: {}", result.model_states)
         .expect("writing to String cannot fail");
-    writeln!(&mut output, "model transitions: {}", result.model_transitions)
-        .expect("writing to String cannot fail");
+    writeln!(
+        &mut output,
+        "model transitions: {}",
+        result.model_transitions
+    )
+    .expect("writing to String cannot fail");
     writeln!(&mut output, "product states: {}", result.product_states)
         .expect("writing to String cannot fail");
-    writeln!(&mut output, "product transitions: {}", result.product_transitions)
-        .expect("writing to String cannot fail");
+    writeln!(
+        &mut output,
+        "product transitions: {}",
+        result.product_transitions
+    )
+    .expect("writing to String cannot fail");
 
     match &result.counterexample {
         None => writeln!(
