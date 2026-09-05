@@ -10,6 +10,9 @@ pub mod eventuality;
 pub mod eventuality_report;
 pub mod examples;
 pub mod model;
+pub mod multi_response;
+pub mod multi_response_examples;
+pub mod multi_response_report;
 pub mod property;
 pub mod recurrence;
 pub mod reduction;
@@ -29,6 +32,11 @@ pub use eventuality::{
 };
 pub use eventuality_report::render_eventuality_report;
 pub use model::{Invariant, ModelError, StateVariable, Transition, TransitionSystem};
+pub use multi_response::{
+    check_multi_response, MultiObligationState, MultiResponseCounterexample, MultiResponseError,
+    MultiResponseProperty, MultiResponseResult, MultiResponseStatus, ResponseClause,
+};
+pub use multi_response_report::render_multi_response_report;
 pub use property::{
     check_deadlock, check_reachability, DeadlockError, DeadlockProperty, DeadlockResult,
     DeadlockStatus, ReachabilityError, ReachabilityProperty, ReachabilityResult,
