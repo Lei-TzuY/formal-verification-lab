@@ -225,7 +225,8 @@ where
                 action: Some(transition.action),
                 depth: next_depth,
             });
-            max_depth_reached = Some(max_depth_reached.map_or(next_depth, |max| max.max(next_depth)));
+            max_depth_reached =
+                Some(max_depth_reached.map_or(next_depth, |max| max.max(next_depth)));
             queue.push_back(id);
         }
     }
