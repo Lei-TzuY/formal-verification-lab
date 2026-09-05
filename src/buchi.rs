@@ -351,7 +351,9 @@ where
             &product,
             product_transitions,
             BuchiCounterexample::AcceptanceAvoidingCycle {
-                acceptance: automaton.acceptance[candidate.acceptance_index].name.clone(),
+                acceptance: automaton.acceptance[candidate.acceptance_index]
+                    .name
+                    .clone(),
                 stem: candidate.stem,
                 cycle: witness.cycle,
             },
