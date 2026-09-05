@@ -28,11 +28,15 @@ use formal_verification_lab::multi_response_examples::{
     dual_response_protocol, unfair_dual_response_protocol,
 };
 use formal_verification_lab::multi_response_report::render_multi_response_report;
-use formal_verification_lab::parse_declarative_model;
+use formal_verification_lab::{parse_declarative_document, parse_declarative_model};
 use formal_verification_lab::property::{
     check_deadlock, check_reachability, DeadlockProperty, DeadlockStatus, ReachabilityProperty,
     ReachabilityStatus,
 };
+use formal_verification_lab::proposition::{
+    check_proposition_property, PropositionPropertySpec,
+};
+use formal_verification_lab::proposition_report::render_proposition_report;
 use formal_verification_lab::recurrence::analyze_recurrence;
 use formal_verification_lab::reduction::{audit_sleep_set_reduction, IndependenceRelation};
 use formal_verification_lab::report::{
@@ -83,6 +87,7 @@ fn run(args: Vec<String>) -> Result<ExitCode, String> {
         [command, rest @ ..] if command == "buchi" => buchi_command(rest),
         [command, rest @ ..] if command == "temporal" => temporal_command(rest),
         [command, rest @ ..] if command == "state" => state_command(rest),
+        [command, rest @ ..] if command == "proposition" => proposition_command(rest),
         _ => Err(usage()),
     }
 }
@@ -580,6 +585,49 @@ fn run_state_file(path: &str, expression: &str) -> Result<ExitCode, String> {
     })
 }
 
+fn proposition_command(args: &[String]) -> Result<ExitCode, String> {
+    match args {
+        [command, path, mode, proposition] if command == "file" => {
+            run_proposition_file(path, mode, proposition)
+        }
+        [query] => Err(format!(
+            "unknown proposition query '{query}'; expected 'file <path> <reachable|all-eventually> <proposition>'"
+        )),
+        _ => Err(usage()),
+    }
+}
+
+fn run_proposition_file(
+    path: &str,
+    mode: &str,
+    proposition: &str,
+) -> Result<ExitCode, String> {
+    let input = fs::read_to_string(path)
+        .map_err(|error| format!("failed to read declarative model '{path}': {error}"))?;
+    let document = parse_declarative_document(&input).map_err(|error| error.to_string())?;
+    let spec = match mode {
+        "reachable" => PropositionPropertySpec::reachable("cli-proposition", proposition),
+        "all-eventually" => {
+            PropositionPropertySpec::all_eventually("cli-proposition", proposition)
+        }
+        _ => {
+            return Err(format!(
+                "unknown proposition property mode '{mode}'; expected reachable or all-eventually"
+            ));
+        }
+    }
+    .map_err(|error| error.to_string())?;
+    let result = check_proposition_property(&document, &spec).map_err(|error| error.to_string())?;
+    print!(
+        "{}",
+        render_proposition_report(document.model().name(), &result)
+    );
+    Ok(match result.status {
+        ExactStateStatus::Satisfied => ExitCode::SUCCESS,
+        ExactStateStatus::Violated => ExitCode::from(11),
+    })
+}
+
 fn parse_limits(args: &[String]) -> Result<ExplorationLimits, String> {
     let mut limits = ExplorationLimits::unbounded();
     let mut index = 0;
@@ -643,7 +691,7 @@ fn status_exit_code(status: VerificationStatus) -> ExitCode {
 }
 
 fn usage() -> String {
-    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | eventually <counter-three|counter-four|traffic-never> | respond <request-grant|request-grant-unfair|dual-grant|dual-grant-unfair-b> | monitor <session-ok|session-double-open|session-stuck> | buchi <pulses|pulses-unfair|finite-ignore|finite-strict> | temporal <request-grant|request-grant-unfair|pulses|pulses-unfair> | temporal check <request-grant|request-grant-unfair|pulses|pulses-unfair> <expression> | temporal file <path> <expression> | state file <path> <expression>]"
+    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | eventually <counter-three|counter-four|traffic-never> | respond <request-grant|request-grant-unfair|dual-grant|dual-grant-unfair-b> | monitor <session-ok|session-double-open|session-stuck> | buchi <pulses|pulses-unfair|finite-ignore|finite-strict> | temporal <request-grant|request-grant-unfair|pulses|pulses-unfair> | temporal check <request-grant|request-grant-unfair|pulses|pulses-unfair> <expression> | temporal file <path> <expression> | state file <path> <expression> | proposition file <path> <reachable|all-eventually> <proposition>]"
         .to_owned()
 }
 
