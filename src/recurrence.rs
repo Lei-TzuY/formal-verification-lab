@@ -1,6 +1,4 @@
-use crate::checker::{
-    search_with_probes, ExplorationLimits, GraphSearchOutcome, TraceStep,
-};
+use crate::checker::{search_with_probes, ExplorationLimits, GraphSearchOutcome, TraceStep};
 use crate::model::{ModelError, Transition, TransitionSystem};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt;
@@ -274,7 +272,7 @@ fn component_is_cyclic<S>(snapshot: &ReachableSnapshot<S>, component: &[usize]) 
         })
 }
 
-fn cycle_witness<S: Clone>(
+fn cycle_witness<S: Clone + Eq>(
     snapshot: &ReachableSnapshot<S>,
     component_index: usize,
     component: &[usize],
@@ -311,7 +309,8 @@ fn cycle_witness<S: Clone>(
         cycle.extend(return_path.into_iter().skip(1));
     }
 
-    if cycle.len() < 2 || cycle.first().map(|step| &step.state) != cycle.last().map(|step| &step.state)
+    if cycle.len() < 2
+        || cycle.first().map(|step| &step.state) != cycle.last().map(|step| &step.state)
     {
         return Err(RecurrenceError::CycleWitnessMissing);
     }
