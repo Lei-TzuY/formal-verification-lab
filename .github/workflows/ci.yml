@@ -256,3 +256,27 @@ jobs:
           grep -Fq -- "--request-->" <<<"$violated_output"
           grep -Fq "pending: true" <<<"$violated_output"
           test "$(grep -Fc -- '--wait-->' <<<"$violated_output")" -eq 1
+      - name: Multi-class response CLI integration test
+        shell: bash
+        run: |
+          satisfied_output="$(cargo run --quiet -- respond dual-grant)"
+          printf '%s\n' "$satisfied_output"
+          grep -Fq "model: dual-response" <<<"$satisfied_output"
+          grep -Fq "property: dual-request-response" <<<"$satisfied_output"
+          grep -Fq "multi-response: SATISFIED" <<<"$satisfied_output"
+          grep -Fq "clauses: 2" <<<"$satisfied_output"
+          grep -Fq "counterexample: none (every clause is eventually answered)" <<<"$satisfied_output"
+
+          set +e
+          violated_output="$(cargo run --quiet -- respond dual-grant-unfair-b)"
+          violated_status=$?
+          set -e
+          printf '%s\n' "$violated_output"
+          test "$violated_status" -eq 7
+          grep -Fq "model: dual-response-unfair-b" <<<"$violated_output"
+          grep -Fq "multi-response: VIOLATED" <<<"$violated_output"
+          grep -Fq "violated clause: class-b" <<<"$violated_output"
+          grep -Fq "counterexample: PENDING_CYCLE" <<<"$violated_output"
+          grep -Fq -- "--request-b-->" <<<"$violated_output"
+          grep -Fq "pending: [false, true]" <<<"$violated_output"
+          test "$(grep -Fc -- '--wait-b-->' <<<"$violated_output")" -eq 1

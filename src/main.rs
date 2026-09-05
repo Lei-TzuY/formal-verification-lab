@@ -7,6 +7,13 @@ use formal_verification_lab::examples::{
     bounded_counter, buggy_mutex, buggy_peterson_mutex, commuting_counters, peterson_mutex,
     traffic_light, CounterState, TrafficLightState,
 };
+use formal_verification_lab::multi_response::{
+    check_multi_response, MultiResponseProperty, MultiResponseStatus, ResponseClause,
+};
+use formal_verification_lab::multi_response_examples::{
+    dual_response_protocol, unfair_dual_response_protocol,
+};
+use formal_verification_lab::multi_response_report::render_multi_response_report;
 use formal_verification_lab::property::{
     check_deadlock, check_reachability, DeadlockProperty, DeadlockStatus, ReachabilityProperty,
     ReachabilityStatus,
@@ -262,27 +269,58 @@ where
 }
 
 fn response_command(args: &[String]) -> Result<ExitCode, String> {
-    let property = ResponseProperty::new(
+    match args {
+        [query] if query == "request-grant" => run_response(
+            request_grant_protocol().map_err(|error| error.to_string())?,
+            single_response_property()?,
+        ),
+        [query] if query == "request-grant-unfair" => run_response(
+            unfair_request_grant_protocol().map_err(|error| error.to_string())?,
+            single_response_property()?,
+        ),
+        [query] if query == "dual-grant" => run_multi_response(
+            dual_response_protocol().map_err(|error| error.to_string())?,
+            dual_response_property()?,
+        ),
+        [query] if query == "dual-grant-unfair-b" => run_multi_response(
+            unfair_dual_response_protocol().map_err(|error| error.to_string())?,
+            dual_response_property()?,
+        ),
+        [query] => Err(format!(
+            "unknown response query '{query}'; expected request-grant, request-grant-unfair, dual-grant, or dual-grant-unfair-b"
+        )),
+        _ => Err(usage()),
+    }
+}
+
+fn single_response_property() -> Result<ResponseProperty, String> {
+    ResponseProperty::new(
         "request-eventually-grant",
         |action| action == "request",
         |action| action == "grant",
     )
-    .map_err(|error| error.to_string())?;
+    .map_err(|error| error.to_string())
+}
 
-    match args {
-        [query] if query == "request-grant" => run_response(
-            request_grant_protocol().map_err(|error| error.to_string())?,
-            property,
-        ),
-        [query] if query == "request-grant-unfair" => run_response(
-            unfair_request_grant_protocol().map_err(|error| error.to_string())?,
-            property,
-        ),
-        [query] => Err(format!(
-            "unknown response query '{query}'; expected request-grant or request-grant-unfair"
-        )),
-        _ => Err(usage()),
-    }
+fn dual_response_property() -> Result<MultiResponseProperty, String> {
+    MultiResponseProperty::new(
+        "dual-request-response",
+        vec![
+            ResponseClause::new(
+                "class-a",
+                |action| action == "request-a",
+                |action| action == "grant-a",
+            )
+            .map_err(|error| error.to_string())?,
+            ResponseClause::new(
+                "class-b",
+                |action| action == "request-b",
+                |action| action == "grant-b",
+            )
+            .map_err(|error| error.to_string())?,
+        ],
+    )
+    .map_err(|error| error.to_string())
 }
 
 fn run_response<S>(
@@ -297,6 +335,21 @@ where
     Ok(match result.status {
         ResponseStatus::Satisfied => ExitCode::SUCCESS,
         ResponseStatus::Violated => ExitCode::from(7),
+    })
+}
+
+fn run_multi_response<S>(
+    model: formal_verification_lab::TransitionSystem<S>,
+    property: MultiResponseProperty,
+) -> Result<ExitCode, String>
+where
+    S: Clone + Eq + std::hash::Hash + std::fmt::Debug,
+{
+    let result = check_multi_response(&model, &property).map_err(|error| error.to_string())?;
+    print!("{}", render_multi_response_report(model.name(), &result));
+    Ok(match result.status {
+        MultiResponseStatus::Satisfied => ExitCode::SUCCESS,
+        MultiResponseStatus::Violated => ExitCode::from(7),
     })
 }
 
@@ -363,7 +416,7 @@ fn status_exit_code(status: VerificationStatus) -> ExitCode {
 }
 
 fn usage() -> String {
-    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | eventually <counter-three|counter-four|traffic-never> | respond <request-grant|request-grant-unfair>]"
+    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | eventually <counter-three|counter-four|traffic-never> | respond <request-grant|request-grant-unfair|dual-grant|dual-grant-unfair-b>]"
         .to_owned()
 }
 
