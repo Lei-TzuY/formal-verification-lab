@@ -54,7 +54,7 @@ impl fmt::Display for TemporalParseError {
             TemporalParseErrorKind::UnknownOperator { operator } => {
                 write!(f, "unsupported temporal operator '{operator}'")
             }
-            TemporalParseErrorKind::ExpectedOpenParen => write!(f, "expected '('") ,
+            TemporalParseErrorKind::ExpectedOpenParen => write!(f, "expected '('"),
             TemporalParseErrorKind::ExpectedString => {
                 write!(f, "expected a double-quoted exact action label")
             }
@@ -64,7 +64,7 @@ impl fmt::Display for TemporalParseError {
             TemporalParseErrorKind::InvalidEscape { escape } => {
                 write!(f, "unsupported string escape '\\{escape}'")
             }
-            TemporalParseErrorKind::ExpectedCommaOrClose => write!(f, "expected ',' or ')'") ,
+            TemporalParseErrorKind::ExpectedCommaOrClose => write!(f, "expected ',' or ')'"),
             TemporalParseErrorKind::WrongArity {
                 operator,
                 expected,
