@@ -62,12 +62,11 @@ fn parser_matches_direct_typed_exact_state_specs_and_round_trips() {
 fn reachable_frontend_matches_direct_backend_and_preserves_shortest_witness() {
     let model = parse_declarative_model(CHAIN).unwrap();
     let target = "done".to_owned();
-    let direct_property = ReachabilityProperty::new("reach-done", move |state: &String| {
-        state == &target
-    })
-    .unwrap();
+    let direct_property =
+        ReachabilityProperty::new("reach-done", move |state: &String| state == &target).unwrap();
     let direct = check_reachability(&model, &direct_property).unwrap();
-    let frontend = check_exact_state_property(&model, &reachable_spec("reach-done", "done")).unwrap();
+    let frontend =
+        check_exact_state_property(&model, &reachable_spec("reach-done", "done")).unwrap();
 
     assert_eq!(direct.status, ReachabilityStatus::Reachable);
     assert_eq!(frontend.backend, ExactStateBackend::Reachability);
@@ -87,10 +86,8 @@ fn reachable_frontend_matches_direct_backend_and_preserves_shortest_witness() {
 fn unreachable_exact_state_is_a_violation_without_fabricated_evidence() {
     let model = parse_declarative_model(CHAIN).unwrap();
     let target = "missing".to_owned();
-    let direct_property = ReachabilityProperty::new("reach-missing", move |state: &String| {
-        state == &target
-    })
-    .unwrap();
+    let direct_property =
+        ReachabilityProperty::new("reach-missing", move |state: &String| state == &target).unwrap();
     let direct = check_reachability(&model, &direct_property).unwrap();
     let frontend =
         check_exact_state_property(&model, &reachable_spec("reach-missing", "missing")).unwrap();
@@ -113,7 +110,8 @@ fn all_eventually_frontend_matches_direct_backend_for_success_and_lasso_failure(
     .unwrap();
     let direct = check_eventuality(&chain, &direct_property).unwrap();
     let frontend =
-        check_exact_state_property(&chain, &all_eventually_spec("eventually-done", "done")).unwrap();
+        check_exact_state_property(&chain, &all_eventually_spec("eventually-done", "done"))
+            .unwrap();
 
     assert_eq!(direct.status, EventualityStatus::Satisfied);
     assert_eq!(frontend.backend, ExactStateBackend::Eventuality);
@@ -130,11 +128,9 @@ fn all_eventually_frontend_matches_direct_backend_for_success_and_lasso_failure(
     })
     .unwrap();
     let direct = check_eventuality(&cyclic, &direct_property).unwrap();
-    let frontend = check_exact_state_property(
-        &cyclic,
-        &all_eventually_spec("eventually-done", "done"),
-    )
-    .unwrap();
+    let frontend =
+        check_exact_state_property(&cyclic, &all_eventually_spec("eventually-done", "done"))
+            .unwrap();
 
     assert_eq!(direct.status, EventualityStatus::Violated);
     let Some(EventualityCounterexample::Infinite { stem, cycle }) = direct.counterexample else {
@@ -159,13 +155,13 @@ initial "start"
     )
     .unwrap();
     let target = "done".to_owned();
-    let direct_property = EventualityProperty::new("eventually-done", move |state: &String| {
-        state == &target
-    })
-    .unwrap();
+    let direct_property =
+        EventualityProperty::new("eventually-done", move |state: &String| state == &target)
+            .unwrap();
     let direct = check_eventuality(&model, &direct_property).unwrap();
     let frontend =
-        check_exact_state_property(&model, &all_eventually_spec("eventually-done", "done")).unwrap();
+        check_exact_state_property(&model, &all_eventually_spec("eventually-done", "done"))
+            .unwrap();
 
     let Some(EventualityCounterexample::Finite { trace }) = direct.counterexample else {
         panic!("expected direct finite counterexample");
@@ -190,7 +186,11 @@ fn exact_state_parser_rejects_malformed_syntax_and_empty_targets_deterministical
     let arity = parse_exact_state_property("x", r#"reachable("a","b")"#).unwrap_err();
     assert!(matches!(
         arity.kind(),
-        ExactStateParseErrorKind::WrongArity { expected: 1, actual: 2, .. }
+        ExactStateParseErrorKind::WrongArity {
+            expected: 1,
+            actual: 2,
+            ..
+        }
     ));
 
     let empty = parse_exact_state_property("x", r#"reachable("")"#).unwrap_err();
