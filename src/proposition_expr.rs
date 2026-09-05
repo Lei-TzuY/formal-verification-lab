@@ -76,11 +76,7 @@ impl PropositionExpression {
         }
     }
 
-    fn evaluate_resolved(
-        &self,
-        members: &HashMap<String, HashSet<String>>,
-        state: &str,
-    ) -> bool {
+    fn evaluate_resolved(&self, members: &HashMap<String, HashSet<String>>, state: &str) -> bool {
         match self {
             Self::Atom(proposition) => members
                 .get(proposition)
@@ -192,7 +188,11 @@ impl PropositionExpressionPropertySpec {
         name: impl Into<String>,
         expression: PropositionExpression,
     ) -> Result<Self, PropositionExpressionError> {
-        Self::new(name, expression, PropositionExpressionPropertyKind::Reachable)
+        Self::new(
+            name,
+            expression,
+            PropositionExpressionPropertyKind::Reachable,
+        )
     }
 
     pub fn all_eventually(
