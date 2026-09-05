@@ -190,6 +190,22 @@ Metadata validation fails closed on empty proposition names, labels that referen
 
 Executable evidence checks proposition membership ordering, M19 graph compatibility, duplicate/unknown metadata rejection, direct-predicate differential equality for multi-state propositions, deterministic shortest positive witnesses, universal-eventuality lasso preservation, unknown-proposition fail-closed behavior, and real external-file proposition/state integration. M21 adds no Boolean proposition composition, state-variable expression language, fairness semantics, CTL/LTL expansion, second traversal engine, or performance claim.
 
+### Milestone 22 — Boolean proposition expressions
+
+Milestone 22 composes M21 named state propositions into a deliberately small Boolean predicate algebra. `PropositionExpression` supports quoted proposition atoms, unary `not`, binary `and` / `or`, and explicit grouping; precedence is `not > and > or`. Canonical rendering is deterministic and fully grouped.
+
+All proposition references are resolved against the `DeclarativeDocument` before backend execution, so unknown names fail closed even when Boolean short-circuiting could otherwise hide them. Reachability and universal eventuality continue to route into the existing M6 and M9 backends; M22 adds no second graph traversal or temporal operator.
+
+`fvlab proposition expr <path> <reachable|all-eventually> <expression>` exposes the Boolean frontend. Violations reuse exit 11, while malformed model/expression/reference input uses exit 2. Independent validation covers **1,200 generated expressions × all 8 assignments of three propositions = 9,600 truth-table cases**, plus parser round trips, backend differential equality, witness/lasso preservation, and built-binary integration.
+
+### Milestone 23 — declarative safety assertions
+
+Milestone 23 adds query-time safety assertions over the M22 Boolean state-predicate language. `PropositionSafetySpec::always` requires every reachable state to satisfy an expression. The implementation resolves the complete expression first and then asks M6 reachability for the predicate complement: a reachable complement state is the deterministic shortest safety counterexample, while `SAFE` is returned only after the complement is exhaustively unreachable.
+
+Safety assertions do **not** mutate the declarative model or inject user properties into the structural `declared-state-domain` invariant. `fvlab proposition always <path> <expression>` returns exit 0 for `SAFE`, exit 12 for `VIOLATED`, and exit 2 for malformed model/expression/reference input.
+
+Executable evidence includes direct complement-reachability differential checks, initial-state zero-transition counterexamples, fail-closed unknown-reference behavior, real binary integration, and an independent **512 directed three-state graphs × 7 non-empty proposition subsets = 3,584-case** oracle checking status, shortest violation distance, real-edge witnesses, falsifying endpoints, and repeated determinism.
+
 ## Architecture
 
 ```text
@@ -215,6 +231,10 @@ src/exact_state.rs            typed/textual exact-state frontend + backend routi
 src/exact_state_report.rs     normalized exact-state frontend reporting
 src/proposition.rs            named-proposition predicate frontend + backend routing
 src/proposition_report.rs     normalized proposition frontend reporting
+src/proposition_expr.rs       Boolean proposition AST/parser + backend routing
+src/proposition_expr_report.rs normalized Boolean proposition reporting
+src/safety.rs                 query-time Boolean safety assertion frontend
+src/safety_report.rs          deterministic safety assertion reporting
 src/reduction.rs              experimental sleep-set path + exhaustive audit
 src/*_report.rs               deterministic analysis-specific reporting
 src/*_examples.rs             executable teaching models
@@ -222,7 +242,7 @@ src/main.rs                   CLI/file/exit-status integration; no model travers
 tests/                        semantic, protocol, graph/product and frontend tests
 ```
 
-The original transition relation remains owned by the canonical `TransitionSystem` plus canonical exploration. Structural and temporal analyses reuse a neutral captured finite labeled graph rather than invoking separate traversal engines. Typed/textual properties, proposition metadata, and declarative model files are ingestion layers only: after validation they route into the already audited core.
+The original transition relation remains owned by the canonical `TransitionSystem` plus canonical exploration. Structural and temporal analyses reuse a neutral captured finite labeled graph rather than invoking separate traversal engines. Typed/textual properties, proposition metadata, Boolean state predicates, query-time safety assertions, and declarative model files are ingestion layers only: after validation they route into the already audited core.
 
 ## Executable examples
 
@@ -248,6 +268,8 @@ cargo run -- state file path/to/model.fvl 'reachable("done")'
 cargo run -- state file path/to/model.fvl 'all-eventually("done")'
 cargo run -- proposition file path/to/model.fvl reachable critical
 cargo run -- proposition file path/to/model.fvl all-eventually complete
+cargo run -- proposition expr path/to/model.fvl reachable '"critical" and not "error"'
+cargo run -- proposition always path/to/model.fvl 'not "error"'
 ```
 
 ### Declarative model file
@@ -265,12 +287,14 @@ label "waiting" "pending"
 label "idle" "quiescent"
 ```
 
-Then verify action-temporal, exact-state, or proposition properties without recompiling Rust:
+Then verify action-temporal, exact-state, proposition, Boolean proposition, or safety properties without recompiling Rust:
 
 ```bash
 cargo run -- temporal file request-grant.fvl 'response("request","grant")'
 cargo run -- state file request-grant.fvl 'reachable("waiting")'
 cargo run -- proposition file request-grant.fvl reachable pending
+cargo run -- proposition expr request-grant.fvl reachable '"pending" or "quiescent"'
+cargo run -- proposition always request-grant.fvl '"pending" or "quiescent"'
 ```
 
 ### Typed and textual temporal frontend
@@ -299,7 +323,8 @@ cargo run -- temporal check pulses-unfair 'infinitely-often("pulse-a","pulse-b")
 - `8`: deterministic finite monitor verification is `VIOLATED`;
 - `9`: generalized Büchi-style acceptance is `VIOLATED`;
 - `10`: typed/textual action-temporal frontend property is `VIOLATED`;
-- `11`: exact-state or proposition frontend state property is `VIOLATED`.
+- `11`: exact-state or proposition frontend state property is `VIOLATED`;
+- `12`: declarative Boolean safety assertion is `VIOLATED`.
 
 ## Tests and CI
 
@@ -312,25 +337,26 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo test --all-targets --all-features
 ```
 
-Coverage includes safety, bounded exploration, Peterson, audited reduction, reachability, deadlock policies, SCC structure, universal eventuality, response products, finite monitor products, generalized Büchi-style acceptance, typed/textual action-temporal frontends, declarative finite-model ingestion, exact-state properties, and named-proposition properties. Independent generated suites include M8's 512 SCC graphs, M9's 4096 eventuality cases, M10's 4096 single-response cases, M11's 38,416 two-class cases, M12's 4096 finite-monitor cases, and M13's 8192 Büchi/finite-policy cases.
+Coverage includes safety, bounded exploration, Peterson, audited reduction, reachability, deadlock policies, SCC structure, universal eventuality, response products, finite monitor products, generalized Büchi-style acceptance, typed/textual action-temporal frontends, declarative finite-model ingestion, exact-state properties, named propositions, Boolean proposition expressions, and declarative safety assertions. Independent generated suites include M8's 512 SCC graphs, M9's 4096 eventuality cases, M10's 4096 single-response cases, M11's 38,416 two-class cases, M12's 4096 finite-monitor cases, M13's 8192 Büchi/finite-policy cases, M22's 9,600 Boolean truth-table cases, and M23's 3,584 safety graph/subset cases.
 
-M17 adds differential frontend tests without weakening backend oracles. M18 adds parser-to-typed/result differential tests, canonical-expression round trips, position-aware error regressions, and user-expression binary integration. M19 adds parsed-model-to-direct-model differential results, order-preservation and validation regressions, plus real external-file binary integration. M20 adds direct M6/M9 differential comparisons, exact-state parser/round-trip regressions, evidence-preservation checks, and real `state file` binary integration. M21 adds proposition-metadata validation, graph-compatibility checks, multi-state direct-predicate differential comparisons, lasso evidence preservation, and real proposition/state-file binary integration. The complete test command still executes the unchanged older semantic and CLI coverage.
+M17 adds differential frontend tests without weakening backend oracles. M18 adds parser-to-typed/result differential tests, canonical-expression round trips, position-aware error regressions, and user-expression binary integration. M19 adds parsed-model-to-direct-model differential results, order-preservation and validation regressions, plus real external-file binary integration. M20 adds direct M6/M9 differential comparisons, exact-state parser/round-trip regressions, evidence-preservation checks, and real `state file` binary integration. M21 adds proposition-metadata validation, graph-compatibility checks, multi-state direct-predicate differential comparisons, lasso evidence preservation, and real proposition/state-file binary integration. M22 adds generated Boolean truth-table evaluation, canonical AST/parser round trips, fail-closed proposition resolution, direct M6/M9 differential checks, and real Boolean-expression binary integration. M23 adds complement-reachability differential safety checks, shortest-counterexample validation, a 3,584-case independent graph oracle, and real `proposition always` binary integration. The complete test command still executes the unchanged older semantic and CLI coverage.
 
 ## Trust boundaries and limitations
 
 - Results apply to the finite transition model and its atomic-step assumptions, not automatically to machine code, weak-memory executions, or external distributed systems.
 - User transition functions, declarative graph files, labels, and property predicates/expressions must faithfully encode the intended system/property; the checker cannot prove modeling fidelity.
-- Declarative input is an explicit finite graph plus named state-proposition metadata, not a programming language, symbolic transition relation, arbitrary state-variable expression language, or safety-assertion language.
-- Proposition queries currently target one named proposition at a time; M21 does not provide Boolean proposition composition.
+- Declarative input is an explicit finite graph plus named state-proposition metadata, not a programming language, symbolic transition relation, or arbitrary state-variable expression language. Safety assertions are query-time properties; there is still no assertion directive embedded in the model file.
+- Boolean state-proposition expressions support only named proposition atoms with `not`, `and`, `or`, and parentheses; they do not provide arithmetic or arbitrary state-field expressions.
 - Explicit-state memory grows with the reachable graph. A `k`-clause response monitor may expand a model state into up to `2^k` pending valuations.
+- Reachability, universal eventuality, and declarative safety frontends are currently exhaustive/unbounded; they do not yet propagate M2-style resource limits or `INCONCLUSIVE` results.
 - Response classes remain Boolean obligations, not per-request identity queues.
-- M9–M21 have **no fairness semantics**. Enabled responses or accepting actions are not assumed to be scheduled.
+- M9–M23 have **no fairness semantics**. Enabled responses or accepting actions are not assumed to be scheduled.
 - The action-temporal frontend supports exact action atoms only. It has no wildcard, Boolean action predicate language, nested temporal operators, temporal negation, or arbitrary formula composition.
 - `all_infinitely_often` is intentionally an infinite-run-only property; finite terminals are ignored. The frontend does not expose M13's strict finite terminal policy for this form.
 - The textual temporal grammar remains deliberately limited to `response(...)` and `infinitely-often(...)`; it is not a general temporal-logic parser.
-- M9–M21 are not a full LTL/CTL implementation and do not claim arbitrary formula parsing/compilation.
+- M9–M23 are not a full LTL/CTL implementation and do not claim arbitrary formula parsing/compilation.
 - The M13 generalized Büchi layer accepts user-defined automata; it does not translate arbitrary LTL into Büchi automata.
-- M14–M16 are internal architecture consolidations and make no performance claim. M17–M21 add frontend/ingestion capability but no performance claim.
+- M14–M16 are internal architecture consolidations and make no performance claim. M17–M23 add frontend/ingestion capability but no performance claim.
 - Tarjan SCC discovery currently uses recursive DFS; very deep graphs may motivate a future iterative implementation.
 - Peterson starvation freedom is still not claimed.
 - The sleep-set engine remains experimental and differentially audited, not a standalone trusted POR proof backend.
@@ -339,6 +365,10 @@ M17 adds differential frontend tests without weakening backend oracles. M18 adds
 
 ## Roadmap
 
-Milestones 1–21 form a coherent explicit-state stack: safety -> bounded honesty -> typed models -> independent graph validation -> audited reduction -> existential reachability -> terminal/deadlock analysis -> recurrent SCC structure -> universal eventuality -> response obligations -> multi-class response composition -> deterministic finite monitors -> explicit generalized Büchi-style acceptance -> shared action-product construction -> neutral captured-graph ownership -> typed action-temporal specification -> textual temporal parsing -> external declarative finite-model ingestion -> exact-state property specification -> named state propositions.
+Milestones 1–23 form a coherent explicit-state stack: safety -> bounded honesty -> typed models -> independent graph validation -> audited reduction -> existential reachability -> terminal/deadlock analysis -> recurrent SCC structure -> universal eventuality -> response obligations -> multi-class response composition -> deterministic finite monitors -> explicit generalized Büchi-style acceptance -> shared action-product construction -> neutral captured-graph ownership -> typed action-temporal specification -> textual temporal parsing -> external declarative finite-model ingestion -> exact-state property specification -> named state propositions -> Boolean proposition expressions -> query-time declarative safety assertions.
 
-The next high-value slice is **Milestone 22: Boolean proposition expressions**. M21 supplies reusable named state predicates but queries can select only one proposition at a time. M22 should add a deliberately small Boolean predicate algebra over existing proposition names (`not`, `and`, `or` with explicit grouping), parse it deterministically, resolve all proposition references fail-closed against `DeclarativeDocument`, and compile the resulting predicate to the same M6/M9 reachability/eventuality backends. The truth semantics should be validated independently with exhaustive/generated truth-table assignments and differential backend checks, including precedence/grouping, unknown-name diagnostics, canonical rendering or stable AST equality, and real external-file CLI integration. M22 remains a state-predicate frontend only: no new temporal operator, fairness assumption, state-variable arithmetic, general CTL/LTL parser, symbolic backend, or second traversal engine is in scope.
+The next high-value slice is **Milestone 24: bounded state-property verification with honest incompleteness**. M2 already proves that a resource cutoff must not be reported as safety. M6/M9/M20–M23 currently expose only exhaustive state-property checks, so M24 should extend deterministic state/transition/depth budgets through reachability, universal eventuality, exact-state, Boolean proposition, and declarative safety paths without weakening their semantics.
+
+A bounded reachability query may still conclude positively when a target witness is found. A bounded safety assertion may still conclude negatively when a falsifying witness is found. A bounded eventuality query may still conclude negatively when a real finite terminal or target-free cycle counterexample has been established. In contrast, absence/safety/satisfaction claims require enough exploration to complete the relevant proof; if a configured limit prevents that, the result must be `INCONCLUSIVE`, never silently promoted to `UNREACHABLE`, `SAFE`, or `SATISFIED`.
+
+M24 should preserve deterministic shortest evidence whenever a conclusive witness is found before the cutoff, expose exact limit reasons/accounting through the state-property frontends and CLI, and validate the semantics with independent generated small-graph × target-set × limit differential oracles. It must not use wall-clock timeouts as proof evidence, weaken existing exhaustive results, or claim a performance improvement merely because less state space was explored.
