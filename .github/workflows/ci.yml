@@ -194,3 +194,35 @@ jobs:
           grep -Fq "cycle component: 0" <<<"$cyclic_output"
           grep -Fq "TrafficLightState { light: Red } [initial]" <<<"$cyclic_output"
           test "$(grep -Fc -- '--advance-->' <<<"$cyclic_output")" -eq 3
+      - name: Universal eventuality CLI integration test
+        shell: bash
+        run: |
+          satisfied_output="$(cargo run --quiet -- eventually counter-three)"
+          printf '%s\n' "$satisfied_output"
+          grep -Fq "model: bounded-counter" <<<"$satisfied_output"
+          grep -Fq "property: all-paths-eventually-three" <<<"$satisfied_output"
+          grep -Fq "eventuality: SATISFIED" <<<"$satisfied_output"
+          grep -Fq "counterexample: none (all maximal executions reach target)" <<<"$satisfied_output"
+
+          set +e
+          finite_output="$(cargo run --quiet -- eventually counter-four)"
+          finite_status=$?
+          set -e
+          printf '%s\n' "$finite_output"
+          test "$finite_status" -eq 6
+          grep -Fq "eventuality: VIOLATED" <<<"$finite_output"
+          grep -Fq "counterexample: FINITE_TERMINAL" <<<"$finite_output"
+          test "$(grep -Fc -- '--increment-->' <<<"$finite_output")" -eq 3
+          grep -Fq "CounterState { value: 3 }" <<<"$finite_output"
+
+          set +e
+          infinite_output="$(cargo run --quiet -- eventually traffic-never)"
+          infinite_status=$?
+          set -e
+          printf '%s\n' "$infinite_output"
+          test "$infinite_status" -eq 6
+          grep -Fq "model: traffic-light" <<<"$infinite_output"
+          grep -Fq "eventuality: VIOLATED" <<<"$infinite_output"
+          grep -Fq "counterexample: INFINITE_CYCLE" <<<"$infinite_output"
+          grep -Fq "TrafficLightState { light: Red } [cycle-entry]" <<<"$infinite_output"
+          test "$(grep -Fc -- '--advance-->' <<<"$infinite_output")" -eq 3
