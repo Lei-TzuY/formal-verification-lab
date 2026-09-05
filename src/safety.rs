@@ -1,7 +1,9 @@
-use crate::checker::TraceStep;
+use crate::bounded::BoundedOutcome;
+use crate::checker::{ExplorationLimits, TraceStep};
 use crate::declarative::DeclarativeDocument;
 use crate::property::{
-    check_reachability, ReachabilityError, ReachabilityProperty, ReachabilityStatus,
+    check_reachability, check_reachability_with_limits, ReachabilityError, ReachabilityProperty,
+    ReachabilityStatus,
 };
 use crate::proposition_expr::{PropositionExpression, PropositionExpressionError};
 use std::collections::HashSet;
@@ -46,6 +48,18 @@ pub struct SafetyResult {
     pub expression: String,
     pub status: SafetyStatus,
     pub discovered_states: usize,
+    pub explored_transitions: usize,
+    pub max_depth_reached: Option<usize>,
+    pub counterexample: Option<Vec<TraceStep<String>>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BoundedSafetyResult {
+    pub property: String,
+    pub expression: String,
+    pub outcome: BoundedOutcome<SafetyStatus>,
+    pub discovered_states: usize,
+    pub checked_states: usize,
     pub explored_transitions: usize,
     pub max_depth_reached: Option<usize>,
     pub counterexample: Option<Vec<TraceStep<String>>>,
@@ -155,6 +169,41 @@ pub fn check_safety_assertion(
             ReachabilityStatus::Unreachable => SafetyStatus::Safe,
         },
         discovered_states: result.discovered_states,
+        explored_transitions: result.explored_transitions,
+        max_depth_reached: result.max_depth_reached,
+        counterexample: result.witness,
+    })
+}
+
+/// Verify a declarative Boolean safety assertion under deterministic resource
+/// limits. A falsifying state found before the cutoff remains a conclusive
+/// shortest counterexample; proving safety requires exhaustive completion.
+pub fn check_safety_assertion_with_limits(
+    document: &DeclarativeDocument,
+    spec: &PropositionSafetySpec,
+    limits: ExplorationLimits,
+) -> Result<BoundedSafetyResult, SafetyError> {
+    let resolved = ResolvedExpression::resolve(document, &spec.expression)?;
+    let property = ReachabilityProperty::new(spec.name.clone(), move |state: &String| {
+        !resolved.evaluate(state)
+    })?;
+    let result = check_reachability_with_limits(document.model(), &property, limits)?;
+    let outcome = match result.outcome {
+        BoundedOutcome::Conclusive(ReachabilityStatus::Reachable) => {
+            BoundedOutcome::Conclusive(SafetyStatus::Violated)
+        }
+        BoundedOutcome::Conclusive(ReachabilityStatus::Unreachable) => {
+            BoundedOutcome::Conclusive(SafetyStatus::Safe)
+        }
+        BoundedOutcome::Inconclusive(reason) => BoundedOutcome::Inconclusive(reason),
+    };
+
+    Ok(BoundedSafetyResult {
+        property: result.property,
+        expression: spec.expression.canonical_expression(),
+        outcome,
+        discovered_states: result.discovered_states,
+        checked_states: result.checked_states,
         explored_transitions: result.explored_transitions,
         max_depth_reached: result.max_depth_reached,
         counterexample: result.witness,
