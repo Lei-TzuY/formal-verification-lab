@@ -29,14 +29,13 @@ fn builder_materializes_an_executable_transition_system() {
 
 #[test]
 fn builder_delegates_to_canonical_model_validation() {
-    let result = TransitionSystemBuilder::new("invalid-builder", |_state: &TinyState| {
-        Ok(Vec::new())
-    })
-    .state_variable("value", "first declaration")
-    .state_variable("value", "duplicate declaration")
-    .initial_state(TinyState(0))
-    .safety_invariant("ok", |_state: &TinyState| true)
-    .build();
+    let result =
+        TransitionSystemBuilder::new("invalid-builder", |_state: &TinyState| Ok(Vec::new()))
+            .state_variable("value", "first declaration")
+            .state_variable("value", "duplicate declaration")
+            .initial_state(TinyState(0))
+            .safety_invariant("ok", |_state: &TinyState| true)
+            .build();
 
     assert!(matches!(
         result,
