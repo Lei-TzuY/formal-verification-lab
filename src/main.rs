@@ -1,6 +1,4 @@
-use formal_verification_lab::checker::{
-    check_with_limits, ExplorationLimits, VerificationStatus,
-};
+use formal_verification_lab::checker::{check_with_limits, ExplorationLimits, VerificationStatus};
 use formal_verification_lab::examples::{bounded_counter, buggy_mutex, traffic_light};
 use formal_verification_lab::report::render_report;
 use std::env;
@@ -41,10 +39,7 @@ fn run_command(args: &[String]) -> Result<ExitCode, String> {
             limits,
         ),
         "mutex-bug" => run_model(buggy_mutex().map_err(|error| error.to_string())?, limits),
-        "traffic-light" => run_model(
-            traffic_light().map_err(|error| error.to_string())?,
-            limits,
-        ),
+        "traffic-light" => run_model(traffic_light().map_err(|error| error.to_string())?, limits),
         _ => Err(format!(
             "unknown example '{example}'; expected counter, mutex-bug, or traffic-light"
         )),
