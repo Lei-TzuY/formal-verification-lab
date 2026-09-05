@@ -404,12 +404,22 @@ fn all_two_node_graphs_actions_and_finite_policies_match_independent_oracle() {
                             && (0..N).all(|to| !has_edge(graph_mask, node, to))
                             && (!accepts(state, 0) || !accepts(state, 1))
                     });
-                let avoiding_cycle = (0..2).any(|set| {
-                    (0..PRODUCT_N).any(|product| {
-                        distance[initial][product] < INF
-                            && on_avoiding_cycle(product, set, &adjacency, &avoiding[set])
-                    })
-                });
+
+                let mut best_avoiding: Option<(usize, usize)> = None;
+                for set in 0..2 {
+                    for product in 0..PRODUCT_N {
+                        if distance[initial][product] >= INF
+                            || !on_avoiding_cycle(product, set, &adjacency, &avoiding[set])
+                        {
+                            continue;
+                        }
+                        let candidate = (distance[initial][product], set);
+                        if best_avoiding.is_none_or(|current| candidate < current) {
+                            best_avoiding = Some(candidate);
+                        }
+                    }
+                }
+                let avoiding_cycle = best_avoiding.is_some();
                 let expected_violation = strict_terminal || avoiding_cycle;
                 assert_eq!(
                     first.status == BuchiStatus::Violated,
@@ -464,7 +474,10 @@ fn all_two_node_graphs_actions_and_finite_policies_match_independent_oracle() {
                             "set-b" => 1,
                             other => panic!("unexpected acceptance set {other}"),
                         };
-                        assert!(avoiding_cycle);
+                        let (best_distance, best_set) =
+                            best_avoiding.expect("cycle counterexample has an oracle candidate");
+                        assert_eq!(set, best_set);
+                        assert_eq!(stem.len() - 1, best_distance);
                         validate_trace(graph_mask, codes, &stem);
                         validate_trace(graph_mask, codes, &cycle);
                         assert!(cycle.iter().all(|step| !accepts(step.state.automaton, set)));
