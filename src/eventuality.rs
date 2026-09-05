@@ -164,8 +164,8 @@ where
         .map(|(id, _)| id)
         .collect::<HashSet<_>>();
 
-    if let Some(terminal) = (0..graph.states.len())
-        .find(|id| residual_reachable[*id] && graph.outgoing[*id].is_empty())
+    if let Some(terminal) =
+        (0..graph.states.len()).find(|id| residual_reachable[*id] && graph.outgoing[*id].is_empty())
     {
         let trace = shortest_path(graph, &graph.initial_ids, terminal, Some(&residual_ids))
             .ok_or(EventualityError::MissingFiniteWitness)?;
