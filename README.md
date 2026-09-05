@@ -87,7 +87,17 @@ Infinite witnesses identify the avoided acceptance set and contain a shortest gl
 
 The executable pulse examples require both `pulse-a` and `pulse-b` infinitely often. The fair alternating protocol satisfies both sets; the unfair variant can take `pulse-a` forever while `pulse-b` remains enabled and therefore yields an acceptance-avoiding lasso for `pulse-b-observed`. A finite quiet run demonstrates the observable difference between the two finite-run policies.
 
-M13's independent generated oracle evaluates **8192** cases: all 16 directed two-node graph masks × all `4^4 = 256` edge-action assignments × both finite-run policies. It independently constructs the eight `(node, automaton_state)` product states, uses Floyd–Warshall for full reachability and per-acceptance-set avoiding reachability, and validates status, product accounting, finite-terminal policy, real-edge witnesses, acceptance-set identity, closed avoiding cycles, stem distances, and repeated determinism.
+M13's independent generated oracle evaluates **8192** cases: all 16 directed two-node graph masks × all `4^4 = 256` edge-action assignments × both finite-run policies. It independently constructs the eight `(node, automaton_state)` product states, uses Floyd–Warshall for full reachability and per-acceptance-set avoiding reachability, and validates status, product accounting, finite-terminal policy, real-edge witnesses, acceptance-set identity, closed avoiding cycles, globally shortest stem distances, acceptance-set tie-breaking, and repeated determinism.
+
+### Milestone 14 — shared deterministic action-product substrate
+
+Milestone 14 removes duplicated executable graph construction from the finite-monitor and Büchi engines. Internal `build_action_product` consumes an already captured labeled model graph, one initial control state, a deterministic `step(control_state, action) -> control_state`, and a caller-provided lift into that engine's public product-state representation.
+
+The shared substrate owns deterministic BFS product discovery, `(model_state_id, control_state)` deduplication, initial-state ordering, captured edge ordering, and product-edge construction. It never re-invokes the model transition relation. `monitor.rs` and `buchi.rs` retain their existing public state types and all property-specific rejecting/progress/acceptance semantics; only their previously duplicated product builders move behind the common substrate.
+
+Migration equivalence is executable rather than asserted by inspection: the unchanged M12 **4096-case** finite-monitor oracle and M13 **8192-case** generalized Büchi oracle both exercise the shared builder while independently validating product reachability/accounting, action updates, deterministic witnesses, terminal/cycle semantics, and selection rules. Existing binary-level monitor and Büchi CLI integration tests remain unchanged.
+
+The canonical multi-response engine is deliberately not migrated in M14, keeping this PR bounded to two already independently audited consumers. That remaining third product builder is the next architectural frontier rather than hidden scope inside this milestone.
 
 ## Architecture
 
@@ -95,14 +105,15 @@ M13's independent generated oracle evaluates **8192** cases: all 16 directed two
 src/model.rs                  transition-system abstraction and validation
 src/builder.rs                typed construction layer
 src/checker.rs                canonical deterministic BFS substrate and bounds
+src/product.rs                shared internal deterministic action-product BFS
 src/property.rs               existential reachability + deadlock policies
 src/recurrence.rs             one-exploration graph snapshot, induced graphs,
                               SCCs, shortest paths, cycle witnesses
 src/eventuality.rs            universal eventuality over target-cut residuals
 src/multi_response.rs         canonical multi-clause response product engine
 src/response.rs               single-clause compatibility API over that engine
-src/monitor.rs                deterministic finite monitor product engine
-src/buchi.rs                  generalized Büchi-style acceptance product engine
+src/monitor.rs                finite-monitor semantics over shared action product
+src/buchi.rs                  Büchi semantics over shared action product
 src/reduction.rs              experimental sleep-set path + exhaustive audit
 src/*_report.rs               deterministic analysis-specific reporting
 src/*_examples.rs             executable teaching models
@@ -110,7 +121,7 @@ src/main.rs                   CLI/exit-status integration; no model traversal lo
 tests/                        semantic, protocol, generated graph/product oracles
 ```
 
-The original transition relation remains owned by the model plus canonical exploration. Structural and temporal analyses reuse a captured finite labeled graph rather than invoking the model transition function again.
+The original transition relation remains owned by the model plus canonical exploration. Structural and temporal analyses reuse a captured finite labeled graph rather than invoking the model transition function again. M14 additionally centralizes deterministic action-product construction for the monitor and Büchi engines while leaving their property semantics separate.
 
 ## Executable examples
 
@@ -166,7 +177,7 @@ cargo test --all-targets --all-features
 
 Coverage includes safety, bounded exploration, Peterson, audited reduction, reachability, deadlock policies, SCC structure, universal eventuality, response products, finite monitor products, and generalized Büchi-style acceptance. Independent generated suites include M9's 4096 eventuality cases, M10's 4096 single-response cases, M11's 38,416 two-class cases, M12's 4096 finite-monitor cases, and M13's 8192 Büchi/finite-policy cases.
 
-The complete test command also executes the built `fvlab` binary for M12 and M13 positive/negative CLI paths, while the workflow retains direct CLI regression gates for earlier milestones.
+M14 changes no property oracle expectations. The unchanged M12 and M13 generated suites act as migration-equivalence gates for the shared action-product substrate, while the complete test command also executes the built `fvlab` binary for M12 and M13 positive/negative CLI paths. The workflow retains direct CLI regression gates for earlier milestones.
 
 ## Trust boundaries and limitations
 
@@ -178,6 +189,7 @@ The complete test command also executes the built `fvlab` binary for M12 and M13
 - M9–M13 have **no fairness semantics**. Enabled responses or accepting actions are not assumed to be scheduled.
 - M9–M13 are not a full LTL/CTL implementation and do not claim temporal-logic parsing, formula compilation, arbitrary nested formulas, or model checking outside the explicitly implemented semantics.
 - The M13 generalized Büchi layer accepts user-defined automata; it does not claim to translate arbitrary LTL into Büchi automata.
+- M14 is an internal architecture consolidation; it adds no new proof semantics and makes no performance claim.
 - Tarjan SCC discovery currently uses recursive DFS; very deep graphs may motivate a future iterative implementation.
 - Peterson starvation freedom is still not claimed.
 - The sleep-set engine remains experimental and differentially audited, not a standalone trusted POR proof backend.
@@ -186,6 +198,6 @@ The complete test command also executes the built `fvlab` binary for M12 and M13
 
 ## Roadmap
 
-Milestones 1–13 form a coherent explicit-state stack: safety -> bounded honesty -> typed models -> independent graph validation -> audited reduction -> existential reachability -> terminal/deadlock analysis -> recurrent SCC structure -> universal eventuality -> response obligations -> multi-class response composition -> deterministic finite monitors -> explicit generalized Büchi-style acceptance.
+Milestones 1–14 form a coherent explicit-state stack: safety -> bounded honesty -> typed models -> independent graph validation -> audited reduction -> existential reachability -> terminal/deadlock analysis -> recurrent SCC structure -> universal eventuality -> response obligations -> multi-class response composition -> deterministic finite monitors -> explicit generalized Büchi-style acceptance -> shared deterministic action-product construction.
 
-The next architectural phase should reduce duplicated product-construction machinery and establish one reusable **action-product substrate** for response, finite-monitor, and Büchi analyses before adding a textual temporal language. A high-value Milestone 14 is to extract deterministic product construction, product-state accounting, shortest-stem reconstruction, residual selection, and lasso witness plumbing into a shared internal layer, then prove behavioral equivalence of M10–M13 with differential regression tests. Only after that substrate is stable should a narrow typed temporal-property AST or formula-to-automaton frontend be introduced.
+The next high-value architectural slice is **Milestone 15: migrate the canonical multi-response engine onto the shared action-product substrate**. Because the single-response API already delegates to multi-response, that migration would bring M10 and M11 onto the same constructor without introducing a second compatibility path. Acceptance should require the existing 4096 single-response and 38,416 multi-response independent oracles plus executable response CLI regressions to remain unchanged. After all action-driven temporal engines share one product constructor, the project can reassess whether captured graph ownership should move out of `recurrence.rs` into a neutral graph substrate before introducing any narrow typed temporal-property AST or formula-to-automaton frontend.
