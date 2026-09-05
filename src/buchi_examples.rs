@@ -10,11 +10,14 @@ pub enum PulseModelState {
 }
 
 pub fn alternating_pulses() -> Result<TransitionSystem<PulseModelState>, ModelError> {
-    TransitionSystemBuilder::new("alternating-pulses", |state: &PulseModelState| match state {
-        PulseModelState::First => Ok(vec![Transition::new("pulse-a", PulseModelState::Second)]),
-        PulseModelState::Second => Ok(vec![Transition::new("pulse-b", PulseModelState::First)]),
-        PulseModelState::Done => Ok(Vec::new()),
-    })
+    TransitionSystemBuilder::new(
+        "alternating-pulses",
+        |state: &PulseModelState| match state {
+            PulseModelState::First => Ok(vec![Transition::new("pulse-a", PulseModelState::Second)]),
+            PulseModelState::Second => Ok(vec![Transition::new("pulse-b", PulseModelState::First)]),
+            PulseModelState::Done => Ok(Vec::new()),
+        },
+    )
     .state_variable("phase", "alternating A/B pulse phase")
     .initial_state(PulseModelState::First)
     .safety_invariant("recognized-phase", |_state: &PulseModelState| true)
@@ -22,14 +25,17 @@ pub fn alternating_pulses() -> Result<TransitionSystem<PulseModelState>, ModelEr
 }
 
 pub fn unfair_second_pulse() -> Result<TransitionSystem<PulseModelState>, ModelError> {
-    TransitionSystemBuilder::new("unfair-second-pulse", |state: &PulseModelState| match state {
-        PulseModelState::First => Ok(vec![Transition::new("pulse-a", PulseModelState::Second)]),
-        PulseModelState::Second => Ok(vec![
-            Transition::new("pulse-a", PulseModelState::Second),
-            Transition::new("pulse-b", PulseModelState::First),
-        ]),
-        PulseModelState::Done => Ok(Vec::new()),
-    })
+    TransitionSystemBuilder::new(
+        "unfair-second-pulse",
+        |state: &PulseModelState| match state {
+            PulseModelState::First => Ok(vec![Transition::new("pulse-a", PulseModelState::Second)]),
+            PulseModelState::Second => Ok(vec![
+                Transition::new("pulse-a", PulseModelState::Second),
+                Transition::new("pulse-b", PulseModelState::First),
+            ]),
+            PulseModelState::Done => Ok(Vec::new()),
+        },
+    )
     .state_variable("phase", "pulse phase with an optional forever-A execution")
     .initial_state(PulseModelState::First)
     .safety_invariant("recognized-phase", |_state: &PulseModelState| true)
