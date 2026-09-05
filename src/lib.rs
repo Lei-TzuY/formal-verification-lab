@@ -1,11 +1,13 @@
 //! Educational formal-methods laboratory.
 //!
-//! The crate provides a small explicit-state safety model checker built from
-//! first principles. The semantic core is intentionally independent from the
-//! CLI so it can be reused by tests and future front ends.
+//! The crate provides a small explicit-state formal-verification core built
+//! from first principles. The semantic core is intentionally independent from
+//! the CLI so it can be reused by tests and future front ends.
 
 pub mod builder;
 pub mod checker;
+pub mod eventuality;
+pub mod eventuality_report;
 pub mod examples;
 pub mod model;
 pub mod property;
@@ -18,6 +20,11 @@ pub use checker::{
     check, check_with_limits, CheckResult, Counterexample, ExplorationLimits, InconclusiveReason,
     TraceStep, VerificationStatus,
 };
+pub use eventuality::{
+    check_eventuality, EventualityCounterexample, EventualityError, EventualityProperty,
+    EventualityResult, EventualityStatus,
+};
+pub use eventuality_report::render_eventuality_report;
 pub use model::{Invariant, ModelError, StateVariable, Transition, TransitionSystem};
 pub use property::{
     check_deadlock, check_reachability, DeadlockError, DeadlockProperty, DeadlockResult,

@@ -1,227 +1,146 @@
 # Formal Verification Lab
 
-A serious educational laboratory for building formal-methods machinery from first principles.
+A serious educational laboratory for building formal-methods machinery from first principles in Rust.
 
-The project implements a small **explicit-state formal-verification laboratory** in Rust. It is not a wrapper around an existing model checker and is not presented as production-grade verification software.
+The project is an explicit-state verification lab, not a wrapper around an existing model checker and not production-grade verification software. The emphasis is executable semantics, deterministic witnesses, independent graph oracles, and clear trust boundaries.
 
 ## Implemented milestones
 
-### Milestone 1: explicit-state transition systems
+### Milestone 1 — explicit-state safety model checking
 
-A model is a finite-state transition system with named state-variable metadata, one or more concrete initial states, an ordered labeled transition relation, and named safety invariants. Concrete state identity is defined by Rust `Eq + Hash`.
+Finite transition systems have named state-variable metadata, one or more initial states, an ordered labeled transition relation, and named safety invariants. The canonical checker uses deterministic BFS, finite-state visited deduplication, invariant checking, and predecessor/action links for shortest transition-count counterexamples.
 
-The canonical checker performs deterministic breadth-first search (BFS). It terminates on finite cyclic state spaces, checks invariants in deterministic order, and stores predecessor/action links so the first reachable invariant violation reconstructs a deterministic shortest transition-count counterexample.
+### Milestone 2 — honest bounded exploration
 
-### Milestone 2: bounded exploration with explicit incompleteness
+`check_with_limits` supports state, transition, and depth limits. A resource limit can produce `INCONCLUSIVE`; it is never reported as `SAFE`. Exact limits can still prove safety when they do not prevent required exploration.
 
-`check_with_limits` supports optional `max_states`, `max_transitions`, and `max_depth` bounds without weakening the meaning of `SAFE`.
+### Milestone 3 — typed construction and Peterson mutual exclusion
 
-Results are explicit:
+`TransitionSystemBuilder<S>` materializes the same canonical transition-system type. The executable Peterson model reaches 20 states / 34 edges while satisfying mutual exclusion; a controlled lost-intent variant has a deterministic six-transition counterexample.
 
-- `SAFE` — exhaustive reachable-state exploration completed and every invariant held;
-- `VIOLATION` — a reachable state violated an invariant and a shortest counterexample is available;
-- `INCONCLUSIVE` — a configured resource bound prevented exhaustive exploration.
+### Milestone 4 — exploration diagnostics and graph oracle
 
-Exact numeric bounds can still produce `SAFE` when they do not block required work. Resource exhaustion is never presented as a proof.
+The checker reports maximum BFS depth and deterministic action-count diagnostics. All 512 directed graphs on three labeled nodes are cross-checked against independent Floyd–Warshall reachability/shortest-path calculations for discovery, accounting, violation distance, trace validity, and determinism.
 
-### Milestone 3: typed model construction and Peterson mutual exclusion
+### Milestone 5 — differentially audited sleep-set reduction
 
-`TransitionSystemBuilder<S>` is a thin typed construction layer that materializes the same canonical `TransitionSystem<S>` and therefore reuses canonical validation and checker semantics.
+An experimental sleep-set DFS consumes an explicit symmetric action-independence relation. It is not a trusted proof backend: `audit_sleep_set_reduction` always compares it with canonical exhaustive checking and fails closed on semantic mismatch. The commuting-counters model demonstrates reduced graph work without making performance claims.
 
-The first nontrivial consumer is a two-process Peterson mutual-exclusion model with explicit program counters, intent flags, and shared `turn`. The correct model exhaustively reaches 20 states and examines 34 transition edges while satisfying `mutual-exclusion`. A controlled lost-intent variant produces a reproducible six-transition counterexample ending with both processes in `Critical`.
+### Milestone 6 — existential reachability
 
-### Milestone 4: exploration diagnostics and independent graph oracle
+`ReachabilityProperty<S>` asks whether at least one reachable state satisfies a target predicate. `REACHABLE` carries a deterministic shortest witness; `UNREACHABLE` is returned only after finite exhaustive exploration. The implementation delegates to canonical BFS rather than introducing a second model traversal.
 
-`CheckResult` exposes deterministic `max_depth_reached` and `transitions_by_action` diagnostics. The latter is a `BTreeMap`, so report ordering is stable, and its values sum to `explored_transitions`.
+### Milestone 7 — deadlock and legitimate terminals
 
-The checker is independently cross-checked across all 512 directed graphs on three labeled nodes. Those tests use Floyd–Warshall shortest paths—not a second BFS implementation—to validate reachability, maximum discovery depth, edge/action accounting, shortest violation distance, reconstructed trace validity, and repeated-run determinism.
+`DeadlockProperty<S>` distinguishes intended terminal states from unexpected terminals. Deadlock analysis observes the same successor vector already generated by the canonical BFS substrate, so the transition relation is called once per checked state. `DEADLOCK_FOUND` carries a shortest witness; `DEADLOCK_FREE` requires exhaustive exploration. All 512 three-node graphs are checked against an independent out-degree/shortest-distance oracle.
 
-### Milestone 5: differential sleep-set reduction audit
+### Milestone 8 — reachable SCCs and recurrent-cycle witnesses
 
-Milestone 5 adds an **experimental reduction layer without promoting it to a trusted proof backend**.
+`analyze_recurrence` captures the complete reachable labeled graph through one canonical exploration, then runs Tarjan SCC analysis only over that snapshot. Components and states are reported in canonical discovery order. A cyclic SCC is a component with more than one state or a singleton self-loop. The first cyclic component receives a deterministic shortest stem and a real-edge closed cycle witness. A 512-graph Floyd–Warshall mutual-reachability oracle validates the SCC partition and cycle classification.
 
-`IndependenceRelation` is an explicit symmetric relation over complete action labels. `audit_sleep_set_reduction` always runs both the canonical exhaustive checker and an experimental deterministic sleep-set DFS. The audit succeeds only when their verification statuses agree. A mismatch returns `ReductionAuditError::SemanticMismatch`; reduced search cannot overwrite exhaustive proof evidence.
+A recurrent SCC is structural information only; it is not automatically a livelock, fairness, or progress claim.
 
-The `commuting-counters` product model provides a genuinely commuting pair (`left:increment`, `right:increment`). With that relation the experiment preserves `SAFE` while reducing examined transition edges from 12 to 8 and recording 4 sleep-set prunes. A deliberately false independence declaration has its own regression and must fail closed. These are graph-work counts, not performance benchmarks.
+### Milestone 9 — universal eventuality on maximal executions
 
-### Milestone 6: existential reachability properties
+Milestone 9 adds a deliberately narrow temporal property:
 
-Milestone 6 expands property expressiveness with a deliberately narrow query:
+> **On every maximal execution from every initial state, is a target state eventually reached?**
 
-> **Does at least one reachable state satisfy a target predicate?**
+`EventualityProperty<S>` names the target predicate and `check_eventuality` returns:
 
-`ReachabilityProperty<S>` names a target predicate and `check_reachability` returns either:
+- `SATISFIED` when every maximal execution reaches target;
+- `VIOLATED` with a finite counterexample when an execution can terminate before target;
+- `VIOLATED` with a stem-plus-cycle counterexample when an execution can remain forever in a target-free recurrent region.
 
-- `REACHABLE` with a deterministic shortest transition-count witness; or
-- `UNREACHABLE` only after the finite reachable graph has been exhaustively explored.
+The semantics are intentionally **without a fairness assumption**. If a target-free cycle has an exit to target, an execution that keeps choosing the cycle is still a valid infinite counterexample.
 
-The property engine does **not** implement a second graph traversal. Internally it creates a derived view over the same transition relation with one sentinel invariant that holds until the target is seen, then delegates to the canonical BFS checker. A target hit therefore inherits canonical shortest-path and deterministic-order guarantees.
+The model transition relation is still evaluated only once. M9 reuses M8's crate-private reachable-graph snapshot and SCC machinery. Target states are absorbing for the property: once target is reached, later behavior is irrelevant. The analyzer therefore computes the states reachable from non-target initial states **without crossing a target state**. This target-cut residual graph is essential: a cycle reachable only after target has already been seen must not become a false counterexample.
 
-Reachability queries intentionally replace the model's safety invariants while evaluating the target. This means a query answers graph reachability independently of whether the original model is safe. Safety and reachability remain separate properties.
+A residual state is a finite counterexample only when it is a true terminal in the original transition graph. A residual node whose only outgoing edges go to target is not terminal: every maximal execution must take an enabled transition and therefore reaches target.
 
-The reachability suite exhaustively enumerates all 512 directed three-node graphs. An independent Floyd–Warshall oracle validates target reachability, shortest witness length, witness-edge validity, unreachable-state exhaustion counts, and repeated-run determinism.
+Counterexample selection is deterministic. Target-free finite terminals take precedence and use canonical discovery order with a shortest residual path. If no such terminal exists, the first target-free cyclic SCC in canonical order produces a shortest stem plus deterministic closed cycle. The chosen cycle is not claimed to be globally shortest.
 
-This milestone is **not** full LTL/CTL and does not claim universal eventuality, fairness, progress, or liveness. `UNREACHABLE` means no target state exists in the exhaustively explored finite reachable graph.
+The M9 oracle exhaustively evaluates every combination of:
 
-### Milestone 7: deadlock and legitimate terminal-state analysis
+- all 512 directed three-node graphs; and
+- all 8 possible target-state subsets.
 
-Milestone 7 adds a second finite-state property without equating every terminal state with a bug.
-
-`DeadlockProperty<S>` contains an explicit **allowed-terminal predicate**. A reachable state is classified as a deadlock exactly when its transition relation produces no outgoing transitions and the allowed-terminal predicate returns `false` for that state.
-
-`check_deadlock` returns either:
-
-- `DEADLOCK_FOUND` with a deterministic shortest transition-count witness; or
-- `DEADLOCK_FREE` only after exhaustive unbounded exploration of the finite reachable graph.
-
-The implementation does not call a model's transition function twice to decide whether a state is terminal. Milestone 7 factors the existing BFS loop into one crate-private canonical `search_with_probes` substrate. Safety checking continues to use that substrate before successor generation, while deadlock analysis observes the single generated successor vector before its edges are expanded. There is still one canonical BFS implementation and one transition-generation call per checked state.
-
-The deadlock suite independently exhausts all 512 directed three-node graphs. Floyd–Warshall supplies shortest reachable distances while a separately computed out-degree oracle identifies terminal nodes.
-
-This milestone is **not** starvation freedom, livelock detection, fairness, or general liveness.
-
-### Milestone 8: reachable SCCs and recurrent-cycle witnesses
-
-Milestone 8 adds structural analysis of the exhaustively reachable graph.
-
-`analyze_recurrence` uses the canonical BFS substrate once to capture states in deterministic discovery order and each checked state's already-generated successor vector. After that single model exploration, all SCC and witness work runs only over the in-memory snapshot; the model transition function is not invoked again.
-
-The recurrence subsystem computes every reachable strongly connected component with Tarjan's algorithm. For deterministic reporting, states inside a component and components themselves are ordered by canonical BFS discovery index. A component is marked `cyclic` exactly when it contains more than one state or a singleton state has a self-loop.
-
-When at least one cyclic SCC exists, the first cyclic component in that canonical ordering receives a `CycleWitness`:
-
-- `stem` is a shortest transition-count path from the declared initial-state set to the component's lowest-discovery entry state;
-- `cycle` starts and ends at that same entry and follows real labeled snapshot edges;
-- cycle selection is deterministic but is not claimed to be the globally shortest possible cycle.
-
-The SCC suite again exhausts all 512 directed three-node graphs, but does not use a second SCC algorithm as the oracle. Floyd–Warshall determines mutual reachability: two reachable nodes belong to the same expected SCC exactly when each can reach the other. A separate self-loop test classifies singleton SCCs as cyclic or acyclic. The suite validates the complete SCC partition, cycle classification, snapshot state/edge accounting, deterministic repeated results, shortest stem distance, and closed witness edges.
-
-A recurrent cycle is only graph structure. Its existence does **not** by itself establish livelock, starvation, unfairness, or failure of an eventuality property.
+That is 4096 graph/property combinations. Floyd–Warshall is used independently to determine target-cut reachability and shortest distances; terminal out-degree and mutual reachability/self-loops independently determine finite and infinite failure classes. Tests also prove that existential reachability does not imply universal eventuality and that post-target cycles are ignored correctly.
 
 ## Architecture
 
 ```text
-src/model.rs       canonical transition-system abstraction and validation
-src/builder.rs     thin typed construction layer
-src/checker.rs     one canonical deterministic BFS substrate, bounds,
-                   diagnostics, invariant checking, predecessor traces
-src/property.rs    existential reachability + deadlock/terminal policies
-src/recurrence.rs  single-exploration graph snapshot + deterministic SCCs,
-                   shortest stems, closed cycle witnesses
-src/reduction.rs   opt-in experimental sleep-set exploration + exhaustive audit
-src/examples.rs    executable teaching models and concurrent/product examples
-src/report.rs      deterministic checker/property/SCC reports
-src/main.rs        CLI and option parsing; no model traversal semantics
-tests/             semantic, protocol, graph-oracle, reduction, property,
-                   deadlock, and SCC recurrence coverage
+src/model.rs              transition-system abstraction and validation
+src/builder.rs            typed construction layer
+src/checker.rs            canonical deterministic BFS substrate, bounds,
+                          diagnostics, invariants, predecessor traces
+src/property.rs           existential reachability + deadlock policies
+src/recurrence.rs         reusable one-exploration graph snapshot,
+                          induced graphs, SCCs, shortest paths, cycle witnesses
+src/eventuality.rs        universal eventuality over the target-cut residual graph
+src/reduction.rs          experimental sleep-set path + exhaustive audit
+src/report.rs             safety/reachability/deadlock/SCC reports
+src/eventuality_report.rs eventuality-specific deterministic reporting
+src/main.rs               CLI/exit-status integration; no model traversal logic
+tests/                    semantic, protocol, graph-oracle, reduction,
+                          reachability, deadlock, SCC, and eventuality coverage
 ```
 
-The canonical model traversal remains in `model` + `checker`. Higher-level analyses either delegate directly to it or capture its generated graph once and operate on the resulting finite snapshot.
+The model transition relation remains owned by `model` + the canonical `checker` traversal. Higher-level structural/temporal analyses operate over the one captured finite graph instead of re-executing the model.
 
 ## Executable examples
 
-List examples:
-
-```bash
-cargo run -- list
-```
-
-### Bounded counter
+Primary commands:
 
 ```bash
 cargo run -- run counter
-cargo run -- run counter --max-states 4 --max-transitions 3 --max-depth 3
-```
-
-The exact-bound run remains `SAFE`, reaches depth 3, and records three `increment` edges.
-
-### Deliberately buggy simple mutual exclusion
-
-```bash
 cargo run -- run mutex-bug
-cargo run -- run mutex-bug --max-depth 3
-```
-
-The unbounded command produces a shortest violation and exits 1. The depth-limited command exits 3 as `INCONCLUSIVE` rather than claiming safety.
-
-### Peterson mutual exclusion
-
-```bash
 cargo run -- run peterson
-cargo run -- run peterson-bug
-```
-
-The correct finite model is `SAFE` at 20 states / 34 examined edges / maximum BFS depth 6. The controlled lost-intent mutation reaches a mutual-exclusion violation.
-
-### Commuting product and reduction audit
-
-```bash
-cargo run -- run commuting-counters
 cargo run -- reduce commuting-counters
-```
-
-The reduction audit reports matching exhaustive/reduced status and stable graph-work counts: exhaustive 9 states / 12 transitions, reduced 9 states / 8 transitions, with 4 pruned transitions.
-
-### Reachability witnesses and exhaustive absence
-
-```bash
 cargo run -- reach counter-three
-cargo run -- reach counter-four
-```
-
-The first command reports `REACHABLE` with the shortest three-transition witness. The second exhausts the four-state finite counter and reports `UNREACHABLE` with exit 4.
-
-### Deadlock versus legitimate termination
-
-```bash
-cargo run -- deadlock counter-terminal-ok
 cargo run -- deadlock counter-terminal-forbidden
-```
-
-The first policy explicitly permits value 3 as successful termination and is `DEADLOCK_FREE`; the strict second policy reports `DEADLOCK_FOUND` with exit 5 and a three-transition witness.
-
-### SCC and recurrent-cycle structure
-
-Acyclic finite counter:
-
-```bash
-cargo run -- scc counter
-```
-
-Expected structural markers include `recurrence: ACYCLIC`, `scc count: 4`, `cyclic scc count: 0`, and `cycle witness: none`.
-
-Cyclic traffic-light model:
-
-```bash
 cargo run -- scc traffic-light
 ```
 
-The three reachable light states form one cyclic SCC. The report includes `recurrence: CYCLIC`, `scc count: 1`, `cyclic scc count: 1`, a zero-transition stem at `Red`, and a closed three-`advance` cycle back to `Red`. Both SCC commands exit 0 because cycle presence is structural information, not an error status.
+### Universal eventuality
+
+A positive property:
+
+```bash
+cargo run -- eventually counter-three
+```
+
+The bounded counter has one maximal execution, reaches value 3, and reports `eventuality: SATISFIED`.
+
+A finite failure:
+
+```bash
+cargo run -- eventually counter-four
+```
+
+Value 4 is never reached and the counter terminates at value 3. The command exits 6, reports `eventuality: VIOLATED`, classifies `counterexample: FINITE_TERMINAL`, and prints the three-increment trace.
+
+An infinite failure:
+
+```bash
+cargo run -- eventually traffic-never
+```
+
+The target predicate is deliberately impossible. The traffic-light graph is recurrent, so the command exits 6 with `counterexample: INFINITE_CYCLE` and a closed `Red -> Green -> Yellow -> Red` witness.
 
 ## CLI exit status
 
-Canonical `run` commands:
+- `0`: successful analysis whose property holds, or successful structural SCC analysis;
+- `1`: safety invariant violation;
+- `2`: malformed CLI/model/analysis error;
+- `3`: bounded safety exploration is `INCONCLUSIVE`;
+- `4`: existential target is `UNREACHABLE`;
+- `5`: unexpected terminal/deadlock found;
+- `6`: universal eventuality is `VIOLATED`.
 
-- `0`: exhaustive result is `SAFE`;
-- `1`: invariant `VIOLATION` with a counterexample;
-- `2`: malformed CLI input or model/exploration/audit/property error;
-- `3`: bounded canonical exploration is `INCONCLUSIVE`.
+## Tests and CI
 
-Reachability commands:
-
-- `0`: target is `REACHABLE` and a shortest witness is available;
-- `4`: target is `UNREACHABLE` after exhaustive finite-state exploration.
-
-Deadlock commands:
-
-- `0`: no unexpected terminal state exists after exhaustive exploration;
-- `5`: a reachable unexpected terminal state was found with a shortest witness.
-
-SCC commands use exit 0 for either cyclic or acyclic successful analysis. `reduce commuting-counters` uses the authoritative exhaustive result's status and treats differential mismatch as an error (exit 2).
-
-## Tests
-
-Run the same primary Rust checks used by CI:
+Primary checks:
 
 ```bash
 cargo fmt --all -- --check
@@ -230,53 +149,25 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo test --all-targets --all-features
 ```
 
-Coverage includes:
+Coverage includes deterministic safety traces, cycles, multiple initial states, bounded exploration, Peterson, differential reduction, existential reachability, deadlock policies, SCC structure, and universal eventuality. Generated-graph suites independently cross-check canonical BFS, reachability, deadlock, SCC, and M9's 4096 graph/target-set combinations.
 
-- reachable-state enumeration, cycles, invariant violations, shortest traces;
-- multiple/duplicate initial states and honest state/transition/depth bounds;
-- deterministic exploration diagnostics and builder delegation;
-- correct and deliberately broken Peterson models;
-- all 512 three-node graphs against independent shortest-path/accounting oracles;
-- explicit reduction validation, positive edge reduction, and fail-closed mismatch;
-- reachability shortest witnesses, exhaustive absence, and 512-graph oracle coverage;
-- legitimate-terminal versus strict deadlock policies and 512-graph out-degree oracle coverage;
-- bounded-counter acyclic SCC decomposition and traffic-light recurrent-cycle witness;
-- all 512 three-node graphs cross-checked against independent Floyd–Warshall mutual-reachability SCC partitions and self-loop cycle classification.
+CI additionally executes real CLI gates for safety violation, bounded inconclusive, Peterson, reduction audit, reachable/unreachable queries, deadlock-free/deadlock-found policies, acyclic/cyclic SCC analysis, and all three eventuality outcomes (`SATISFIED`, finite failure, infinite failure).
 
-CI additionally exercises canonical violation, bounded-inconclusive, Peterson, reduction-audit, reachability, deadlock, and both acyclic/cyclic SCC paths through the real CLI.
+## Trust boundaries and limitations
 
-## Trust boundaries
-
-Canonical model construction rejects malformed metadata and empty transition labels. The checker propagates transition-generation errors. It cannot prove that a user transition function is pure, finite, deterministic, or faithful to an external implementation.
-
-Reduction declarations are model-author claims; M5 therefore retains exhaustive checking as authority and rejects observed status mismatch.
-
-Reachability predicates and deadlock terminal policies are user-supplied semantic assertions over the modeled finite graph.
-
-SCC analysis is structural: it faithfully classifies the captured reachable graph, subject to the same transition-model trust boundary. A cyclic SCC says executions can remain within a recurrent region; it does not say an external implementation will take those transitions, that a scheduler is fair or unfair, or that useful progress is absent.
-
-## Limitations
-
-- explicit-state memory grows with retained reachable states; SCC analysis additionally retains the complete reachable labeled edge snapshot;
-- Tarjan SCC discovery currently uses recursive DFS over the captured snapshot, so extremely deep graphs may require a future iterative implementation;
-- safety, existential reachability, finite-state deadlock policies, and structural SCC/cycle analysis only; no general temporal logic yet;
-- deadlock freedom and cycle presence do not imply starvation/livelock/fairness/progress results;
-- Peterson liveness/starvation freedom is not claimed;
-- protocol results apply to the finite model and its atomic-step assumptions, not arbitrary machine code or weak-memory executions;
-- resource limits do not interrupt a successor function while it is building one state's transition vector;
-- reduction statistics are state/edge accounting, not controlled performance benchmarks;
-- the sleep-set engine is experimental and differentially audited, not a standalone trusted POR backend;
-- no LTL/CTL parser, fairness, Büchi automata, SAT/SMT, BDDs, symbolic execution, theorem proving, symmetry reduction, disk-backed storage, parallel search, or distributed checking;
-- deterministic traces require deterministic successor ordering from the model.
+- Results apply to the finite transition model and its atomic-step assumptions, not automatically to machine code, weak-memory executions, or external distributed systems.
+- User transition functions and predicates must faithfully encode the intended system/property; the checker cannot prove their modeling fidelity or purity.
+- Explicit-state memory grows with the reachable state/edge set. SCC and eventuality analyses retain the complete reachable labeled snapshot.
+- Tarjan SCC discovery currently uses recursive DFS; very deep graphs may motivate a future iterative implementation.
+- M9's eventuality has **no fairness semantics**. It proves the stated all-maximal-executions property only for the modeled finite graph.
+- M9 is not a full LTL/CTL implementation and does not claim general temporal-logic parsing, Büchi automata, fairness constraints, or arbitrary nested path/state formulas.
+- Peterson starvation freedom is still not claimed.
+- The sleep-set engine remains experimental and differentially audited, not a standalone trusted POR proof backend.
+- No SAT/SMT, BDDs, symbolic execution, theorem proving, symmetry reduction, disk-backed state storage, parallel exploration, or distributed checking is implemented.
+- Deterministic witnesses require deterministic successor ordering from the model.
 
 ## Roadmap
 
-Milestones 1–8 now cover deterministic explicit-state safety, honest bounded outcomes, typed construction, a real concurrent protocol, independent BFS validation, fail-closed reduction experiments, existential reachability, explicit deadlock policy analysis, and deterministic SCC/recurrent-cycle structure.
+Milestones 1–9 now form a coherent explicit-state stack: safety -> bounded honesty -> typed models -> independent graph validation -> audited reduction -> existential reachability -> terminal/deadlock analysis -> recurrent SCC structure -> universal eventuality with finite/infinite counterexamples.
 
-The next high-value architectural promotion is a deliberately narrow **universal eventuality** property over the finite graph rather than a premature full LTL surface. A Milestone 9 should:
-
-1. define precise finite-path semantics for "from every initial execution, a target state is eventually reached";
-2. classify a reachable non-target terminal state as a finite counterexample and a reachable non-target cyclic SCC as an infinite stem-plus-cycle counterexample;
-3. reuse the one-exploration graph snapshot/SCC machinery rather than invoking the transition function again;
-4. cross-check positive and negative results against independently generated finite graphs;
-5. state fairness assumptions explicitly and avoid claiming full LTL/CTL until parser/automaton machinery actually exists.
+The next architectural frontier should deepen temporal expressiveness without jumping prematurely to a full parser. A high-value Milestone 10 is an executable **response / leads-to property** such as `request -> eventually grant`, implemented as a small explicit obligation monitor composed with the captured transition graph. It should provide deterministic counterexamples, keep fairness assumptions explicit, and receive an independent generated-graph/product oracle before any broader LTL/CTL surface is claimed.
