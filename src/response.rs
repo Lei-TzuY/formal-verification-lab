@@ -190,7 +190,9 @@ where
         .enumerate()
         .find(|(_, component)| component_is_cyclic(&residual, component))
     {
-        let entry = *component.first().ok_or(ResponseError::MissingCycleWitness)?;
+        let entry = *component
+            .first()
+            .ok_or(ResponseError::MissingCycleWitness)?;
         let product_entry = pending_old_ids[entry];
         let stem = shortest_path(&product, &product.initial_ids, product_entry, None)
             .ok_or(ResponseError::MissingCycleWitness)?;
