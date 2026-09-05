@@ -9,7 +9,7 @@ use std::fmt;
 use std::hash::Hash;
 use std::sync::Arc;
 
-type ActionPredicate = Arc<dyn Fn(&str) -> bool + Send + Sync>;
+pub(crate) type ActionPredicate = Arc<dyn Fn(&str) -> bool + Send + Sync>;
 
 /// One independently tracked action-response obligation class.
 pub struct ResponseClause {
