@@ -1,11 +1,13 @@
-use crate::checker::TraceStep;
+use crate::bounded::BoundedOutcome;
+use crate::checker::{ExplorationLimits, TraceStep};
 use crate::eventuality::{
-    check_eventuality, EventualityCounterexample, EventualityError, EventualityProperty,
-    EventualityStatus,
+    check_eventuality, check_eventuality_with_limits, EventualityCounterexample, EventualityError,
+    EventualityProperty, EventualityStatus,
 };
 use crate::model::TransitionSystem;
 use crate::property::{
-    check_reachability, ReachabilityError, ReachabilityProperty, ReachabilityStatus,
+    check_reachability, check_reachability_with_limits, ReachabilityError, ReachabilityProperty,
+    ReachabilityStatus,
 };
 use std::fmt;
 
@@ -132,6 +134,19 @@ pub struct ExactStateResult {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BoundedExactStateResult {
+    pub property: String,
+    pub target: String,
+    pub backend: ExactStateBackend,
+    pub outcome: BoundedOutcome<ExactStateStatus>,
+    pub discovered_states: usize,
+    pub checked_states: usize,
+    pub explored_transitions: usize,
+    pub max_depth_reached: Option<usize>,
+    pub evidence: Option<ExactStateEvidence>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ExactStateError {
     EmptyPropertyName,
     EmptyTargetState,
@@ -178,6 +193,19 @@ pub fn check_exact_state_property(
     }
 }
 
+pub fn check_exact_state_property_with_limits(
+    model: &TransitionSystem<String>,
+    spec: &ExactStatePropertySpec,
+    limits: ExplorationLimits,
+) -> Result<BoundedExactStateResult, ExactStateError> {
+    match spec.kind {
+        ExactStatePropertyKind::Reachable => check_reachable_with_limits(model, spec, limits),
+        ExactStatePropertyKind::AllEventually => {
+            check_all_eventually_with_limits(model, spec, limits)
+        }
+    }
+}
+
 fn check_reachable(
     model: &TransitionSystem<String>,
     spec: &ExactStatePropertySpec,
@@ -205,6 +233,41 @@ fn check_reachable(
     })
 }
 
+fn check_reachable_with_limits(
+    model: &TransitionSystem<String>,
+    spec: &ExactStatePropertySpec,
+    limits: ExplorationLimits,
+) -> Result<BoundedExactStateResult, ExactStateError> {
+    let target = spec.target.clone();
+    let property =
+        ReachabilityProperty::new(spec.name.clone(), move |state: &String| state == &target)?;
+    let result = check_reachability_with_limits(model, &property, limits)?;
+    let evidence = result
+        .witness
+        .map(|trace| ExactStateEvidence::ReachabilityWitness { trace });
+    let outcome = match result.outcome {
+        BoundedOutcome::Conclusive(ReachabilityStatus::Reachable) => {
+            BoundedOutcome::Conclusive(ExactStateStatus::Satisfied)
+        }
+        BoundedOutcome::Conclusive(ReachabilityStatus::Unreachable) => {
+            BoundedOutcome::Conclusive(ExactStateStatus::Violated)
+        }
+        BoundedOutcome::Inconclusive(reason) => BoundedOutcome::Inconclusive(reason),
+    };
+
+    Ok(BoundedExactStateResult {
+        property: result.property,
+        target: spec.target.clone(),
+        backend: ExactStateBackend::Reachability,
+        outcome,
+        discovered_states: result.discovered_states,
+        checked_states: result.checked_states,
+        explored_transitions: result.explored_transitions,
+        max_depth_reached: result.max_depth_reached,
+        evidence,
+    })
+}
+
 fn check_all_eventually(
     model: &TransitionSystem<String>,
     spec: &ExactStatePropertySpec,
@@ -213,15 +276,7 @@ fn check_all_eventually(
     let property =
         EventualityProperty::new(spec.name.clone(), move |state: &String| state == &target)?;
     let result = check_eventuality(model, &property)?;
-    let evidence = match result.counterexample {
-        None => None,
-        Some(EventualityCounterexample::Finite { trace }) => {
-            Some(ExactStateEvidence::EventualityFiniteCounterexample { trace })
-        }
-        Some(EventualityCounterexample::Infinite { stem, cycle }) => {
-            Some(ExactStateEvidence::EventualityInfiniteCounterexample { stem, cycle })
-        }
-    };
+    let evidence = normalize_eventuality_evidence(result.counterexample);
 
     Ok(ExactStateResult {
         property: result.property,
@@ -236,6 +291,53 @@ fn check_all_eventually(
         max_depth_reached: result.max_depth_reached,
         evidence,
     })
+}
+
+fn check_all_eventually_with_limits(
+    model: &TransitionSystem<String>,
+    spec: &ExactStatePropertySpec,
+    limits: ExplorationLimits,
+) -> Result<BoundedExactStateResult, ExactStateError> {
+    let target = spec.target.clone();
+    let property =
+        EventualityProperty::new(spec.name.clone(), move |state: &String| state == &target)?;
+    let result = check_eventuality_with_limits(model, &property, limits)?;
+    let evidence = normalize_eventuality_evidence(result.counterexample);
+    let outcome = match result.outcome {
+        BoundedOutcome::Conclusive(EventualityStatus::Satisfied) => {
+            BoundedOutcome::Conclusive(ExactStateStatus::Satisfied)
+        }
+        BoundedOutcome::Conclusive(EventualityStatus::Violated) => {
+            BoundedOutcome::Conclusive(ExactStateStatus::Violated)
+        }
+        BoundedOutcome::Inconclusive(reason) => BoundedOutcome::Inconclusive(reason),
+    };
+
+    Ok(BoundedExactStateResult {
+        property: result.property,
+        target: spec.target.clone(),
+        backend: ExactStateBackend::Eventuality,
+        outcome,
+        discovered_states: result.discovered_states,
+        checked_states: result.checked_states,
+        explored_transitions: result.explored_transitions,
+        max_depth_reached: result.max_depth_reached,
+        evidence,
+    })
+}
+
+fn normalize_eventuality_evidence(
+    counterexample: Option<EventualityCounterexample<String>>,
+) -> Option<ExactStateEvidence> {
+    match counterexample {
+        None => None,
+        Some(EventualityCounterexample::Finite { trace }) => {
+            Some(ExactStateEvidence::EventualityFiniteCounterexample { trace })
+        }
+        Some(EventualityCounterexample::Infinite { stem, cycle }) => {
+            Some(ExactStateEvidence::EventualityInfiniteCounterexample { stem, cycle })
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -290,7 +392,7 @@ impl fmt::Display for ExactStateParseError {
             ExactStateParseErrorKind::UnknownOperator { operator } => {
                 write!(f, "unsupported exact-state operator '{operator}'")
             }
-            ExactStateParseErrorKind::ExpectedOpenParen => write!(f, "expected '('"),
+            ExactStateParseErrorKind::ExpectedOpenParen => write!(f, "expected '('") ,
             ExactStateParseErrorKind::ExpectedString => {
                 write!(f, "expected a double-quoted exact state id")
             }
@@ -300,7 +402,7 @@ impl fmt::Display for ExactStateParseError {
             ExactStateParseErrorKind::InvalidEscape { escape } => {
                 write!(f, "unsupported string escape '\\{escape}'")
             }
-            ExactStateParseErrorKind::ExpectedCommaOrClose => write!(f, "expected ',' or ')'"),
+            ExactStateParseErrorKind::ExpectedCommaOrClose => write!(f, "expected ',' or ')'") ,
             ExactStateParseErrorKind::WrongArity {
                 operator,
                 expected,
