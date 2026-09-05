@@ -7,6 +7,7 @@
 pub mod builder;
 pub mod checker;
 pub mod eventuality;
+pub mod eventuality_report;
 pub mod examples;
 pub mod model;
 pub mod property;
@@ -23,6 +24,7 @@ pub use eventuality::{
     check_eventuality, EventualityCounterexample, EventualityError, EventualityProperty,
     EventualityResult, EventualityStatus,
 };
+pub use eventuality_report::render_eventuality_report;
 pub use model::{Invariant, ModelError, StateVariable, Transition, TransitionSystem};
 pub use property::{
     check_deadlock, check_reachability, DeadlockError, DeadlockProperty, DeadlockResult,
