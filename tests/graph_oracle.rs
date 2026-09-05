@@ -36,10 +36,7 @@ fn all_pairs_shortest_paths(mask: usize) -> [[usize; N]; N] {
     distance
 }
 
-fn graph_model(
-    mask: usize,
-    invariant: Invariant<usize>,
-) -> TransitionSystem<usize> {
+fn graph_model(mask: usize, invariant: Invariant<usize>) -> TransitionSystem<usize> {
     TransitionSystem::new(
         format!("graph-{mask}"),
         vec![StateVariable::new("node", "current graph node")],
@@ -121,9 +118,10 @@ fn exhaustive_three_node_graphs_match_independent_shortest_counterexample_oracle
                 let from = pair[0].state;
                 let to = pair[1].state;
                 assert!(has_edge(mask, from, to), "trace used missing edge for mask={mask}");
+                let expected_action = format!("{from}->{to}");
                 assert_eq!(
                     pair[1].action.as_deref(),
-                    Some(format!("{from}->{to}").as_str()),
+                    Some(expected_action.as_str()),
                     "mask={mask}"
                 );
             }
