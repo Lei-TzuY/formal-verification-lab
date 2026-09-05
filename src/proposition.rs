@@ -1,11 +1,14 @@
+use crate::bounded::BoundedOutcome;
+use crate::checker::ExplorationLimits;
 use crate::declarative::DeclarativeDocument;
 use crate::eventuality::{
-    check_eventuality, EventualityCounterexample, EventualityError, EventualityProperty,
-    EventualityStatus,
+    check_eventuality, check_eventuality_with_limits, EventualityCounterexample, EventualityError,
+    EventualityProperty, EventualityStatus,
 };
 use crate::exact_state::{ExactStateBackend, ExactStateEvidence, ExactStateStatus};
 use crate::property::{
-    check_reachability, ReachabilityError, ReachabilityProperty, ReachabilityStatus,
+    check_reachability, check_reachability_with_limits, ReachabilityError, ReachabilityProperty,
+    ReachabilityStatus,
 };
 use std::collections::HashSet;
 use std::fmt;
@@ -84,6 +87,19 @@ pub struct PropositionResult {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BoundedPropositionResult {
+    pub property: String,
+    pub proposition: String,
+    pub backend: ExactStateBackend,
+    pub outcome: BoundedOutcome<ExactStateStatus>,
+    pub discovered_states: usize,
+    pub checked_states: usize,
+    pub explored_transitions: usize,
+    pub max_depth_reached: Option<usize>,
+    pub evidence: Option<ExactStateEvidence>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PropositionError {
     EmptyPropertyName,
     EmptyProposition,
@@ -126,19 +142,43 @@ pub fn check_proposition_property(
     document: &DeclarativeDocument,
     spec: &PropositionPropertySpec,
 ) -> Result<PropositionResult, PropositionError> {
-    let members = document
+    let members = proposition_members(document, spec)?;
+
+    match spec.kind {
+        PropositionPropertyKind::Reachable => check_reachable(document, spec, members),
+        PropositionPropertyKind::AllEventually => check_all_eventually(document, spec, members),
+    }
+}
+
+pub fn check_proposition_property_with_limits(
+    document: &DeclarativeDocument,
+    spec: &PropositionPropertySpec,
+    limits: ExplorationLimits,
+) -> Result<BoundedPropositionResult, PropositionError> {
+    let members = proposition_members(document, spec)?;
+
+    match spec.kind {
+        PropositionPropertyKind::Reachable => {
+            check_reachable_with_limits(document, spec, members, limits)
+        }
+        PropositionPropertyKind::AllEventually => {
+            check_all_eventually_with_limits(document, spec, members, limits)
+        }
+    }
+}
+
+fn proposition_members(
+    document: &DeclarativeDocument,
+    spec: &PropositionPropertySpec,
+) -> Result<HashSet<String>, PropositionError> {
+    Ok(document
         .proposition_states(&spec.proposition)
         .ok_or_else(|| PropositionError::UnknownProposition {
             proposition: spec.proposition.clone(),
         })?
         .iter()
         .cloned()
-        .collect::<HashSet<_>>();
-
-    match spec.kind {
-        PropositionPropertyKind::Reachable => check_reachable(document, spec, members),
-        PropositionPropertyKind::AllEventually => check_all_eventually(document, spec, members),
-    }
+        .collect())
 }
 
 fn check_reachable(
@@ -169,6 +209,42 @@ fn check_reachable(
     })
 }
 
+fn check_reachable_with_limits(
+    document: &DeclarativeDocument,
+    spec: &PropositionPropertySpec,
+    members: HashSet<String>,
+    limits: ExplorationLimits,
+) -> Result<BoundedPropositionResult, PropositionError> {
+    let property = ReachabilityProperty::new(spec.name.clone(), move |state: &String| {
+        members.contains(state)
+    })?;
+    let result = check_reachability_with_limits(document.model(), &property, limits)?;
+    let evidence = result
+        .witness
+        .map(|trace| ExactStateEvidence::ReachabilityWitness { trace });
+    let outcome = match result.outcome {
+        BoundedOutcome::Conclusive(ReachabilityStatus::Reachable) => {
+            BoundedOutcome::Conclusive(ExactStateStatus::Satisfied)
+        }
+        BoundedOutcome::Conclusive(ReachabilityStatus::Unreachable) => {
+            BoundedOutcome::Conclusive(ExactStateStatus::Violated)
+        }
+        BoundedOutcome::Inconclusive(reason) => BoundedOutcome::Inconclusive(reason),
+    };
+
+    Ok(BoundedPropositionResult {
+        property: result.property,
+        proposition: spec.proposition.clone(),
+        backend: ExactStateBackend::Reachability,
+        outcome,
+        discovered_states: result.discovered_states,
+        checked_states: result.checked_states,
+        explored_transitions: result.explored_transitions,
+        max_depth_reached: result.max_depth_reached,
+        evidence,
+    })
+}
+
 fn check_all_eventually(
     document: &DeclarativeDocument,
     spec: &PropositionPropertySpec,
@@ -178,15 +254,7 @@ fn check_all_eventually(
         members.contains(state)
     })?;
     let result = check_eventuality(document.model(), &property)?;
-    let evidence = match result.counterexample {
-        None => None,
-        Some(EventualityCounterexample::Finite { trace }) => {
-            Some(ExactStateEvidence::EventualityFiniteCounterexample { trace })
-        }
-        Some(EventualityCounterexample::Infinite { stem, cycle }) => {
-            Some(ExactStateEvidence::EventualityInfiniteCounterexample { stem, cycle })
-        }
-    };
+    let evidence = normalize_eventuality_evidence(result.counterexample);
 
     Ok(PropositionResult {
         property: result.property,
@@ -201,4 +269,52 @@ fn check_all_eventually(
         max_depth_reached: result.max_depth_reached,
         evidence,
     })
+}
+
+fn check_all_eventually_with_limits(
+    document: &DeclarativeDocument,
+    spec: &PropositionPropertySpec,
+    members: HashSet<String>,
+    limits: ExplorationLimits,
+) -> Result<BoundedPropositionResult, PropositionError> {
+    let property = EventualityProperty::new(spec.name.clone(), move |state: &String| {
+        members.contains(state)
+    })?;
+    let result = check_eventuality_with_limits(document.model(), &property, limits)?;
+    let evidence = normalize_eventuality_evidence(result.counterexample);
+    let outcome = match result.outcome {
+        BoundedOutcome::Conclusive(EventualityStatus::Satisfied) => {
+            BoundedOutcome::Conclusive(ExactStateStatus::Satisfied)
+        }
+        BoundedOutcome::Conclusive(EventualityStatus::Violated) => {
+            BoundedOutcome::Conclusive(ExactStateStatus::Violated)
+        }
+        BoundedOutcome::Inconclusive(reason) => BoundedOutcome::Inconclusive(reason),
+    };
+
+    Ok(BoundedPropositionResult {
+        property: result.property,
+        proposition: spec.proposition.clone(),
+        backend: ExactStateBackend::Eventuality,
+        outcome,
+        discovered_states: result.discovered_states,
+        checked_states: result.checked_states,
+        explored_transitions: result.explored_transitions,
+        max_depth_reached: result.max_depth_reached,
+        evidence,
+    })
+}
+
+fn normalize_eventuality_evidence(
+    counterexample: Option<EventualityCounterexample<String>>,
+) -> Option<ExactStateEvidence> {
+    match counterexample {
+        None => None,
+        Some(EventualityCounterexample::Finite { trace }) => {
+            Some(ExactStateEvidence::EventualityFiniteCounterexample { trace })
+        }
+        Some(EventualityCounterexample::Infinite { stem, cycle }) => {
+            Some(ExactStateEvidence::EventualityInfiniteCounterexample { stem, cycle })
+        }
+    }
 }
