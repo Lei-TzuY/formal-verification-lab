@@ -14,6 +14,9 @@ pub mod property;
 pub mod recurrence;
 pub mod reduction;
 pub mod report;
+pub mod response;
+pub mod response_examples;
+pub mod response_report;
 
 pub use builder::TransitionSystemBuilder;
 pub use checker::{
@@ -39,3 +42,8 @@ pub use reduction::{
     audit_sleep_set_reduction, IndependenceError, IndependenceRelation, ReducedExploration,
     ReductionAudit, ReductionAuditError,
 };
+pub use response::{
+    check_response, ObligationState, ResponseCounterexample, ResponseError, ResponseProperty,
+    ResponseResult, ResponseStatus,
+};
+pub use response_report::render_response_report;
