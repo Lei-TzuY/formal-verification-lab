@@ -1,5 +1,5 @@
 use crate::model::{Invariant, ModelError, StateVariable, Transition, TransitionSystem};
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -44,6 +44,18 @@ pub enum DeclarativeModelError {
         from: String,
         action: String,
         to: String,
+    },
+    EmptyProposition {
+        line: usize,
+    },
+    UnknownLabelState {
+        line: usize,
+        state: String,
+    },
+    DuplicateLabel {
+        line: usize,
+        state: String,
+        proposition: String,
     },
     ExpectedDirective {
         line: usize,
@@ -113,6 +125,20 @@ impl fmt::Display for DeclarativeModelError {
                 f,
                 "duplicate edge '{from}' --{action}--> '{to}' at line {line}"
             ),
+            Self::EmptyProposition { line } => {
+                write!(f, "empty proposition name at line {line}")
+            }
+            Self::UnknownLabelState { line, state } => {
+                write!(f, "label state '{state}' at line {line} is not declared")
+            }
+            Self::DuplicateLabel {
+                line,
+                state,
+                proposition,
+            } => write!(
+                f,
+                "duplicate label '{proposition}' on state '{state}' at line {line}"
+            ),
             Self::ExpectedDirective { line, column } => {
                 write!(f, "expected directive at line {line}, column {column}")
             }
@@ -165,7 +191,47 @@ struct EdgeDecl {
     to: String,
 }
 
-/// Parse a deterministic line-oriented finite labeled-graph model.
+#[derive(Debug, Clone)]
+struct LabelDecl {
+    line: usize,
+    state: String,
+    proposition: String,
+}
+
+/// A parsed declarative document owns proposition metadata alongside the same
+/// canonical transition system used by every verification backend.
+///
+/// Propositions are ingestion metadata only. They do not become safety
+/// invariants, do not alter the transition relation, and do not introduce a
+/// second graph representation.
+#[derive(Debug)]
+pub struct DeclarativeDocument {
+    model: TransitionSystem<String>,
+    propositions: BTreeMap<String, Vec<String>>,
+}
+
+impl DeclarativeDocument {
+    pub fn model(&self) -> &TransitionSystem<String> {
+        &self.model
+    }
+
+    pub fn into_model(self) -> TransitionSystem<String> {
+        self.model
+    }
+
+    /// Return proposition members in label declaration order.
+    pub fn proposition_states(&self, proposition: &str) -> Option<&[String]> {
+        self.propositions.get(proposition).map(Vec::as_slice)
+    }
+
+    pub fn state_has_proposition(&self, state: &str, proposition: &str) -> bool {
+        self.proposition_states(proposition)
+            .is_some_and(|states| states.iter().any(|candidate| candidate == state))
+    }
+}
+
+/// Parse a deterministic line-oriented finite labeled-graph document with
+/// optional named state propositions.
 ///
 /// Supported directives are:
 ///
@@ -174,15 +240,16 @@ struct EdgeDecl {
 /// state "state-id"
 /// initial "state-id"
 /// edge "from" "action" "to"
+/// label "state-id" "proposition"
 /// ```
 ///
 /// Blank lines and lines whose first non-whitespace byte is `#` are ignored.
-/// Strings support the same basic escapes as the temporal expression surface:
-/// `\\`, `\"`, `\n`, `\r`, and `\t`. State and edge declaration order is
-/// preserved when the canonical transition system is materialized.
-pub fn parse_declarative_model(
+/// Strings support `\\`, `\"`, `\n`, `\r`, and `\t`. Initial-state,
+/// per-source edge, and per-proposition member ordering follows declaration
+/// order for deterministic witnesses and metadata inspection.
+pub fn parse_declarative_document(
     input: &str,
-) -> Result<TransitionSystem<String>, DeclarativeModelError> {
+) -> Result<DeclarativeDocument, DeclarativeModelError> {
     let mut model_name: Option<String> = None;
     let mut states = Vec::new();
     let mut state_set = HashSet::new();
@@ -190,6 +257,8 @@ pub fn parse_declarative_model(
     let mut initial_set = HashSet::new();
     let mut edges = Vec::new();
     let mut edge_set: HashSet<(String, String, String)> = HashSet::new();
+    let mut labels = Vec::new();
+    let mut label_set: HashSet<(String, String)> = HashSet::new();
 
     for (line_index, text) in input.lines().enumerate() {
         let line = line_index + 1;
@@ -203,6 +272,7 @@ pub fn parse_declarative_model(
         let arguments = parser.parse_arguments()?;
         let expected = match directive.as_str() {
             "model" | "state" | "initial" => 1,
+            "label" => 2,
             "edge" => 3,
             _ => {
                 return Err(DeclarativeModelError::UnknownDirective { line, directive });
@@ -266,6 +336,25 @@ pub fn parse_declarative_model(
                     to,
                 });
             }
+            "label" => {
+                let state = arguments[0].clone();
+                let proposition = arguments[1].clone();
+                if proposition.trim().is_empty() {
+                    return Err(DeclarativeModelError::EmptyProposition { line });
+                }
+                if !label_set.insert((state.clone(), proposition.clone())) {
+                    return Err(DeclarativeModelError::DuplicateLabel {
+                        line,
+                        state,
+                        proposition,
+                    });
+                }
+                labels.push(LabelDecl {
+                    line,
+                    state,
+                    proposition,
+                });
+            }
             _ => unreachable!("directive was validated before dispatch"),
         }
     }
@@ -300,6 +389,14 @@ pub fn parse_declarative_model(
             });
         }
     }
+    for label in &labels {
+        if !state_set.contains(&label.state) {
+            return Err(DeclarativeModelError::UnknownLabelState {
+                line: label.line,
+                state: label.state.clone(),
+            });
+        }
+    }
 
     let mut adjacency: HashMap<String, Vec<Transition<String>>> = states
         .iter()
@@ -313,10 +410,17 @@ pub fn parse_declarative_model(
             .push(Transition::new(edge.action, edge.to));
     }
 
+    let mut propositions: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for label in labels {
+        propositions
+            .entry(label.proposition)
+            .or_default()
+            .push(label.state);
+    }
+
     let initial_states = initials.into_iter().map(|(_, state)| state).collect();
-    let domain = state_set;
-    let invariant_domain = domain.clone();
-    TransitionSystem::new(
+    let invariant_domain = state_set.clone();
+    let model = TransitionSystem::new(
         name,
         vec![StateVariable::new("state", "declarative state id")],
         initial_states,
@@ -333,7 +437,21 @@ pub fn parse_declarative_model(
             move |state: &String| invariant_domain.contains(state),
         )],
     )
-    .map_err(DeclarativeModelError::Model)
+    .map_err(DeclarativeModelError::Model)?;
+
+    Ok(DeclarativeDocument {
+        model,
+        propositions,
+    })
+}
+
+/// Backward-compatible M19 graph loader. Proposition metadata is accepted but
+/// deliberately discarded when only the canonical transition system is
+/// requested.
+pub fn parse_declarative_model(
+    input: &str,
+) -> Result<TransitionSystem<String>, DeclarativeModelError> {
+    Ok(parse_declarative_document(input)?.into_model())
 }
 
 struct LineParser<'a> {
