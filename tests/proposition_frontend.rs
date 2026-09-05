@@ -129,7 +129,10 @@ fn proposition_reachability_matches_direct_multi_state_predicate() {
     assert_eq!(frontend.backend, ExactStateBackend::Reachability);
     assert_eq!(frontend.status, ExactStateStatus::Satisfied);
     assert_eq!(frontend.discovered_states, direct_result.discovered_states);
-    assert_eq!(frontend.explored_transitions, direct_result.explored_transitions);
+    assert_eq!(
+        frontend.explored_transitions,
+        direct_result.explored_transitions
+    );
     assert_eq!(frontend.max_depth_reached, direct_result.max_depth_reached);
     assert_eq!(
         frontend.evidence,
@@ -146,8 +149,8 @@ fn proposition_reachability_matches_direct_multi_state_predicate() {
 #[test]
 fn proposition_eventuality_matches_direct_predicate_for_success_and_lasso_failure() {
     let document = parse_declarative_document(LABELED_GRAPH).unwrap();
-    let direct = EventualityProperty::new("eventually-complete", |state: &String| state == "done")
-        .unwrap();
+    let direct =
+        EventualityProperty::new("eventually-complete", |state: &String| state == "done").unwrap();
     let direct_result = check_eventuality(document.model(), &direct).unwrap();
     let frontend = check_proposition_property(
         &document,
@@ -159,13 +162,16 @@ fn proposition_eventuality_matches_direct_predicate_for_success_and_lasso_failur
     assert_eq!(frontend.backend, ExactStateBackend::Eventuality);
     assert_eq!(frontend.status, ExactStateStatus::Satisfied);
     assert_eq!(frontend.discovered_states, direct_result.discovered_states);
-    assert_eq!(frontend.explored_transitions, direct_result.explored_transitions);
+    assert_eq!(
+        frontend.explored_transitions,
+        direct_result.explored_transitions
+    );
     assert_eq!(frontend.max_depth_reached, direct_result.max_depth_reached);
     assert!(frontend.evidence.is_none());
 
     let avoiding = parse_declarative_document(AVOIDING_GRAPH).unwrap();
-    let direct = EventualityProperty::new("eventually-complete", |state: &String| state == "done")
-        .unwrap();
+    let direct =
+        EventualityProperty::new("eventually-complete", |state: &String| state == "done").unwrap();
     let direct_result = check_eventuality(avoiding.model(), &direct).unwrap();
     let frontend = check_proposition_property(
         &avoiding,
