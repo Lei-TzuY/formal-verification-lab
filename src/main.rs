@@ -479,7 +479,8 @@ fn temporal_command(args: &[String]) -> Result<ExitCode, String> {
 }
 
 fn run_temporal_expression(model_name: &str, expression: &str) -> Result<ExitCode, String> {
-    let spec = parse_action_temporal("cli-temporal", expression).map_err(|error| error.to_string())?;
+    let spec =
+        parse_action_temporal("cli-temporal", expression).map_err(|error| error.to_string())?;
     match model_name {
         "request-grant" => run_temporal(
             request_grant_protocol().map_err(|error| error.to_string())?,
