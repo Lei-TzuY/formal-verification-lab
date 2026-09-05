@@ -42,30 +42,43 @@ A recurrent SCC is structural information only; it is not automatically a livelo
 
 ### Milestone 9 — universal eventuality on maximal executions
 
-Milestone 9 adds a deliberately narrow temporal property:
+`EventualityProperty<S>` asks whether every maximal execution from every initial state eventually reaches a target predicate. It reports `SATISFIED`, a finite terminal counterexample, or a target-free stem-plus-cycle counterexample. The property has no fairness assumption.
 
-> **On every maximal execution from every initial state, is a target state eventually reached?**
+The model transition relation is evaluated once. Target states are absorbing for this property, so analysis uses the states reachable from non-target initial states without crossing target. A residual sink counts as a finite violation only when it is a true terminal in the original graph. All 512 directed three-node graphs across all 8 target subsets — 4096 graph/property combinations — are independently checked with Floyd–Warshall target-cut reachability and cycle/terminal oracles.
 
-`EventualityProperty<S>` names the target predicate and `check_eventuality` returns:
+### Milestone 10 — action response / leads-to obligations
 
-- `SATISFIED` when every maximal execution reaches target;
-- `VIOLATED` with a finite counterexample when an execution can terminate before target;
-- `VIOLATED` with a stem-plus-cycle counterexample when an execution can remain forever in a target-free recurrent region.
+Milestone 10 adds the action-level temporal property:
 
-The semantics are intentionally **without a fairness assumption**. If a target-free cycle has an exit to target, an execution that keeps choosing the cycle is still a valid infinite counterexample.
+> **Whenever a trigger action occurs, must a response action eventually follow on every maximal execution?**
 
-The model transition relation is still evaluated only once. M9 reuses M8's crate-private reachable-graph snapshot and SCC machinery. Target states are absorbing for the property: once target is reached, later behavior is irrelevant. The analyzer therefore computes the states reachable from non-target initial states **without crossing a target state**. This target-cut residual graph is essential: a cycle reachable only after target has already been seen must not become a false counterexample.
+`ResponseProperty` contains named trigger and response predicates over complete transition labels. `check_response` constructs a one-bit obligation monitor over the already captured model graph:
 
-A residual state is a finite counterexample only when it is a true terminal in the original transition graph. A residual node whose only outgoing edges go to target is not terminal: every maximal execution must take an enabled transition and therefore reaches target.
+- monitor starts with `pending = false`;
+- a trigger sets `pending = true`;
+- a response clears `pending = false`;
+- if one action matches both predicates, the response wins, so the trigger is satisfied immediately;
+- another trigger while already pending leaves the single outstanding-obligation bit set.
 
-Counterexample selection is deterministic. Target-free finite terminals take precedence and use canonical discovery order with a shortest residual path. If no such terminal exists, the first target-free cyclic SCC in canonical order produces a shortest stem plus deterministic closed cycle. The chosen cycle is not claimed to be globally shortest.
+The original model transition relation is still evaluated exactly once. M10 then explores the finite product graph `(model_state, pending)` using the captured labeled edges. This avoids the incorrect shortcut of checking eventuality from an initially clear monitor, which would trivially succeed before any request occurs.
 
-The M9 oracle exhaustively evaluates every combination of:
+`check_response` returns:
 
-- all 512 directed three-node graphs; and
-- all 8 possible target-state subsets.
+- `SATISFIED` when no maximal execution can leave a trigger unanswered;
+- `VIOLATED` / `PENDING_TERMINAL` when a reachable finite execution terminates with `pending = true`;
+- `VIOLATED` / `PENDING_CYCLE` when a reachable execution can remain forever in a cyclic product region with `pending = true`.
 
-That is 4096 graph/property combinations. Floyd–Warshall is used independently to determine target-cut reachability and shortest distances; terminal out-degree and mutual reachability/self-loops independently determine finite and infinite failure classes. Tests also prove that existential reachability does not imply universal eventuality and that post-target cycles are ignored correctly.
+No fairness is assumed. If `grant` is enabled but the model can repeatedly take a `wait` self-loop forever, that infinite execution is a valid response violation. Finite pending terminals take precedence; otherwise the first pending cyclic SCC in canonical product discovery order is chosen. The reported stem is a shortest path from the real product initial state, and the closed cycle keeps the obligation pending throughout.
+
+The generated-product oracle exhaustively evaluates 4096 combinations over two-node fixtures:
+
+- all 16 directed graph masks;
+- all 16 trigger-action masks; and
+- all 16 response-action masks.
+
+The oracle independently constructs the four possible `(node, pending)` product states and uses Floyd–Warshall for product reachability plus pending-only recurrence. It validates result status, deterministic repeated analysis, finite/infinite counterexample class, real labeled transitions, monitor updates, terminal correctness, closed pending cycles, and shortest stems. The same generated suite naturally covers actions classified simultaneously as trigger and response.
+
+Two executable request/grant models demonstrate the fairness boundary. `request-grant` has only `request -> grant` continuation and satisfies the property. `request-grant-unfair` enables both `wait` and `grant` while waiting; without fairness, the infinite `wait` execution violates response even though `grant` remains enabled.
 
 ## Architecture
 
@@ -77,16 +90,18 @@ src/checker.rs            canonical deterministic BFS substrate, bounds,
 src/property.rs           existential reachability + deadlock policies
 src/recurrence.rs         reusable one-exploration graph snapshot,
                           induced graphs, SCCs, shortest paths, cycle witnesses
-src/eventuality.rs        universal eventuality over the target-cut residual graph
+src/eventuality.rs        universal eventuality over target-cut residual graphs
+src/response.rs           action obligation product + response verification
 src/reduction.rs          experimental sleep-set path + exhaustive audit
 src/report.rs             safety/reachability/deadlock/SCC reports
 src/eventuality_report.rs eventuality-specific deterministic reporting
+src/response_report.rs    response-specific deterministic reporting
+src/response_examples.rs  executable request/grant teaching models
 src/main.rs               CLI/exit-status integration; no model traversal logic
-tests/                    semantic, protocol, graph-oracle, reduction,
-                          reachability, deadlock, SCC, and eventuality coverage
+tests/                    semantic, protocol, generated-graph/product oracles
 ```
 
-The model transition relation remains owned by `model` + the canonical `checker` traversal. Higher-level structural/temporal analyses operate over the one captured finite graph instead of re-executing the model.
+The original transition relation remains owned by `model` + the canonical `checker` traversal. Structural and temporal analyses reuse the captured finite graph; M10's additional traversal is over an explicit monitor product of that snapshot, not a second invocation of the model transition function.
 
 ## Executable examples
 
@@ -100,33 +115,37 @@ cargo run -- reduce commuting-counters
 cargo run -- reach counter-three
 cargo run -- deadlock counter-terminal-forbidden
 cargo run -- scc traffic-light
+cargo run -- eventually counter-three
+cargo run -- respond request-grant
 ```
 
 ### Universal eventuality
 
-A positive property:
-
 ```bash
 cargo run -- eventually counter-three
-```
-
-The bounded counter has one maximal execution, reaches value 3, and reports `eventuality: SATISFIED`.
-
-A finite failure:
-
-```bash
 cargo run -- eventually counter-four
-```
-
-Value 4 is never reached and the counter terminates at value 3. The command exits 6, reports `eventuality: VIOLATED`, classifies `counterexample: FINITE_TERMINAL`, and prints the three-increment trace.
-
-An infinite failure:
-
-```bash
 cargo run -- eventually traffic-never
 ```
 
-The target predicate is deliberately impossible. The traffic-light graph is recurrent, so the command exits 6 with `counterexample: INFINITE_CYCLE` and a closed `Red -> Green -> Yellow -> Red` witness.
+These demonstrate `SATISFIED`, finite terminal failure, and infinite cycle failure respectively. Eventuality violations exit 6.
+
+### Response / leads-to
+
+A protocol where the only continuation after a request is a grant:
+
+```bash
+cargo run -- respond request-grant
+```
+
+It reports `response: SATISFIED`.
+
+A protocol where a waiting process may stutter forever even though grant is enabled:
+
+```bash
+cargo run -- respond request-grant-unfair
+```
+
+It exits 7, reports `response: VIOLATED`, and prints a `PENDING_CYCLE` witness containing the request stem and a pending `wait` self-loop.
 
 ## CLI exit status
 
@@ -136,7 +155,8 @@ The target predicate is deliberately impossible. The traffic-light graph is recu
 - `3`: bounded safety exploration is `INCONCLUSIVE`;
 - `4`: existential target is `UNREACHABLE`;
 - `5`: unexpected terminal/deadlock found;
-- `6`: universal eventuality is `VIOLATED`.
+- `6`: universal eventuality is `VIOLATED`;
+- `7`: action response property is `VIOLATED`.
 
 ## Tests and CI
 
@@ -149,18 +169,19 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo test --all-targets --all-features
 ```
 
-Coverage includes deterministic safety traces, cycles, multiple initial states, bounded exploration, Peterson, differential reduction, existential reachability, deadlock policies, SCC structure, and universal eventuality. Generated-graph suites independently cross-check canonical BFS, reachability, deadlock, SCC, and M9's 4096 graph/target-set combinations.
+Coverage includes deterministic safety traces, cycles, multiple initial states, bounded exploration, Peterson, differential reduction, existential reachability, deadlock policies, SCC structure, universal eventuality, and action-response monitor products. Generated suites independently cross-check canonical BFS, reachability, deadlock, SCC, M9's 4096 graph/target-set cases, and M10's 4096 graph/trigger/response product cases.
 
-CI additionally executes real CLI gates for safety violation, bounded inconclusive, Peterson, reduction audit, reachable/unreachable queries, deadlock-free/deadlock-found policies, acyclic/cyclic SCC analysis, and all three eventuality outcomes (`SATISFIED`, finite failure, infinite failure).
+CI additionally executes real CLI gates for every milestone, including both response paths.
 
 ## Trust boundaries and limitations
 
 - Results apply to the finite transition model and its atomic-step assumptions, not automatically to machine code, weak-memory executions, or external distributed systems.
-- User transition functions and predicates must faithfully encode the intended system/property; the checker cannot prove their modeling fidelity or purity.
-- Explicit-state memory grows with the reachable state/edge set. SCC and eventuality analyses retain the complete reachable labeled snapshot.
+- User transition functions and state/action predicates must faithfully encode the intended system/property; the checker cannot prove modeling fidelity or purity.
+- Explicit-state memory grows with the reachable graph. SCC/eventuality retain the graph; response can expand it to at most two monitor states per captured model state for the current one-bit obligation.
 - Tarjan SCC discovery currently uses recursive DFS; very deep graphs may motivate a future iterative implementation.
-- M9's eventuality has **no fairness semantics**. It proves the stated all-maximal-executions property only for the modeled finite graph.
-- M9 is not a full LTL/CTL implementation and does not claim general temporal-logic parsing, Büchi automata, fairness constraints, or arbitrary nested path/state formulas.
+- M9 and M10 have **no fairness semantics**. Enabled responses are not assumed to be scheduled.
+- M10 tracks one Boolean outstanding obligation, not request multiplicity or per-request identity. Repeated triggers while pending do not create a counter.
+- M9/M10 are not a full LTL/CTL implementation and do not claim temporal-logic parsing, Büchi automata, fairness constraints, or arbitrary nested formulas.
 - Peterson starvation freedom is still not claimed.
 - The sleep-set engine remains experimental and differentially audited, not a standalone trusted POR proof backend.
 - No SAT/SMT, BDDs, symbolic execution, theorem proving, symmetry reduction, disk-backed state storage, parallel exploration, or distributed checking is implemented.
@@ -168,6 +189,6 @@ CI additionally executes real CLI gates for safety violation, bounded inconclusi
 
 ## Roadmap
 
-Milestones 1–9 now form a coherent explicit-state stack: safety -> bounded honesty -> typed models -> independent graph validation -> audited reduction -> existential reachability -> terminal/deadlock analysis -> recurrent SCC structure -> universal eventuality with finite/infinite counterexamples.
+Milestones 1–10 form a coherent explicit-state stack: safety -> bounded honesty -> typed models -> independent graph validation -> audited reduction -> existential reachability -> terminal/deadlock analysis -> recurrent SCC structure -> universal eventuality -> monitored response obligations.
 
-The next architectural frontier should deepen temporal expressiveness without jumping prematurely to a full parser. A high-value Milestone 10 is an executable **response / leads-to property** such as `request -> eventually grant`, implemented as a small explicit obligation monitor composed with the captured transition graph. It should provide deterministic counterexamples, keep fairness assumptions explicit, and receive an independent generated-graph/product oracle before any broader LTL/CTL surface is claimed.
+The next frontier should deepen monitor composition rather than jump directly to a textual temporal-logic parser. A high-value Milestone 11 is **bounded/counting obligations or multi-class response monitors**: distinguish multiple outstanding request classes or bounded request multiplicity, keep product-state growth explicit, provide deterministic counterexamples, and validate the product semantics against an independent generated monitor oracle before considering generalized automata or LTL syntax.
