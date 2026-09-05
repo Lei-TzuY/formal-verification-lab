@@ -1,5 +1,7 @@
 use formal_verification_lab::checker::{check_with_limits, ExplorationLimits, VerificationStatus};
-use formal_verification_lab::examples::{bounded_counter, buggy_mutex, traffic_light};
+use formal_verification_lab::examples::{
+    bounded_counter, buggy_mutex, buggy_peterson_mutex, peterson_mutex, traffic_light,
+};
 use formal_verification_lab::report::render_report;
 use std::env;
 use std::process::ExitCode;
@@ -40,8 +42,13 @@ fn run_command(args: &[String]) -> Result<ExitCode, String> {
         ),
         "mutex-bug" => run_model(buggy_mutex().map_err(|error| error.to_string())?, limits),
         "traffic-light" => run_model(traffic_light().map_err(|error| error.to_string())?, limits),
+        "peterson" => run_model(peterson_mutex().map_err(|error| error.to_string())?, limits),
+        "peterson-bug" => run_model(
+            buggy_peterson_mutex().map_err(|error| error.to_string())?,
+            limits,
+        ),
         _ => Err(format!(
-            "unknown example '{example}'; expected counter, mutex-bug, or traffic-light"
+            "unknown example '{example}'; expected counter, mutex-bug, traffic-light, peterson, or peterson-bug"
         )),
     }
 }
@@ -98,10 +105,10 @@ where
 }
 
 fn usage() -> String {
-    "usage: fvlab [list | run <counter|mutex-bug|traffic-light> [--max-states N] [--max-transitions N] [--max-depth N]]"
+    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug> [--max-states N] [--max-transitions N] [--max-depth N]]"
         .to_owned()
 }
 
 fn print_examples() {
-    println!("counter\nmutex-bug\ntraffic-light");
+    println!("counter\nmutex-bug\ntraffic-light\npeterson\npeterson-bug");
 }
