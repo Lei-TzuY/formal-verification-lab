@@ -49,6 +49,10 @@ use formal_verification_lab::response_examples::{
     request_grant_protocol, unfair_request_grant_protocol,
 };
 use formal_verification_lab::response_report::render_response_report;
+use formal_verification_lab::safety::{
+    check_safety_assertion, PropositionSafetySpec, SafetyStatus,
+};
+use formal_verification_lab::safety_report::render_safety_report;
 use formal_verification_lab::temporal::{
     check_action_temporal, ActionAtom, ActionTemporalSpec, TemporalStatus,
 };
@@ -596,8 +600,11 @@ fn proposition_command(args: &[String]) -> Result<ExitCode, String> {
         [command, path, mode, expression] if command == "expr" => {
             run_proposition_expression_file(path, mode, expression)
         }
+        [command, path, expression] if command == "always" => {
+            run_safety_file(path, expression)
+        }
         [query] => Err(format!(
-            "unknown proposition query '{query}'; expected 'file <path> <reachable|all-eventually> <proposition>' or 'expr <path> <reachable|all-eventually> <expression>'"
+            "unknown proposition query '{query}'; expected 'file <path> <reachable|all-eventually> <proposition>', 'expr <path> <reachable|all-eventually> <expression>', or 'always <path> <expression>'"
         )),
         _ => Err(usage()),
     }
@@ -664,6 +671,21 @@ fn run_proposition_expression_file(
     })
 }
 
+fn run_safety_file(path: &str, expression: &str) -> Result<ExitCode, String> {
+    let input = fs::read_to_string(path)
+        .map_err(|error| format!("failed to read declarative model '{path}': {error}"))?;
+    let document = parse_declarative_document(&input).map_err(|error| error.to_string())?;
+    let expression = parse_proposition_expression(expression).map_err(|error| error.to_string())?;
+    let spec = PropositionSafetySpec::always("cli-safety", expression)
+        .map_err(|error| error.to_string())?;
+    let result = check_safety_assertion(&document, &spec).map_err(|error| error.to_string())?;
+    print!("{}", render_safety_report(document.model().name(), &result));
+    Ok(match result.status {
+        SafetyStatus::Safe => ExitCode::SUCCESS,
+        SafetyStatus::Violated => ExitCode::from(12),
+    })
+}
+
 fn parse_limits(args: &[String]) -> Result<ExplorationLimits, String> {
     let mut limits = ExplorationLimits::unbounded();
     let mut index = 0;
@@ -727,7 +749,7 @@ fn status_exit_code(status: VerificationStatus) -> ExitCode {
 }
 
 fn usage() -> String {
-    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | eventually <counter-three|counter-four|traffic-never> | respond <request-grant|request-grant-unfair|dual-grant|dual-grant-unfair-b> | monitor <session-ok|session-double-open|session-stuck> | buchi <pulses|pulses-unfair|finite-ignore|finite-strict> | temporal <request-grant|request-grant-unfair|pulses|pulses-unfair> | temporal check <request-grant|request-grant-unfair|pulses|pulses-unfair> <expression> | temporal file <path> <expression> | state file <path> <expression> | proposition file <path> <reachable|all-eventually> <proposition> | proposition expr <path> <reachable|all-eventually> <expression>]"
+    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | eventually <counter-three|counter-four|traffic-never> | respond <request-grant|request-grant-unfair|dual-grant|dual-grant-unfair-b> | monitor <session-ok|session-double-open|session-stuck> | buchi <pulses|pulses-unfair|finite-ignore|finite-strict> | temporal <request-grant|request-grant-unfair|pulses|pulses-unfair> | temporal check <request-grant|request-grant-unfair|pulses|pulses-unfair> <expression> | temporal file <path> <expression> | state file <path> <expression> | proposition file <path> <reachable|all-eventually> <proposition> | proposition expr <path> <reachable|all-eventually> <expression> | proposition always <path> <expression>]"
         .to_owned()
 }
 
