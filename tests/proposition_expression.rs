@@ -1,9 +1,10 @@
 use formal_verification_lab::{
     check_eventuality, check_proposition_expression_property, check_reachability,
     parse_declarative_document, parse_proposition_expression, EventualityCounterexample,
-    EventualityProperty, EventualityStatus, ExactStateBackend, ExactStateEvidence, ExactStateStatus,
-    PropositionExpression, PropositionExpressionError, PropositionExpressionParseErrorKind,
-    PropositionExpressionPropertySpec, ReachabilityProperty, ReachabilityStatus,
+    EventualityProperty, EventualityStatus, ExactStateBackend, ExactStateEvidence,
+    ExactStateStatus, PropositionExpression, PropositionExpressionError,
+    PropositionExpressionParseErrorKind, PropositionExpressionPropertySpec, ReachabilityProperty,
+    ReachabilityStatus,
 };
 use std::fs;
 use std::path::PathBuf;
@@ -122,7 +123,11 @@ impl OracleExpr {
 }
 
 fn generated_oracle_expressions() -> Vec<OracleExpr> {
-    let atoms = vec![OracleExpr::Atom(0), OracleExpr::Atom(1), OracleExpr::Atom(2)];
+    let atoms = vec![
+        OracleExpr::Atom(0),
+        OracleExpr::Atom(1),
+        OracleExpr::Atom(2),
+    ];
     let mut level_one = atoms.clone();
     for expression in &atoms {
         level_one.push(OracleExpr::Not(Box::new(expression.clone())));
@@ -223,7 +228,10 @@ fn expression_reachability_matches_direct_backend_and_shortest_witness() {
     assert_eq!(frontend.backend, ExactStateBackend::Reachability);
     assert_eq!(frontend.status, ExactStateStatus::Satisfied);
     assert_eq!(frontend.discovered_states, direct_result.discovered_states);
-    assert_eq!(frontend.explored_transitions, direct_result.explored_transitions);
+    assert_eq!(
+        frontend.explored_transitions,
+        direct_result.explored_transitions
+    );
     assert_eq!(frontend.max_depth_reached, direct_result.max_depth_reached);
     assert_eq!(
         frontend.evidence,
@@ -248,11 +256,8 @@ fn expression_eventuality_matches_direct_backend_and_lasso_evidence() {
     let expression = parse_proposition_expression(r#""complete" and not "blocked""#).unwrap();
     let frontend = check_proposition_expression_property(
         &document,
-        &PropositionExpressionPropertySpec::all_eventually(
-            "eventually-clear-complete",
-            expression,
-        )
-        .unwrap(),
+        &PropositionExpressionPropertySpec::all_eventually("eventually-clear-complete", expression)
+            .unwrap(),
     )
     .unwrap();
 
@@ -260,7 +265,10 @@ fn expression_eventuality_matches_direct_backend_and_lasso_evidence() {
     assert_eq!(frontend.backend, ExactStateBackend::Eventuality);
     assert_eq!(frontend.status, ExactStateStatus::Violated);
     assert_eq!(frontend.discovered_states, direct_result.discovered_states);
-    assert_eq!(frontend.explored_transitions, direct_result.explored_transitions);
+    assert_eq!(
+        frontend.explored_transitions,
+        direct_result.explored_transitions
+    );
     assert_eq!(frontend.max_depth_reached, direct_result.max_depth_reached);
     let Some(EventualityCounterexample::Infinite { stem, cycle }) = direct_result.counterexample
     else {
