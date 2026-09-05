@@ -80,7 +80,5 @@ pub use temporal::{
     check_action_temporal, ActionAtom, ActionTemporalSpec, TemporalBackend, TemporalCounterexample,
     TemporalError, TemporalObligation, TemporalResult, TemporalStatus,
 };
-pub use temporal_parse::{
-    parse_action_temporal, TemporalParseError, TemporalParseErrorKind,
-};
+pub use temporal_parse::{parse_action_temporal, TemporalParseError, TemporalParseErrorKind};
 pub use temporal_report::render_temporal_report;
