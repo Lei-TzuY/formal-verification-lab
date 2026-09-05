@@ -128,7 +128,9 @@ where
 
     match result.status {
         VerificationStatus::Violated => {
-            let counterexample = result.counterexample.ok_or(ReachabilityError::MissingWitness)?;
+            let counterexample = result
+                .counterexample
+                .ok_or(ReachabilityError::MissingWitness)?;
             Ok(ReachabilityResult {
                 property: property.name.clone(),
                 status: ReachabilityStatus::Reachable,
