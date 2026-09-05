@@ -121,7 +121,10 @@ fn unknown_proposition_fails_closed_before_boolean_short_circuiting() {
     );
 }
 
-fn generated_document(graph_mask: u16, proposition_mask: u8) -> formal_verification_lab::DeclarativeDocument {
+fn generated_document(
+    graph_mask: u16,
+    proposition_mask: u8,
+) -> formal_verification_lab::DeclarativeDocument {
     let mut input = String::from("model \"generated-safety\"\n");
     for state in 0..3 {
         input.push_str(&format!("state \"s{state}\"\n"));
@@ -131,9 +134,7 @@ fn generated_document(graph_mask: u16, proposition_mask: u8) -> formal_verificat
         for to in 0..3 {
             let edge = from * 3 + to;
             if graph_mask & (1 << edge) != 0 {
-                input.push_str(&format!(
-                    "edge \"s{from}\" \"e{from}{to}\" \"s{to}\"\n"
-                ));
+                input.push_str(&format!("edge \"s{from}\" \"e{from}{to}\" \"s{to}\"\n"));
             }
         }
     }
@@ -206,7 +207,10 @@ fn exhaustive_three_state_graph_oracle_matches_safety_semantics() {
                         let to = state_index(&pair[1].state);
                         let edge = from * 3 + to;
                         assert_ne!(graph_mask & (1 << edge), 0);
-                        assert_eq!(pair[1].action.as_deref(), Some(format!("e{from}{to}").as_str()));
+                        assert_eq!(
+                            pair[1].action.as_deref(),
+                            Some(format!("e{from}{to}").as_str())
+                        );
                     }
                 }
             }
