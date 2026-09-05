@@ -34,20 +34,32 @@ fn all_pairs_shortest_paths(mask: usize) -> [[usize; N]; N] {
     distance
 }
 
+/// For these three-node generated fixtures, canonical BFS starts at node 0 and
+/// enumerates numeric successor ids in ascending order. Floyd-Warshall already
+/// gives each node's shortest discovery depth; with only two non-initial nodes,
+/// sorting by (depth, node id) therefore gives the exact independent discovery
+/// order without re-running the checker traversal.
+fn expected_discovery_order(distance: &[[usize; N]; N]) -> Vec<usize> {
+    let mut order = (0..N)
+        .filter(|node| distance[0][*node] < INF)
+        .collect::<Vec<_>>();
+    order.sort_by_key(|node| (distance[0][*node], *node));
+    order
+}
+
 fn expected_components(mask: usize, distance: &[[usize; N]; N]) -> Vec<(Vec<usize>, bool)> {
+    let discovery_order = expected_discovery_order(distance);
     let mut assigned = [false; N];
     let mut components = Vec::new();
 
-    for node in 0..N {
-        if assigned[node] || distance[0][node] >= INF {
+    for &node in &discovery_order {
+        if assigned[node] {
             continue;
         }
-        let members = (0..N)
-            .filter(|other| {
-                distance[0][*other] < INF
-                    && distance[node][*other] < INF
-                    && distance[*other][node] < INF
-            })
+        let members = discovery_order
+            .iter()
+            .copied()
+            .filter(|other| distance[node][*other] < INF && distance[*other][node] < INF)
             .collect::<Vec<_>>();
         for member in &members {
             assigned[*member] = true;
