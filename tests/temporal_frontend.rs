@@ -55,7 +55,10 @@ fn typed_response_matches_direct_response_backend() {
         assert_eq!(typed.model_transitions, direct.model_transitions);
         assert_eq!(typed.product_states, direct.product_states);
         assert_eq!(typed.product_transitions, direct.product_transitions);
-        assert_eq!(typed.counterexample.is_some(), direct.counterexample.is_some());
+        assert_eq!(
+            typed.counterexample.is_some(),
+            direct.counterexample.is_some()
+        );
     }
 }
 
@@ -82,17 +85,17 @@ fn typed_infinitely_often_matches_hand_built_buchi_examples() {
         assert_eq!(typed.model_transitions, direct.model_transitions);
         assert_eq!(typed.product_states, direct.product_states);
         assert_eq!(typed.product_transitions, direct.product_transitions);
-        assert_eq!(typed.counterexample.is_some(), direct.counterexample.is_some());
+        assert_eq!(
+            typed.counterexample.is_some(),
+            direct.counterexample.is_some()
+        );
     }
 }
 
 #[test]
 fn typed_frontend_normalizes_backend_control_state_out_of_witnesses() {
-    let response = check_action_temporal(
-        &unfair_request_grant_protocol().unwrap(),
-        &response_spec(),
-    )
-    .unwrap();
+    let response =
+        check_action_temporal(&unfair_request_grant_protocol().unwrap(), &response_spec()).unwrap();
     let Some(TemporalCounterexample::Infinite {
         obligation,
         stem,
@@ -102,11 +105,12 @@ fn typed_frontend_normalizes_backend_control_state_out_of_witnesses() {
         panic!("expected normalized response lasso");
     };
     assert_eq!(obligation, TemporalObligation::Response);
-    assert!(stem.iter().any(|step| step.action.as_deref() == Some("request")));
+    assert!(stem
+        .iter()
+        .any(|step| step.action.as_deref() == Some("request")));
     assert_eq!(cycle.first().unwrap().state, cycle.last().unwrap().state);
 
-    let recurring =
-        check_action_temporal(&unfair_second_pulse().unwrap(), &pulse_spec()).unwrap();
+    let recurring = check_action_temporal(&unfair_second_pulse().unwrap(), &pulse_spec()).unwrap();
     let Some(TemporalCounterexample::Infinite {
         obligation,
         stem: _,
