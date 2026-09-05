@@ -1,4 +1,4 @@
-use crate::recurrence::{ReachableGraph, SnapshotEdge};
+use crate::graph::{ReachableGraph, SnapshotEdge};
 use std::collections::{HashMap, VecDeque};
 use std::hash::Hash;
 
