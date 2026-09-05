@@ -243,18 +243,17 @@ pub(crate) fn induced_graph<S: Clone>(
         .outgoing
         .iter()
         .enumerate()
-        .filter_map(|(old_id, edges)| {
-            included[old_id].then(|| {
-                edges
-                    .iter()
-                    .filter_map(|edge| {
-                        old_to_new[edge.target].map(|target| SnapshotEdge {
-                            action: edge.action.clone(),
-                            target,
-                        })
+        .filter(|(old_id, _)| included[*old_id])
+        .map(|(_, edges)| {
+            edges
+                .iter()
+                .filter_map(|edge| {
+                    old_to_new[edge.target].map(|target| SnapshotEdge {
+                        action: edge.action.clone(),
+                        target,
                     })
-                    .collect::<Vec<_>>()
-            })
+                })
+                .collect::<Vec<_>>()
         })
         .collect::<Vec<_>>();
 
