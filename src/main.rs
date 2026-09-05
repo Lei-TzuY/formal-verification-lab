@@ -1,6 +1,4 @@
-use formal_verification_lab::buchi::{
-    check_buchi, BuchiAutomaton, BuchiStatus, FiniteRunPolicy,
-};
+use formal_verification_lab::buchi::{check_buchi, BuchiAutomaton, BuchiStatus, FiniteRunPolicy};
 use formal_verification_lab::buchi_examples::{
     alternating_pulses, finite_quiet_run, pulse_automaton, unfair_second_pulse,
 };
