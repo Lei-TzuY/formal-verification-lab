@@ -1,4 +1,6 @@
-use formal_verification_lab::checker::{check, VerificationStatus};
+use formal_verification_lab::checker::{
+    check, check_with_limits, ExplorationLimits, InconclusiveReason, VerificationStatus,
+};
 use formal_verification_lab::examples::{
     bounded_counter, buggy_mutex, traffic_light, MutexState, Phase,
 };
@@ -17,6 +19,7 @@ fn enumerates_all_reachable_counter_states() {
     assert_eq!(result.checked_states, 4);
     assert_eq!(result.explored_transitions, 3);
     assert!(result.counterexample.is_none());
+    assert!(result.inconclusive_reason.is_none());
 }
 
 #[test]
@@ -25,6 +28,7 @@ fn detects_invariant_failure() {
     let result = check(&model).unwrap();
 
     assert_eq!(result.status, VerificationStatus::Violated);
+    assert!(result.inconclusive_reason.is_none());
     let counterexample = result.counterexample.expect("bug must be reachable");
     assert_eq!(counterexample.invariant, "mutual-exclusion");
     assert_eq!(
@@ -170,4 +174,158 @@ fn finds_initial_state_violation_with_zero_length_path() {
     assert_eq!(counterexample.trace.len(), 1);
     assert_eq!(counterexample.trace[0].state, 7);
     assert!(counterexample.trace[0].action.is_none());
+}
+
+#[test]
+fn state_limit_returns_inconclusive_instead_of_safe() {
+    let model = bounded_counter().unwrap();
+    let result = check_with_limits(
+        &model,
+        ExplorationLimits {
+            max_states: Some(3),
+            ..ExplorationLimits::default()
+        },
+    )
+    .unwrap();
+
+    assert_eq!(result.status, VerificationStatus::Inconclusive);
+    assert_eq!(
+        result.inconclusive_reason,
+        Some(InconclusiveReason::StateLimitReached { limit: 3 })
+    );
+    assert_eq!(result.discovered_states, 3);
+    assert_eq!(result.checked_states, 3);
+    assert_eq!(result.explored_transitions, 3);
+    assert!(result.counterexample.is_none());
+}
+
+#[test]
+fn transition_limit_returns_inconclusive_instead_of_safe() {
+    let model = bounded_counter().unwrap();
+    let result = check_with_limits(
+        &model,
+        ExplorationLimits {
+            max_transitions: Some(2),
+            ..ExplorationLimits::default()
+        },
+    )
+    .unwrap();
+
+    assert_eq!(result.status, VerificationStatus::Inconclusive);
+    assert_eq!(
+        result.inconclusive_reason,
+        Some(InconclusiveReason::TransitionLimitReached { limit: 2 })
+    );
+    assert_eq!(result.discovered_states, 3);
+    assert_eq!(result.checked_states, 3);
+    assert_eq!(result.explored_transitions, 2);
+}
+
+#[test]
+fn depth_limit_returns_inconclusive_before_hidden_violation() {
+    let model = buggy_mutex().unwrap();
+    let result = check_with_limits(
+        &model,
+        ExplorationLimits {
+            max_depth: Some(3),
+            ..ExplorationLimits::default()
+        },
+    )
+    .unwrap();
+
+    assert_eq!(result.status, VerificationStatus::Inconclusive);
+    assert_eq!(
+        result.inconclusive_reason,
+        Some(InconclusiveReason::DepthLimitReached { limit: 3 })
+    );
+    assert!(result.counterexample.is_none());
+}
+
+#[test]
+fn exact_resource_limits_can_still_prove_safety() {
+    let model = bounded_counter().unwrap();
+    let result = check_with_limits(
+        &model,
+        ExplorationLimits {
+            max_states: Some(4),
+            max_transitions: Some(3),
+            max_depth: Some(3),
+        },
+    )
+    .unwrap();
+
+    assert_eq!(result.status, VerificationStatus::Safe);
+    assert!(result.inconclusive_reason.is_none());
+    assert_eq!(result.discovered_states, 4);
+    assert_eq!(result.explored_transitions, 3);
+}
+
+#[test]
+fn depth_boundary_can_prove_a_closed_cycle() {
+    let model = traffic_light().unwrap();
+    let result = check_with_limits(
+        &model,
+        ExplorationLimits {
+            max_depth: Some(2),
+            ..ExplorationLimits::default()
+        },
+    )
+    .unwrap();
+
+    assert_eq!(result.status, VerificationStatus::Safe);
+    assert_eq!(result.discovered_states, 3);
+    assert_eq!(result.explored_transitions, 3);
+}
+
+#[test]
+fn sufficient_depth_preserves_shortest_counterexample() {
+    let model = buggy_mutex().unwrap();
+    let result = check_with_limits(
+        &model,
+        ExplorationLimits {
+            max_depth: Some(4),
+            ..ExplorationLimits::default()
+        },
+    )
+    .unwrap();
+
+    assert_eq!(result.status, VerificationStatus::Violated);
+    let trace = result.counterexample.unwrap().trace;
+    assert_eq!(trace.len(), 5);
+    assert_eq!(
+        trace.last().unwrap().state,
+        MutexState {
+            p1: Phase::Critical,
+            p2: Phase::Critical,
+        }
+    );
+}
+
+#[test]
+fn state_budget_must_cover_all_unique_initial_states() {
+    let model = TransitionSystem::new(
+        "multiple-initial-budget",
+        vec![StateVariable::new("value", "small integer")],
+        vec![0u8, 1u8, 0u8],
+        |_state| Ok(Vec::new()),
+        vec![Invariant::new("small", |state: &u8| *state <= 1)],
+    )
+    .unwrap();
+
+    let result = check_with_limits(
+        &model,
+        ExplorationLimits {
+            max_states: Some(1),
+            ..ExplorationLimits::default()
+        },
+    )
+    .unwrap();
+
+    assert_eq!(result.status, VerificationStatus::Inconclusive);
+    assert_eq!(result.discovered_states, 1);
+    assert_eq!(result.checked_states, 0);
+    assert_eq!(
+        result.inconclusive_reason,
+        Some(InconclusiveReason::StateLimitReached { limit: 1 })
+    );
 }
