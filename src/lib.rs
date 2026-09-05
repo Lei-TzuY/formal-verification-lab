@@ -20,6 +20,7 @@ pub mod multi_response;
 pub mod multi_response_examples;
 pub mod multi_response_report;
 pub mod property;
+mod product;
 pub mod recurrence;
 pub mod reduction;
 pub mod report;
