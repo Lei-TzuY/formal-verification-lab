@@ -1,4 +1,4 @@
-use formal_verification_lab::examples::{bounded_counter, eventuality_choice, EventualityChoiceState};
+use formal_verification_lab::examples::bounded_counter;
 use formal_verification_lab::{
     check_eventuality, check_reachability, EventualityCounterexample, EventualityProperty,
     EventualityStatus, Invariant, ReachabilityProperty, ReachabilityStatus, StateVariable,
@@ -8,6 +8,53 @@ use formal_verification_lab::{
 const N: usize = 3;
 const EDGE_COUNT: usize = N * N;
 const INF: usize = usize::MAX / 4;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum ChoicePhase {
+    Start,
+    Goal,
+    Loop,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct ChoiceState {
+    phase: ChoicePhase,
+}
+
+fn choice_model() -> TransitionSystem<ChoiceState> {
+    TransitionSystem::new(
+        "eventuality-choice",
+        vec![StateVariable::new("phase", "branching progress state")],
+        vec![ChoiceState {
+            phase: ChoicePhase::Start,
+        }],
+        |state| match state.phase {
+            ChoicePhase::Start => Ok(vec![
+                Transition::new(
+                    "choose-goal",
+                    ChoiceState {
+                        phase: ChoicePhase::Goal,
+                    },
+                ),
+                Transition::new(
+                    "choose-loop",
+                    ChoiceState {
+                        phase: ChoicePhase::Loop,
+                    },
+                ),
+            ]),
+            ChoicePhase::Goal => Ok(Vec::new()),
+            ChoicePhase::Loop => Ok(vec![Transition::new(
+                "loop",
+                ChoiceState {
+                    phase: ChoicePhase::Loop,
+                },
+            )]),
+        },
+        vec![Invariant::new("well-formed", |_state: &ChoiceState| true)],
+    )
+    .unwrap()
+}
 
 fn has_edge(mask: usize, from: usize, to: usize) -> bool {
     mask & (1usize << (from * N + to)) != 0
@@ -92,13 +139,13 @@ fn bounded_counter_missing_target_has_finite_counterexample() {
 
 #[test]
 fn existential_reachability_does_not_imply_universal_eventuality() {
-    let model = eventuality_choice().unwrap();
+    let model = choice_model();
     let reachable = ReachabilityProperty::new("goal-reachable", |state| {
-        state.phase == EventualityChoiceState::Goal
+        state.phase == ChoicePhase::Goal
     })
     .unwrap();
     let eventual = EventualityProperty::new("goal-inevitable", |state| {
-        state.phase == EventualityChoiceState::Goal
+        state.phase == ChoicePhase::Goal
     })
     .unwrap();
 
@@ -111,9 +158,9 @@ fn existential_reachability_does_not_imply_universal_eventuality() {
     let EventualityCounterexample::Infinite { stem, cycle } = result.counterexample.unwrap() else {
         panic!("expected infinite counterexample");
     };
-    assert_eq!(stem.last().unwrap().state.phase, EventualityChoiceState::Loop);
-    assert_eq!(cycle.first().unwrap().state.phase, EventualityChoiceState::Loop);
-    assert_eq!(cycle.last().unwrap().state.phase, EventualityChoiceState::Loop);
+    assert_eq!(stem.last().unwrap().state.phase, ChoicePhase::Loop);
+    assert_eq!(cycle.first().unwrap().state.phase, ChoicePhase::Loop);
+    assert_eq!(cycle.last().unwrap().state.phase, ChoicePhase::Loop);
 }
 
 #[test]
