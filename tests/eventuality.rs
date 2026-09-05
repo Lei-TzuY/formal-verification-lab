@@ -140,14 +140,12 @@ fn bounded_counter_missing_target_has_finite_counterexample() {
 #[test]
 fn existential_reachability_does_not_imply_universal_eventuality() {
     let model = choice_model();
-    let reachable = ReachabilityProperty::new("goal-reachable", |state| {
-        state.phase == ChoicePhase::Goal
-    })
-    .unwrap();
-    let eventual = EventualityProperty::new("goal-inevitable", |state| {
-        state.phase == ChoicePhase::Goal
-    })
-    .unwrap();
+    let reachable =
+        ReachabilityProperty::new("goal-reachable", |state| state.phase == ChoicePhase::Goal)
+            .unwrap();
+    let eventual =
+        EventualityProperty::new("goal-inevitable", |state| state.phase == ChoicePhase::Goal)
+            .unwrap();
 
     assert_eq!(
         check_reachability(&model, &reachable).unwrap().status,
@@ -195,20 +193,23 @@ fn all_three_node_graphs_and_target_sets_match_independent_oracle() {
     for mask in 0..(1usize << EDGE_COUNT) {
         for target_mask in 0..(1usize << N) {
             let model = graph_model(mask);
-            let property = EventualityProperty::new(format!("target-{target_mask}"), move |state| {
-                target_contains(target_mask, *state)
-            })
-            .unwrap();
+            let property =
+                EventualityProperty::new(format!("target-{target_mask}"), move |state| {
+                    target_contains(target_mask, *state)
+                })
+                .unwrap();
             let first = check_eventuality(&model, &property).unwrap();
             let second = check_eventuality(&model, &property).unwrap();
-            assert_eq!(first, second, "determinism mask={mask} target={target_mask}");
+            assert_eq!(
+                first, second,
+                "determinism mask={mask} target={target_mask}"
+            );
 
             let distance = residual_distances(mask, target_mask);
             let initial_is_target = target_contains(target_mask, 0);
             let residual_reachable = |node: usize| !initial_is_target && distance[0][node] < INF;
-            let has_terminal = (0..N).any(|node| {
-                residual_reachable(node) && (0..N).all(|to| !has_edge(mask, node, to))
-            });
+            let has_terminal = (0..N)
+                .any(|node| residual_reachable(node) && (0..N).all(|to| !has_edge(mask, node, to)));
             let has_cycle = (0..N).any(|node| {
                 residual_reachable(node)
                     && (has_edge(mask, node, node)
@@ -252,7 +253,11 @@ fn all_three_node_graphs_and_target_sets_match_independent_oracle() {
     }
 }
 
-fn validate_trace(mask: usize, target_mask: usize, trace: &[formal_verification_lab::TraceStep<usize>]) {
+fn validate_trace(
+    mask: usize,
+    target_mask: usize,
+    trace: &[formal_verification_lab::TraceStep<usize>],
+) {
     assert!(!trace.is_empty());
     for step in trace {
         assert!(!target_contains(target_mask, step.state));
@@ -260,7 +265,13 @@ fn validate_trace(mask: usize, target_mask: usize, trace: &[formal_verification_
     for pair in trace.windows(2) {
         let from = pair[0].state;
         let to = pair[1].state;
-        assert!(has_edge(mask, from, to), "missing edge {from}->{to} mask={mask}");
-        assert_eq!(pair[1].action.as_deref(), Some(format!("{from}->{to}").as_str()));
+        assert!(
+            has_edge(mask, from, to),
+            "missing edge {from}->{to} mask={mask}"
+        );
+        assert_eq!(
+            pair[1].action.as_deref(),
+            Some(format!("{from}->{to}").as_str())
+        );
     }
 }
