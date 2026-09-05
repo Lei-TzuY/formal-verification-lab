@@ -66,18 +66,18 @@ fn target_contains(target_mask: usize, node: usize) -> bool {
 
 fn residual_distances(mask: usize, target_mask: usize) -> [[usize; N]; N] {
     let mut distance = [[INF; N]; N];
-    for node in 0..N {
+    for (node, row) in distance.iter_mut().enumerate() {
         if !target_contains(target_mask, node) {
-            distance[node][node] = 0;
+            row[node] = 0;
         }
     }
-    for from in 0..N {
-        for to in 0..N {
+    for (from, row) in distance.iter_mut().enumerate() {
+        for (to, value) in row.iter_mut().enumerate() {
             if !target_contains(target_mask, from)
                 && !target_contains(target_mask, to)
                 && has_edge(mask, from, to)
             {
-                distance[from][to] = distance[from][to].min(1);
+                *value = (*value).min(1);
             }
         }
     }
