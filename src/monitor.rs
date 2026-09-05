@@ -130,11 +130,19 @@ impl<M: fmt::Debug> fmt::Debug for FiniteMonitor<M> {
             .field("initial", &self.initial)
             .field(
                 "rejecting",
-                &self.rejecting.iter().map(|item| &item.name).collect::<Vec<_>>(),
+                &self
+                    .rejecting
+                    .iter()
+                    .map(|item| &item.name)
+                    .collect::<Vec<_>>(),
             )
             .field(
                 "progress",
-                &self.progress.iter().map(|item| &item.name).collect::<Vec<_>>(),
+                &self
+                    .progress
+                    .iter()
+                    .map(|item| &item.name)
+                    .collect::<Vec<_>>(),
             )
             .finish_non_exhaustive()
     }
@@ -374,9 +382,9 @@ where
                 component_index,
                 component: component.clone(),
             };
-            let replace = best.as_ref().is_none_or(|current| {
-                candidate_key(&candidate) < candidate_key(current)
-            });
+            let replace = best
+                .as_ref()
+                .is_none_or(|current| candidate_key(&candidate) < candidate_key(current));
             if replace {
                 best = Some(candidate);
             }
