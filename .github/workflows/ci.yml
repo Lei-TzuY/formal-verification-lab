@@ -142,3 +142,31 @@ jobs:
           grep -Fq "checked states: 4" <<<"$unreachable_output"
           grep -Fq "explored transitions: 3" <<<"$unreachable_output"
           grep -Fq "witness: none (reachable graph exhausted)" <<<"$unreachable_output"
+      - name: Deadlock terminal policy CLI integration test
+        shell: bash
+        run: |
+          free_output="$(cargo run --quiet -- deadlock counter-terminal-ok)"
+          printf '%s\n' "$free_output"
+          grep -Fq "model: bounded-counter" <<<"$free_output"
+          grep -Fq "property: counter-completion-is-terminal" <<<"$free_output"
+          grep -Fq "deadlock: DEADLOCK_FREE" <<<"$free_output"
+          grep -Fq "discovered states: 4" <<<"$free_output"
+          grep -Fq "checked states: 4" <<<"$free_output"
+          grep -Fq "explored transitions: 3" <<<"$free_output"
+          grep -Fq "max depth reached: 3" <<<"$free_output"
+          grep -Fq "deadlock witness: none (reachable graph exhausted)" <<<"$free_output"
+
+          set +e
+          found_output="$(cargo run --quiet -- deadlock counter-terminal-forbidden)"
+          found_status=$?
+          set -e
+
+          printf '%s\n' "$found_output"
+          test "$found_status" -eq 5
+          grep -Fq "property: no-terminal-state-is-allowed" <<<"$found_output"
+          grep -Fq "deadlock: DEADLOCK_FOUND" <<<"$found_output"
+          grep -Fq "discovered states: 4" <<<"$found_output"
+          grep -Fq "checked states: 4" <<<"$found_output"
+          grep -Fq "explored transitions: 3" <<<"$found_output"
+          test "$(grep -Fc -- '--increment-->' <<<"$found_output")" -eq 3
+          grep -Fq "CounterState { value: 3 }" <<<"$found_output"

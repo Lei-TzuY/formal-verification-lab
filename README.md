@@ -55,32 +55,53 @@ Milestone 6 expands property expressiveness with a deliberately narrow query:
 - `REACHABLE` with a deterministic shortest transition-count witness; or
 - `UNREACHABLE` only after the finite reachable graph has been exhaustively explored.
 
-The property engine does **not** implement a second graph traversal. Internally it creates a derived view over the same transition relation with one sentinel invariant that holds until the target is seen, then delegates to the canonical BFS checker. A target hit is therefore the canonical checker's first sentinel-invariant violation and inherits its shortest-path and deterministic-order guarantees.
-
-The derived-model hook is `pub(crate)` rather than public API. It reuses the same model metadata validation and the same transition-relation `Arc`; reachability is an additional interpretation over an existing transition graph, not an alternate execution semantics.
+The property engine does **not** implement a second graph traversal. Internally it creates a derived view over the same transition relation with one sentinel invariant that holds until the target is seen, then delegates to the canonical BFS checker. A target hit therefore inherits canonical shortest-path and deterministic-order guarantees.
 
 Reachability queries intentionally replace the model's safety invariants while evaluating the target. This means a query answers graph reachability independently of whether the original model is safe. Safety and reachability remain separate properties.
 
-The reachability suite again exhaustively enumerates all 512 directed three-node graphs. An independent Floyd–Warshall oracle validates target reachability, shortest witness length, witness-edge validity, unreachable-state exhaustion counts, and repeated-run determinism.
+The reachability suite exhaustively enumerates all 512 directed three-node graphs. An independent Floyd–Warshall oracle validates target reachability, shortest witness length, witness-edge validity, unreachable-state exhaustion counts, and repeated-run determinism.
 
 This milestone is **not** full LTL/CTL and does not claim universal eventuality, fairness, progress, or liveness. `UNREACHABLE` means no target state exists in the exhaustively explored finite reachable graph.
+
+### Milestone 7: deadlock and legitimate terminal-state analysis
+
+Milestone 7 adds a second finite-state property without equating every terminal state with a bug.
+
+`DeadlockProperty<S>` contains an explicit **allowed-terminal predicate**. A reachable state is classified as a deadlock exactly when:
+
+1. its transition relation produces no outgoing transitions; and
+2. the allowed-terminal predicate returns `false` for that state.
+
+`check_deadlock` returns either:
+
+- `DEADLOCK_FOUND` with a deterministic shortest transition-count witness; or
+- `DEADLOCK_FREE` only after exhaustive unbounded exploration of the finite reachable graph.
+
+The implementation does not call a model's transition function twice to decide whether a state is terminal. Milestone 7 factors the existing BFS loop into one crate-private canonical `search_with_probes` substrate. Safety checking continues to use that substrate before successor generation, while deadlock analysis observes the single generated successor vector before its edges are expanded. There is still one canonical BFS implementation and one transition-generation call per checked state.
+
+Deadlock analysis intentionally ignores the model's original safety invariants, just as reachability is a distinct graph property. A safety violation therefore cannot hide a later reachable deadlock from a deadlock query.
+
+The deadlock suite independently exhausts all 512 directed three-node graphs. Floyd–Warshall supplies shortest reachable distances while a separately computed out-degree oracle identifies terminal nodes. Tests verify deadlock existence, shortest witness length, witness-edge validity, deterministic repeated results, and full state/edge accounting when no reachable deadlock exists.
+
+This milestone is **not** starvation freedom, livelock detection, fairness, or general liveness. `DEADLOCK_FREE` means only that every reachable out-degree-zero state accepted by the finite model is explicitly allowed by the supplied terminal policy.
 
 ## Architecture
 
 ```text
 src/model.rs      canonical transition-system abstraction and validation
 src/builder.rs    thin typed construction layer
-src/checker.rs    canonical deterministic BFS, bounds, diagnostics, traces
-src/property.rs   reachability queries encoded through the canonical checker
+src/checker.rs    one canonical deterministic BFS substrate, bounds,
+                  diagnostics, invariant checking, predecessor traces
+src/property.rs   existential reachability + deadlock/terminal policies
 src/reduction.rs  opt-in experimental sleep-set exploration + exhaustive audit
 src/examples.rs   executable teaching models and concurrent/product examples
-src/report.rs     deterministic checker and property reports
+src/report.rs     deterministic checker, reachability, and deadlock reports
 src/main.rs       CLI and option parsing; no graph traversal semantics
 tests/            semantic, builder, protocol, graph-oracle, reduction,
-                  and reachability coverage
+                  reachability, and deadlock coverage
 ```
 
-The canonical graph semantics remain in `model` + `checker`. Property and reduction layers consume those models without changing default `check()` / `check_with_limits()` behavior.
+The canonical graph semantics remain in `model` + `checker`. Property layers consume the same transition graph and canonical BFS substrate. Reduction remains an explicitly experimental, differentially audited path.
 
 ## Executable examples
 
@@ -152,6 +173,24 @@ cargo run -- reach counter-four
 
 The finite counter can only reach 0 through 3. The command therefore exhausts all four reachable states, reports `reachability: UNREACHABLE`, prints `witness: none (reachable graph exhausted)`, and exits 4.
 
+### Deadlock versus legitimate termination
+
+Treat counter value 3 as an intentional terminal state:
+
+```bash
+cargo run -- deadlock counter-terminal-ok
+```
+
+The command exhausts all four states and reports `deadlock: DEADLOCK_FREE`.
+
+Apply a strict policy that allows no terminal state:
+
+```bash
+cargo run -- deadlock counter-terminal-forbidden
+```
+
+The same graph now reports `deadlock: DEADLOCK_FOUND`, exits 5, and prints the shortest three-transition witness to counter value 3. The difference is the explicit terminal policy, not a change to transition semantics.
+
 ## CLI exit status
 
 Canonical `run` commands:
@@ -165,6 +204,11 @@ Reachability commands:
 
 - `0`: target is `REACHABLE` and a shortest witness is available;
 - `4`: target is `UNREACHABLE` after exhaustive finite-state exploration.
+
+Deadlock commands:
+
+- `0`: no unexpected terminal state exists after exhaustive exploration;
+- `5`: a reachable unexpected terminal state was found with a shortest witness.
 
 `reduce commuting-counters` uses the authoritative exhaustive result's success/violation exit status and treats differential mismatch as an error (exit 2).
 
@@ -189,14 +233,15 @@ Coverage includes:
 - correct and deliberately broken Peterson models;
 - all 512 three-node directed graphs against an independent shortest-path oracle for canonical BFS;
 - explicit reduction independence validation, positive edge reduction, and fail-closed semantic mismatch;
-- reachability property-name validation;
-- zero-transition initial-state reachability witnesses;
-- deterministic shortest reachability witnesses;
-- unreachable targets requiring full reachable-graph exhaustion;
-- reachability queries remaining independent of original safety invariants;
-- all 512 three-node directed graphs independently cross-checking reachability and witness semantics.
+- reachability property-name validation, shortest witnesses, and exhaustive absence;
+- reachability remaining independent of original safety invariants;
+- all 512 three-node directed graphs independently cross-checking reachability semantics;
+- deadlock property-name validation and zero-transition initial deadlocks;
+- legitimate-terminal versus strict-terminal policies on the same executable counter model;
+- deadlock queries remaining independent of original safety invariants;
+- all 512 three-node directed graphs cross-checked against independent shortest-distance and out-degree deadlock oracles.
 
-CI additionally exercises canonical violation, bounded-inconclusive, Peterson, reduction-audit, reachable-property, and unreachable-property paths through the real CLI.
+CI additionally exercises canonical violation, bounded-inconclusive, Peterson, reduction-audit, reachable/unreachable property paths, and deadlock-free/deadlock-found terminal policies through the real CLI.
 
 ## Trust boundaries
 
@@ -204,12 +249,15 @@ Canonical model construction rejects malformed metadata and empty transition lab
 
 Reduction declarations are model-author claims; M5 therefore retains exhaustive checking as authority and rejects observed status mismatch.
 
-Reachability predicates are also user-supplied Rust functions. M6 proves only whether such a predicate is encountered in the finite explicit transition graph represented by the model. It does not infer real-world liveness or implementation behavior from that result.
+Reachability predicates are user-supplied Rust functions. M6 proves only whether such a predicate is encountered in the finite explicit transition graph represented by the model.
+
+Deadlock terminal policies are also model-author claims. Marking a terminal state as allowed is an explicit semantic assertion by the caller; the checker does not infer whether that terminal state represents successful completion in an external implementation.
 
 ## Limitations
 
 - explicit-state memory grows with retained reachable states;
-- safety plus existential state reachability only; no universal eventuality or general temporal logic;
+- safety, existential state reachability, and finite-state deadlock/terminal analysis only; no general temporal logic;
+- deadlock freedom does not imply starvation freedom, livelock freedom, fairness, or progress;
 - Peterson liveness/starvation freedom is not claimed;
 - protocol results apply to the finite model and its atomic-step assumptions, not arbitrary machine code or weak-memory executions;
 - resource limits do not interrupt a successor function while it is building one state's transition vector;
@@ -220,12 +268,12 @@ Reachability predicates are also user-supplied Rust functions. M6 proves only wh
 
 ## Roadmap
 
-Milestones 1–6 now cover deterministic explicit-state safety, honest bounded outcomes, typed construction, a real concurrent protocol, independent BFS validation, fail-closed reduction experiments, and existential reachability with shortest witnesses.
+Milestones 1–7 cover deterministic explicit-state safety, honest bounded outcomes, typed construction, a real concurrent protocol, independent BFS validation, fail-closed reduction experiments, existential reachability, and explicit deadlock/terminal-state analysis.
 
-The next highest-value property frontier is **deadlock/terminal-state analysis** rather than immediately claiming full temporal logic:
+The next architectural frontier should add **cycle and recurrent-state structure** rather than proliferating more terminal-policy examples. A high-value Milestone 8 would:
 
-1. define deadlock precisely as a reachable state with no enabled outgoing transition, keeping legitimate terminal states distinguishable through an explicit predicate or policy;
-2. return a deterministic shortest witness to a reachable deadlock when one exists;
-3. prove deadlock absence only after exhaustive finite-state exploration;
-4. cross-check deadlock detection against independently generated finite-graph out-degree oracles;
-5. integrate the property into CLI/reporting before considering broader temporal operators, fairness, Büchi/LTL machinery, or stronger standalone POR claims.
+1. compute reachable strongly connected components (SCCs) with deterministic reporting;
+2. distinguish trivial terminal states from cyclic recurrent regions and identify reachable nontrivial cycles/self-loops;
+3. return a deterministic stem-plus-cycle witness for a reachable recurrent region;
+4. cross-check SCC/cycle classification against an independent generated-graph oracle;
+5. use that executable foundation before attempting universal eventuality, livelock properties, Büchi/LTL machinery, or fairness claims.

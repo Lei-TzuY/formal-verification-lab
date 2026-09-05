@@ -1,4 +1,6 @@
-use crate::checker::{check, TraceStep, VerificationStatus};
+use crate::checker::{
+    check, search_with_probes, ExplorationLimits, GraphSearchOutcome, TraceStep, VerificationStatus,
+};
 use crate::model::{Invariant, ModelError, TransitionSystem};
 use std::fmt;
 use std::hash::Hash;
@@ -151,5 +153,161 @@ where
             witness: None,
         }),
         VerificationStatus::Inconclusive => Err(ReachabilityError::UnexpectedInconclusive),
+    }
+}
+
+/// A named policy that distinguishes legitimate terminal states from
+/// unexpected terminal states. A reachable state is considered a deadlock iff
+/// it has no outgoing transitions and this predicate returns false.
+pub struct DeadlockProperty<S> {
+    name: String,
+    allowed_terminal: Arc<dyn Fn(&S) -> bool + Send + Sync>,
+}
+
+impl<S> Clone for DeadlockProperty<S> {
+    fn clone(&self) -> Self {
+        Self {
+            name: self.name.clone(),
+            allowed_terminal: Arc::clone(&self.allowed_terminal),
+        }
+    }
+}
+
+impl<S> fmt::Debug for DeadlockProperty<S> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DeadlockProperty")
+            .field("name", &self.name)
+            .finish_non_exhaustive()
+    }
+}
+
+impl<S> DeadlockProperty<S> {
+    pub fn new(
+        name: impl Into<String>,
+        allowed_terminal: impl Fn(&S) -> bool + Send + Sync + 'static,
+    ) -> Result<Self, DeadlockError> {
+        let name = name.into();
+        if name.trim().is_empty() {
+            return Err(DeadlockError::EmptyPropertyName);
+        }
+        Ok(Self {
+            name,
+            allowed_terminal: Arc::new(allowed_terminal),
+        })
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DeadlockStatus {
+    DeadlockFound,
+    DeadlockFree,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeadlockResult<S> {
+    pub property: String,
+    pub status: DeadlockStatus,
+    pub discovered_states: usize,
+    pub checked_states: usize,
+    pub explored_transitions: usize,
+    pub max_depth_reached: Option<usize>,
+    /// A shortest transition-count path to an unexpected terminal state when
+    /// one is reachable. The first step is an initial state with no action.
+    pub witness: Option<Vec<TraceStep<S>>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DeadlockError {
+    EmptyPropertyName,
+    Model(ModelError),
+    UnexpectedInconclusive,
+    MissingWitness,
+}
+
+impl fmt::Display for DeadlockError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::EmptyPropertyName => write!(f, "deadlock property name must not be empty"),
+            Self::Model(error) => write!(f, "deadlock exploration failed: {error}"),
+            Self::UnexpectedInconclusive => write!(
+                f,
+                "unbounded canonical deadlock exploration unexpectedly became inconclusive"
+            ),
+            Self::MissingWitness => write!(
+                f,
+                "canonical search reported a reachable deadlock without a witness trace"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for DeadlockError {}
+
+impl From<ModelError> for DeadlockError {
+    fn from(value: ModelError) -> Self {
+        Self::Model(value)
+    }
+}
+
+/// Detect reachable unexpected terminal states using the same canonical BFS
+/// substrate as safety checking. The transition relation is evaluated exactly
+/// once for each checked state. Original safety invariants are intentionally
+/// not part of this graph property.
+///
+/// `DeadlockFree` is returned only after exhaustive unbounded exploration of
+/// the finite reachable graph. A found deadlock inherits deterministic shortest
+/// transition-count witness semantics from canonical BFS ordering.
+pub fn check_deadlock<S>(
+    model: &TransitionSystem<S>,
+    property: &DeadlockProperty<S>,
+) -> Result<DeadlockResult<S>, DeadlockError>
+where
+    S: Clone + Eq + Hash,
+{
+    let search = search_with_probes(
+        model,
+        ExplorationLimits::unbounded(),
+        |_state| None,
+        |state, transitions| {
+            (transitions.is_empty() && !(property.allowed_terminal)(state))
+                .then(|| "unexpected-terminal".to_owned())
+        },
+    )?;
+
+    let property_name = property.name.clone();
+    let discovered_states = search.discovered_states;
+    let checked_states = search.checked_states;
+    let explored_transitions = search.explored_transitions;
+    let max_depth_reached = search.max_depth_reached;
+
+    match search.outcome {
+        GraphSearchOutcome::Match { trace, .. } => {
+            if trace.is_empty() {
+                return Err(DeadlockError::MissingWitness);
+            }
+            Ok(DeadlockResult {
+                property: property_name,
+                status: DeadlockStatus::DeadlockFound,
+                discovered_states,
+                checked_states,
+                explored_transitions,
+                max_depth_reached,
+                witness: Some(trace),
+            })
+        }
+        GraphSearchOutcome::Exhausted => Ok(DeadlockResult {
+            property: property_name,
+            status: DeadlockStatus::DeadlockFree,
+            discovered_states,
+            checked_states,
+            explored_transitions,
+            max_depth_reached,
+            witness: None,
+        }),
+        GraphSearchOutcome::Inconclusive(_) => Err(DeadlockError::UnexpectedInconclusive),
     }
 }

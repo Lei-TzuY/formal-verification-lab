@@ -19,7 +19,8 @@ pub use checker::{
 };
 pub use model::{Invariant, ModelError, StateVariable, Transition, TransitionSystem};
 pub use property::{
-    check_reachability, ReachabilityError, ReachabilityProperty, ReachabilityResult,
+    check_deadlock, check_reachability, DeadlockError, DeadlockProperty, DeadlockResult,
+    DeadlockStatus, ReachabilityError, ReachabilityProperty, ReachabilityResult,
     ReachabilityStatus,
 };
 pub use reduction::{

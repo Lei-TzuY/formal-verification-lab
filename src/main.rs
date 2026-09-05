@@ -4,10 +4,13 @@ use formal_verification_lab::examples::{
     traffic_light, CounterState,
 };
 use formal_verification_lab::property::{
-    check_reachability, ReachabilityProperty, ReachabilityStatus,
+    check_deadlock, check_reachability, DeadlockProperty, DeadlockStatus, ReachabilityProperty,
+    ReachabilityStatus,
 };
 use formal_verification_lab::reduction::{audit_sleep_set_reduction, IndependenceRelation};
-use formal_verification_lab::report::{render_reachability_report, render_report};
+use formal_verification_lab::report::{
+    render_deadlock_report, render_reachability_report, render_report,
+};
 use std::env;
 use std::process::ExitCode;
 
@@ -34,6 +37,7 @@ fn run(args: Vec<String>) -> Result<ExitCode, String> {
         [command, rest @ ..] if command == "run" => run_command(rest),
         [command, rest @ ..] if command == "reduce" => reduce_command(rest),
         [command, rest @ ..] if command == "reach" => reach_command(rest),
+        [command, rest @ ..] if command == "deadlock" => deadlock_command(rest),
         _ => Err(usage()),
     }
 }
@@ -134,6 +138,39 @@ fn run_counter_reachability(
     })
 }
 
+fn deadlock_command(args: &[String]) -> Result<ExitCode, String> {
+    match args {
+        [query] if query == "counter-terminal-ok" => run_counter_deadlock(
+            "counter-completion-is-terminal",
+            |state: &CounterState| state.value == 3,
+        ),
+        [query] if query == "counter-terminal-forbidden" => run_counter_deadlock(
+            "no-terminal-state-is-allowed",
+            |_state: &CounterState| false,
+        ),
+        [query] => Err(format!(
+            "unknown deadlock query '{query}'; expected counter-terminal-ok or counter-terminal-forbidden"
+        )),
+        _ => Err(usage()),
+    }
+}
+
+fn run_counter_deadlock(
+    property_name: &str,
+    allowed_terminal: impl Fn(&CounterState) -> bool + Send + Sync + 'static,
+) -> Result<ExitCode, String> {
+    let model = bounded_counter().map_err(|error| error.to_string())?;
+    let property = DeadlockProperty::new(property_name, allowed_terminal)
+        .map_err(|error| error.to_string())?;
+    let result = check_deadlock(&model, &property).map_err(|error| error.to_string())?;
+    print!("{}", render_deadlock_report(model.name(), &result));
+
+    Ok(match result.status {
+        DeadlockStatus::DeadlockFree => ExitCode::SUCCESS,
+        DeadlockStatus::DeadlockFound => ExitCode::from(5),
+    })
+}
+
 fn parse_limits(args: &[String]) -> Result<ExplorationLimits, String> {
     let mut limits = ExplorationLimits::unbounded();
     let mut index = 0;
@@ -197,7 +234,7 @@ fn status_exit_code(status: VerificationStatus) -> ExitCode {
 }
 
 fn usage() -> String {
-    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four>]"
+    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden>]"
         .to_owned()
 }
 
