@@ -1,10 +1,11 @@
 use crate::checker::TraceStep;
 use crate::model::TransitionSystem;
+use crate::product::build_action_product;
 use crate::recurrence::{
     capture_reachable_graph, component_is_cyclic, cycle_witness, induced_graph, shortest_path,
-    strongly_connected_components, ReachableGraph, RecurrenceError, SnapshotEdge,
+    strongly_connected_components, ReachableGraph, RecurrenceError,
 };
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::HashSet;
 use std::fmt;
 use std::hash::Hash;
 use std::sync::Arc;
@@ -303,7 +304,12 @@ where
     M: Clone + Eq + Hash,
 {
     let captured = capture_reachable_graph(model)?;
-    let product = build_product_graph(&captured.graph, monitor);
+    let product = build_action_product(
+        &captured.graph,
+        &monitor.initial,
+        |state, action| (monitor.step)(state, action),
+        |state, monitor| MonitorProductState { state, monitor },
+    );
     let product_transitions = product.outgoing.iter().map(Vec::len).sum();
 
     for (product_id, state) in product.states.iter().enumerate() {
@@ -464,71 +470,4 @@ fn candidate_key<S, M>(candidate: &ProgressCandidate<S, M>) -> (usize, usize, us
         candidate.condition_index,
         candidate.product_entry,
     )
-}
-
-fn build_product_graph<S, M>(
-    graph: &ReachableGraph<S>,
-    monitor: &FiniteMonitor<M>,
-) -> ReachableGraph<MonitorProductState<S, M>>
-where
-    S: Clone,
-    M: Clone + Eq + Hash,
-{
-    let mut states = Vec::new();
-    let mut outgoing: Vec<Vec<SnapshotEdge>> = Vec::new();
-    let mut initial_ids = Vec::new();
-    let mut ids: HashMap<(usize, M), usize> = HashMap::new();
-    let mut queue = VecDeque::new();
-
-    for &model_id in &graph.initial_ids {
-        let monitor_state = monitor.initial.clone();
-        let key = (model_id, monitor_state.clone());
-        let product_id = if let Some(id) = ids.get(&key).copied() {
-            id
-        } else {
-            let id = states.len();
-            ids.insert(key.clone(), id);
-            states.push(MonitorProductState {
-                state: graph.states[model_id].clone(),
-                monitor: monitor_state,
-            });
-            outgoing.push(Vec::new());
-            queue.push_back(key);
-            id
-        };
-        if !initial_ids.contains(&product_id) {
-            initial_ids.push(product_id);
-        }
-    }
-
-    while let Some((model_id, monitor_state)) = queue.pop_front() {
-        let source = ids[&(model_id, monitor_state.clone())];
-        for edge in &graph.outgoing[model_id] {
-            let next_monitor = (monitor.step)(&monitor_state, &edge.action);
-            let key = (edge.target, next_monitor.clone());
-            let target = if let Some(id) = ids.get(&key).copied() {
-                id
-            } else {
-                let id = states.len();
-                ids.insert(key.clone(), id);
-                states.push(MonitorProductState {
-                    state: graph.states[edge.target].clone(),
-                    monitor: next_monitor,
-                });
-                outgoing.push(Vec::new());
-                queue.push_back(key);
-                id
-            };
-            outgoing[source].push(SnapshotEdge {
-                action: edge.action.clone(),
-                target,
-            });
-        }
-    }
-
-    ReachableGraph {
-        states,
-        outgoing,
-        initial_ids,
-    }
 }
