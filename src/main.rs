@@ -38,6 +38,10 @@ use formal_verification_lab::response_examples::{
     request_grant_protocol, unfair_request_grant_protocol,
 };
 use formal_verification_lab::response_report::render_response_report;
+use formal_verification_lab::temporal::{
+    check_action_temporal, ActionAtom, ActionTemporalSpec, TemporalStatus,
+};
+use formal_verification_lab::temporal_report::render_temporal_report;
 use std::env;
 use std::process::ExitCode;
 
@@ -70,6 +74,7 @@ fn run(args: Vec<String>) -> Result<ExitCode, String> {
         [command, rest @ ..] if command == "respond" => response_command(rest),
         [command, rest @ ..] if command == "monitor" => monitor_command(rest),
         [command, rest @ ..] if command == "buchi" => buchi_command(rest),
+        [command, rest @ ..] if command == "temporal" => temporal_command(rest),
         _ => Err(usage()),
     }
 }
@@ -444,6 +449,66 @@ where
     })
 }
 
+fn temporal_command(args: &[String]) -> Result<ExitCode, String> {
+    match args {
+        [query] if query == "request-grant" => run_temporal(
+            request_grant_protocol().map_err(|error| error.to_string())?,
+            typed_response_spec()?,
+        ),
+        [query] if query == "request-grant-unfair" => run_temporal(
+            unfair_request_grant_protocol().map_err(|error| error.to_string())?,
+            typed_response_spec()?,
+        ),
+        [query] if query == "pulses" => run_temporal(
+            alternating_pulses().map_err(|error| error.to_string())?,
+            typed_pulse_spec()?,
+        ),
+        [query] if query == "pulses-unfair" => run_temporal(
+            unfair_second_pulse().map_err(|error| error.to_string())?,
+            typed_pulse_spec()?,
+        ),
+        [query] => Err(format!(
+            "unknown temporal query '{query}'; expected request-grant, request-grant-unfair, pulses, or pulses-unfair"
+        )),
+        _ => Err(usage()),
+    }
+}
+
+fn typed_response_spec() -> Result<ActionTemporalSpec, String> {
+    ActionTemporalSpec::response(
+        "request-eventually-grant",
+        ActionAtom::exact("request").map_err(|error| error.to_string())?,
+        ActionAtom::exact("grant").map_err(|error| error.to_string())?,
+    )
+    .map_err(|error| error.to_string())
+}
+
+fn typed_pulse_spec() -> Result<ActionTemporalSpec, String> {
+    ActionTemporalSpec::all_infinitely_often(
+        "infinitely-often-a-and-b",
+        vec![
+            ActionAtom::exact("pulse-a").map_err(|error| error.to_string())?,
+            ActionAtom::exact("pulse-b").map_err(|error| error.to_string())?,
+        ],
+    )
+    .map_err(|error| error.to_string())
+}
+
+fn run_temporal<S>(
+    model: formal_verification_lab::TransitionSystem<S>,
+    spec: ActionTemporalSpec,
+) -> Result<ExitCode, String>
+where
+    S: Clone + Eq + std::hash::Hash + std::fmt::Debug,
+{
+    let result = check_action_temporal(&model, &spec).map_err(|error| error.to_string())?;
+    print!("{}", render_temporal_report(model.name(), &result));
+    Ok(match result.status {
+        TemporalStatus::Satisfied => ExitCode::SUCCESS,
+        TemporalStatus::Violated => ExitCode::from(10),
+    })
+}
+
 fn parse_limits(args: &[String]) -> Result<ExplorationLimits, String> {
     let mut limits = ExplorationLimits::unbounded();
     let mut index = 0;
@@ -507,7 +572,7 @@ fn status_exit_code(status: VerificationStatus) -> ExitCode {
 }
 
 fn usage() -> String {
-    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | eventually <counter-three|counter-four|traffic-never> | respond <request-grant|request-grant-unfair|dual-grant|dual-grant-unfair-b> | monitor <session-ok|session-double-open|session-stuck> | buchi <pulses|pulses-unfair|finite-ignore|finite-strict>]"
+    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | eventually <counter-three|counter-four|traffic-never> | respond <request-grant|request-grant-unfair|dual-grant|dual-grant-unfair-b> | monitor <session-ok|session-double-open|session-stuck> | buchi <pulses|pulses-unfair|finite-ignore|finite-strict> | temporal <request-grant|request-grant-unfair|pulses|pulses-unfair>]"
         .to_owned()
 }
 

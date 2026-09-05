@@ -72,50 +72,48 @@ The executable session monitor distinguishes a valid `open -> commit -> close` l
 
 Milestone 13 adds explicit generalized Büchi-style acceptance over deterministic user-defined finite action automata.
 
-`BuchiAutomaton<A>` contains:
+`BuchiAutomaton<A>` contains one finite initial automaton state, a deterministic action update, one or more uniquely named acceptance sets, and an explicit finite-run policy. For infinite maximal executions, `check_buchi` requires every named acceptance set to be visited infinitely often. An infinite counterexample is a reachable lasso that eventually remains forever outside one acceptance set.
 
-- one finite initial automaton state;
-- a deterministic action update `step(automaton_state, action) -> automaton_state`;
-- one or more uniquely named acceptance sets `F_i`; and
-- an explicit finite-run policy.
+Finite maximal executions are deliberately not assigned an implicit Büchi interpretation. `FiniteRunPolicy::IgnoreTerminals` applies only the infinite-run acceptance condition. `FiniteRunPolicy::RequireAcceptingTerminal` additionally requires every finite product terminal to belong to every configured acceptance set.
 
-For infinite maximal executions, `check_buchi` requires **every** named acceptance set to be visited infinitely often. For acceptance set `F_i`, an infinite counterexample exists exactly when a reachable product lasso can eventually remain forever in `not F_i`. The checker therefore builds the explicit `(model_state, automaton_state)` product once, induces a separate `not F_i` residual graph for each acceptance set, and searches those residuals for cyclic SCCs.
-
-Finite maximal executions are deliberately not given an implicit Büchi interpretation. `FiniteRunPolicy::IgnoreTerminals` applies only the infinite-run acceptance condition. `FiniteRunPolicy::RequireAcceptingTerminal` additionally requires every finite product terminal to belong to every configured acceptance set. Strict finite-terminal failures take precedence over infinite lassos.
-
-Infinite witnesses identify the avoided acceptance set and contain a shortest global stem plus a deterministic real-edge closed cycle that never enters that set. No fairness is assumed, so an enabled accepting transition does not save a run that can choose a non-accepting cycle forever.
-
-The executable pulse examples require both `pulse-a` and `pulse-b` infinitely often. The fair alternating protocol satisfies both sets; the unfair variant can take `pulse-a` forever while `pulse-b` remains enabled and therefore yields an acceptance-avoiding lasso for `pulse-b-observed`. A finite quiet run demonstrates the observable difference between the two finite-run policies.
-
-M13's independent generated oracle evaluates **8192** cases: all 16 directed two-node graph masks × all `4^4 = 256` edge-action assignments × both finite-run policies. It independently constructs the eight `(node, automaton_state)` product states, uses Floyd–Warshall for full reachability and per-acceptance-set avoiding reachability, and validates status, product accounting, finite-terminal policy, real-edge witnesses, acceptance-set identity, closed avoiding cycles, globally shortest stem distances, acceptance-set tie-breaking, and repeated determinism.
+The executable pulse examples require both `pulse-a` and `pulse-b` infinitely often. M13's independent generated oracle evaluates **8192** graph/action/policy cases and validates status, product accounting, finite-terminal policy, real-edge witnesses, acceptance-set identity, closed avoiding cycles, globally shortest stem distances, tie-breaking, and determinism.
 
 ### Milestone 14 — shared deterministic action-product substrate
 
-Milestone 14 removes duplicated executable graph construction from the finite-monitor and Büchi engines. Internal `build_action_product` consumes an already captured labeled model graph, one initial control state, a deterministic `step(control_state, action) -> control_state`, and a caller-provided lift into that engine's public product-state representation.
+Milestone 14 removes duplicated executable graph construction from the finite-monitor and Büchi engines. Internal `build_action_product` owns deterministic BFS product discovery, `(model_state_id, control_state)` deduplication, initial-state ordering, captured edge ordering, and product-edge construction while preserving each caller's public product-state representation.
 
-The shared substrate owns deterministic BFS product discovery, `(model_state_id, control_state)` deduplication, initial-state ordering, captured edge ordering, and product-edge construction. It never re-invokes the model transition relation. `monitor.rs` and `buchi.rs` retain their existing public state types and all property-specific rejecting/progress/acceptance semantics; only their previously duplicated product builders move behind the common substrate.
-
-Migration equivalence is executable rather than asserted by inspection: the unchanged M12 **4096-case** finite-monitor oracle and M13 **8192-case** generalized Büchi oracle both exercise the shared builder while independently validating product reachability/accounting, action updates, deterministic witnesses, terminal/cycle semantics, and selection rules. Existing binary-level monitor and Büchi CLI integration tests remain unchanged.
+The unchanged M12 **4096-case** finite-monitor oracle and M13 **8192-case** generalized Büchi oracle act as executable migration-equivalence gates.
 
 ### Milestone 15 — response products on the shared substrate
 
-Milestone 15 migrates the canonical multi-response engine onto the same internal action-product constructor. Its control state is the existing `Vec<bool>` pending vector, initialized with every clause clear. The action update is unchanged: for each clause, a matching response clears that clause; otherwise a matching trigger sets it.
+Milestone 15 migrates the canonical multi-response engine onto the same internal action-product constructor. The existing `Vec<bool>` pending-vector update semantics are preserved exactly, and the M10 single-response adapter reaches the same shared constructor.
 
-`MultiObligationState<S>`, finite pending-terminal precedence, per-clause pending residuals, SCC/lasso analysis, shortest-stem selection, reporting, and CLI behavior remain property-owned and unchanged. Because the M10 single-response API already delegates to the canonical multi-response engine, both single- and multi-class response verification now reach the shared constructor without another compatibility path.
-
-Migration equivalence is again executable: the unchanged M10 **4096-case** single-response oracle and M11 **38,416-case** two-class oracle validate product reachability/accounting, pending updates, finite and infinite failures, clause identity, witnesses, and determinism. M12 and M13 continue exercising the same shared substrate through their independent monitor and Büchi oracles, so the common constructor now has three independently audited temporal consumers.
-
-M15 adds no response semantics, fairness assumptions, public API, or performance claim. Its architectural effect is to eliminate the final duplicated action-driven temporal product BFS while keeping each verification property's acceptance/failure semantics separate.
+The unchanged M10 **4096-case** single-response oracle, M11 **38,416-case** multi-response oracle, and M12/M13 suites validate the migration. M15 adds no new response semantics, fairness assumptions, public API, or performance claim.
 
 ### Milestone 16 — neutral captured-graph substrate
 
-Milestone 16 moves generic reachable-graph ownership out of the recurrence-specific layer. Internal `graph.rs` now owns the labeled `ReachableGraph`, snapshot edges, canonical model-to-snapshot materialization and accounting, deterministic induced-subgraph construction, and deterministic shortest-path reconstruction.
+Milestone 16 moves generic reachable-graph ownership out of the recurrence-specific layer. Internal `graph.rs` owns the labeled `ReachableGraph`, snapshot edges, canonical model-to-snapshot materialization and accounting, deterministic induced-subgraph construction, and deterministic shortest-path reconstruction.
 
-`recurrence.rs` keeps only recurrence-specific structure: Tarjan SCC decomposition, cyclic-component classification, recurrence cycle witnesses, and the existing public `RecurrenceError` contract. Graph capture failures use an internal `GraphCaptureError` and are mapped back to the existing recurrence error variants, so no new public error surface is introduced.
+`recurrence.rs` keeps Tarjan SCC decomposition, cyclic-component classification, cycle witnesses, and the existing public `RecurrenceError` contract. Eventuality, response products, finite monitors, Büchi verification, and shared action-product construction consume the neutral graph substrate directly.
 
-The shared action-product builder, universal eventuality, response products, finite monitors, and generalized Büchi verification now consume the neutral graph substrate directly rather than treating recurrence as a generic graph facade. The model transition relation is still evaluated once through canonical exhaustive BFS for each captured analysis, and deterministic state/edge ordering is unchanged.
+Migration equivalence is enforced by the unchanged M8 **512-graph** SCC oracle, M9 **4096-case** eventuality oracle, M10 **4096-case** single-response oracle, M11 **38,416-case** multi-response oracle, M12 **4096-case** finite-monitor oracle, M13 **8192-case** Büchi oracle, and all binary CLI regressions.
 
-Migration equivalence is enforced by the unchanged M8 **512-graph** SCC oracle, M9 **4096-case** eventuality oracle, M10 **4096-case** single-response oracle, M11 **38,416-case** multi-response oracle, M12 **4096-case** finite-monitor oracle, M13 **8192-case** Büchi oracle, and all binary CLI regressions. M16 adds no proof semantics or performance claim; it establishes a neutral graph/data-flow boundary for later front ends and analyses.
+### Milestone 17 — typed action-temporal frontend
+
+Milestone 17 is the first specification frontend above the validated temporal engines. It is deliberately **not** a general LTL/CTL implementation.
+
+`ActionAtom::exact(label)` represents one exact action label. `ActionTemporalSpec` currently supports two typed forms:
+
+- `response(name, trigger, response)`: every exact trigger action must eventually be followed by the exact response action on every maximal execution;
+- `all_infinitely_often(name, actions)`: every listed exact action must occur infinitely often on every infinite execution. Finite terminal runs are explicitly ignored for this form.
+
+Response specs compile to the canonical response backend. Recurring-action specs compile to generalized Büchi with one acceptance set per exact action and `FiniteRunPolicy::IgnoreTerminals`. The frontend's internal Büchi control state records only the last matching required action; visiting each corresponding acceptance set infinitely often is therefore equivalent to each named action occurring infinitely often.
+
+`check_action_temporal` erases backend monitor/automaton control state from returned witnesses and exposes a stable frontend-level `TemporalResult`: backend identity, status, model/product accounting, and finite or lasso counterexamples over the original model states. Violations identify either the pending response obligation or the exact action that failed its infinitely-often obligation.
+
+Validation is deterministic: empty property/action names, an empty recurring-action list, and duplicate recurring actions are rejected before verification.
+
+Differential tests compare typed response against the existing hand-built request/grant backend on both fair and unfair models, and typed recurring actions against the hand-built pulse Büchi automaton on fair, unfair, and finite-ignore models. These tests also compare model/product accounting, verify normalized witnesses, and execute the built `fvlab temporal` binary on positive and negative paths.
 
 ## Architecture
 
@@ -133,14 +131,16 @@ src/multi_response.rs         multi-clause response semantics over shared produc
 src/response.rs               single-clause compatibility API over multi-response
 src/monitor.rs                finite-monitor semantics over shared action product
 src/buchi.rs                  Büchi semantics over shared action product
+src/temporal.rs               typed exact-action temporal frontend + backend routing
+src/temporal_report.rs        normalized frontend reporting
 src/reduction.rs              experimental sleep-set path + exhaustive audit
 src/*_report.rs               deterministic analysis-specific reporting
 src/*_examples.rs             executable teaching models
 src/main.rs                   CLI/exit-status integration; no model traversal logic
-tests/                        semantic, protocol, generated graph/product oracles
+tests/                        semantic, protocol, graph/product and frontend tests
 ```
 
-The original transition relation remains owned by the model plus canonical exploration. Structural and temporal analyses reuse a neutral captured finite labeled graph rather than invoking the model transition function again. M14–M16 centralize action-product construction and captured-graph ownership while leaving property-specific acceptance/failure semantics separate.
+The original transition relation remains owned by the model plus canonical exploration. Structural and temporal analyses reuse a neutral captured finite labeled graph rather than invoking the model transition function again. The typed temporal frontend compiles only to already validated engines; it does not introduce a second model-checking backend.
 
 ## Executable examples
 
@@ -157,18 +157,20 @@ cargo run -- respond request-grant
 cargo run -- respond dual-grant
 cargo run -- monitor session-ok
 cargo run -- buchi pulses
+cargo run -- temporal request-grant
+cargo run -- temporal pulses
 ```
 
-### Generalized Büchi-style acceptance
+### Typed temporal frontend
 
 ```bash
-cargo run -- buchi pulses
-cargo run -- buchi pulses-unfair
-cargo run -- buchi finite-ignore
-cargo run -- buchi finite-strict
+cargo run -- temporal request-grant
+cargo run -- temporal request-grant-unfair
+cargo run -- temporal pulses
+cargo run -- temporal pulses-unfair
 ```
 
-`pulses` satisfies both infinitely-often acceptance sets. `pulses-unfair` exits 9 with `ACCEPTANCE_AVOIDING_CYCLE` for `pulse-b-observed`. The two finite commands run the same finite model under different explicit terminal policies: ignore succeeds, strict exits 9 with `FINITE_TERMINAL`.
+`request-grant` and `pulses` satisfy their typed properties. The unfair variants return frontend-level normalized counterexamples and exit with status 10. The existing `respond` and `buchi` commands remain available as direct backend paths for comparison.
 
 ## CLI exit status
 
@@ -181,7 +183,8 @@ cargo run -- buchi finite-strict
 - `6`: universal eventuality is `VIOLATED`;
 - `7`: single- or multi-class response property is `VIOLATED`;
 - `8`: deterministic finite monitor verification is `VIOLATED`;
-- `9`: generalized Büchi-style acceptance is `VIOLATED`.
+- `9`: generalized Büchi-style acceptance is `VIOLATED`;
+- `10`: typed temporal frontend property is `VIOLATED`.
 
 ## Tests and CI
 
@@ -194,21 +197,23 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo test --all-targets --all-features
 ```
 
-Coverage includes safety, bounded exploration, Peterson, audited reduction, reachability, deadlock policies, SCC structure, universal eventuality, response products, finite monitor products, and generalized Büchi-style acceptance. Independent generated suites include M8's 512 SCC graphs, M9's 4096 eventuality cases, M10's 4096 single-response cases, M11's 38,416 two-class cases, M12's 4096 finite-monitor cases, and M13's 8192 Büchi/finite-policy cases.
+Coverage includes safety, bounded exploration, Peterson, audited reduction, reachability, deadlock policies, SCC structure, universal eventuality, response products, finite monitor products, generalized Büchi-style acceptance, and the typed temporal frontend. Independent generated suites include M8's 512 SCC graphs, M9's 4096 eventuality cases, M10's 4096 single-response cases, M11's 38,416 two-class cases, M12's 4096 finite-monitor cases, and M13's 8192 Büchi/finite-policy cases.
 
-M14–M16 change no property-oracle expectations. The unchanged M8–M13 generated suites act as migration-equivalence gates for shared product and neutral graph infrastructure, while the complete test command executes built `fvlab` binary integrations and the workflow retains direct CLI regression gates.
+M17 adds differential frontend tests rather than weakening those backend oracles. The complete test command executes built `fvlab` binary paths for the typed frontend as well as the existing integration coverage.
 
 ## Trust boundaries and limitations
 
 - Results apply to the finite transition model and its atomic-step assumptions, not automatically to machine code, weak-memory executions, or external distributed systems.
-- User transition functions and state/action/automaton predicates must faithfully encode the intended system/property; the checker cannot prove modeling fidelity or purity.
-- Explicit-state memory grows with the reachable graph. A `k`-clause response monitor may expand a model state into up to `2^k` pending valuations. Deterministic monitor and Büchi products are bounded by `|S| * |M|` or `|S| * |A|` before reachability pruning.
+- User transition functions and predicates must faithfully encode the intended system/property; the checker cannot prove modeling fidelity or purity.
+- Explicit-state memory grows with the reachable graph. A `k`-clause response monitor may expand a model state into up to `2^k` pending valuations.
 - Response classes remain Boolean obligations, not per-request identity queues.
-- M12/M13 automaton transitions are deterministic and action-driven. There is no nondeterministic automaton, epsilon transition, automaton minimization, textual property parser, or automatic formula-to-automaton translation.
-- M9–M13 have **no fairness semantics**. Enabled responses or accepting actions are not assumed to be scheduled.
-- M9–M13 are not a full LTL/CTL implementation and do not claim temporal-logic parsing, formula compilation, arbitrary nested formulas, or model checking outside the explicitly implemented semantics.
-- The M13 generalized Büchi layer accepts user-defined automata; it does not claim to translate arbitrary LTL into Büchi automata.
-- M14–M16 are internal architecture consolidations; they add no new proof semantics and make no performance claim.
+- M9–M17 have **no fairness semantics**. Enabled responses or accepting actions are not assumed to be scheduled.
+- The typed M17 frontend supports exact action atoms only. It has no wildcard, Boolean action predicate language, nested temporal operators, temporal negation, or arbitrary formula composition.
+- `all_infinitely_often` is intentionally an infinite-run-only property; finite terminals are ignored. The frontend does not expose M13's strict finite terminal policy for this form.
+- There is no textual temporal-property parser yet. M17 constructs typed Rust specifications directly.
+- M9–M17 are not a full LTL/CTL implementation and do not claim arbitrary formula parsing/compilation.
+- The M13 generalized Büchi layer accepts user-defined automata; it does not translate arbitrary LTL into Büchi automata.
+- M14–M16 are internal architecture consolidations and make no performance claim. M17 adds frontend capability but no performance claim.
 - Tarjan SCC discovery currently uses recursive DFS; very deep graphs may motivate a future iterative implementation.
 - Peterson starvation freedom is still not claimed.
 - The sleep-set engine remains experimental and differentially audited, not a standalone trusted POR proof backend.
@@ -217,6 +222,6 @@ M14–M16 change no property-oracle expectations. The unchanged M8–M13 generat
 
 ## Roadmap
 
-Milestones 1–16 form a coherent explicit-state stack: safety -> bounded honesty -> typed models -> independent graph validation -> audited reduction -> existential reachability -> terminal/deadlock analysis -> recurrent SCC structure -> universal eventuality -> response obligations -> multi-class response composition -> deterministic finite monitors -> explicit generalized Büchi-style acceptance -> shared deterministic action-product construction -> neutral captured-graph ownership.
+Milestones 1–17 form a coherent explicit-state stack: safety -> bounded honesty -> typed models -> independent graph validation -> audited reduction -> existential reachability -> terminal/deadlock analysis -> recurrent SCC structure -> universal eventuality -> response obligations -> multi-class response composition -> deterministic finite monitors -> explicit generalized Büchi-style acceptance -> shared action-product construction -> neutral captured-graph ownership -> typed action-temporal specification.
 
-The next high-value architectural slice should move from infrastructure consolidation back to executable specification capability: a **narrow typed temporal-property frontend** that compiles a deliberately small, explicitly documented property subset into the already validated monitor/Büchi backends. It should not claim full LTL/CTL. Acceptance should require differential equivalence against hand-built existing M9–M13 properties, deterministic diagnostics for unsupported combinations, and end-to-end CLI examples that prove the frontend actually reaches the existing verification engines. Only after that typed layer is stable should textual parsing or broader formula compilation be considered.
+The next high-value slice is **Milestone 18: a minimal textual parser for exactly the M17 typed subset**. The parser should add usability, not new semantics: parse a small deterministic grammar into `ActionTemporalSpec`, reuse all existing constructor validation, and route through `check_action_temporal`. Acceptance should require parser-to-typed differential equivalence, precise position-aware errors for malformed/unsupported syntax, round-trip or canonical rendering tests where appropriate, and CLI examples that accept user-supplied formulas rather than fixed example names. Broader temporal operators, fairness, and general LTL/CTL compilation remain out of scope until that textual layer is proven stable.
