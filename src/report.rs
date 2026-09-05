@@ -1,7 +1,5 @@
 use crate::checker::{CheckResult, InconclusiveReason, VerificationStatus};
-use crate::property::{
-    DeadlockResult, DeadlockStatus, ReachabilityResult, ReachabilityStatus,
-};
+use crate::property::{DeadlockResult, DeadlockStatus, ReachabilityResult, ReachabilityStatus};
 use std::fmt::{Debug, Write};
 
 /// Render a stable, line-oriented report suitable for the CLI and snapshots.
@@ -148,10 +146,7 @@ pub fn render_reachability_report<S: Debug>(
 }
 
 /// Render a stable report for reachable deadlock/terminal-state analysis.
-pub fn render_deadlock_report<S: Debug>(
-    model_name: &str,
-    result: &DeadlockResult<S>,
-) -> String {
+pub fn render_deadlock_report<S: Debug>(model_name: &str, result: &DeadlockResult<S>) -> String {
     let mut output = String::new();
     writeln!(&mut output, "model: {model_name}").expect("writing to String cannot fail");
     writeln!(&mut output, "property: {}", result.property).expect("writing to String cannot fail");
@@ -194,8 +189,11 @@ pub fn render_deadlock_report<S: Debug>(
             .expect("writing to String cannot fail");
         }
     } else {
-        writeln!(&mut output, "deadlock witness: none (reachable graph exhausted)")
-            .expect("writing to String cannot fail");
+        writeln!(
+            &mut output,
+            "deadlock witness: none (reachable graph exhausted)"
+        )
+        .expect("writing to String cannot fail");
     }
 
     output
