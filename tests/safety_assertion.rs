@@ -44,7 +44,7 @@ fn safety_assertion_matches_complement_reachability_and_shortest_counterexample(
         &PropositionSafetySpec::always("all-states-ok", expression).unwrap(),
     )
     .unwrap();
-    let complement = ReachabilityProperty::new("not-ok", |state: &String| false).unwrap();
+    let complement = ReachabilityProperty::new("not-ok", |_state: &String| false).unwrap();
     let direct = check_reachability(safe.model(), &complement).unwrap();
 
     assert_eq!(direct.status, ReachabilityStatus::Unreachable);
@@ -154,10 +154,10 @@ fn independent_shortest_violation(graph_mask: u16, proposition_mask: u8) -> Opti
 
     while let Some(from) = queue.pop_front() {
         let from_distance = distance[from].unwrap();
-        for to in 0..3 {
+        for (to, slot) in distance.iter_mut().enumerate() {
             let edge = from * 3 + to;
-            if graph_mask & (1 << edge) != 0 && distance[to].is_none() {
-                distance[to] = Some(from_distance + 1);
+            if graph_mask & (1 << edge) != 0 && slot.is_none() {
+                *slot = Some(from_distance + 1);
                 queue.push_back(to);
             }
         }
