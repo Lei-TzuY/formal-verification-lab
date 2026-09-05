@@ -198,11 +198,19 @@ pub fn render_recurrence_report<S: Debug>(
     writeln!(
         &mut output,
         "recurrence: {}",
-        if cyclic_count == 0 { "ACYCLIC" } else { "CYCLIC" }
+        if cyclic_count == 0 {
+            "ACYCLIC"
+        } else {
+            "CYCLIC"
+        }
     )
     .expect("writing to String cannot fail");
-    writeln!(&mut output, "discovered states: {}", analysis.discovered_states)
-        .expect("writing to String cannot fail");
+    writeln!(
+        &mut output,
+        "discovered states: {}",
+        analysis.discovered_states
+    )
+    .expect("writing to String cannot fail");
     writeln!(
         &mut output,
         "explored transitions: {}",
@@ -236,8 +244,7 @@ pub fn render_recurrence_report<S: Debug>(
         writeln!(&mut output, "cycle:").expect("writing to String cannot fail");
         render_trace(&mut output, &witness.cycle, "cycle-entry");
     } else {
-        writeln!(&mut output, "cycle witness: none")
-            .expect("writing to String cannot fail");
+        writeln!(&mut output, "cycle witness: none").expect("writing to String cannot fail");
     }
 
     output
