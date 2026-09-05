@@ -110,10 +110,7 @@ where
         if node_by_state.contains_key(initial) {
             continue;
         }
-        if let Some(limit) = limits
-            .max_states
-            .filter(|limit| nodes.len() >= *limit)
-        {
+        if let Some(limit) = limits.max_states.filter(|limit| nodes.len() >= *limit) {
             return Ok(inconclusive_result(
                 nodes.len(),
                 0,
@@ -186,10 +183,7 @@ where
                 ));
             }
 
-            if let Some(limit) = limits
-                .max_states
-                .filter(|limit| nodes.len() >= *limit)
-            {
+            if let Some(limit) = limits.max_states.filter(|limit| nodes.len() >= *limit) {
                 return Ok(inconclusive_result(
                     nodes.len(),
                     checked_states,
