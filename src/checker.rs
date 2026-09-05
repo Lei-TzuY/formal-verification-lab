@@ -1,4 +1,4 @@
-use crate::model::{ModelError, TransitionSystem};
+use crate::model::{ModelError, Transition, TransitionSystem};
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::fmt;
 use std::hash::Hash;
@@ -84,6 +84,28 @@ struct Node<S> {
     depth: usize,
 }
 
+/// Internal outcome of the one canonical BFS substrate. Property layers use
+/// probes rather than implementing their own graph traversal.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum GraphSearchOutcome<S> {
+    Exhausted,
+    Match {
+        label: String,
+        trace: Vec<TraceStep<S>>,
+    },
+    Inconclusive(InconclusiveReason),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct GraphSearchResult<S> {
+    pub outcome: GraphSearchOutcome<S>,
+    pub discovered_states: usize,
+    pub checked_states: usize,
+    pub explored_transitions: usize,
+    pub max_depth_reached: Option<usize>,
+    pub transitions_by_action: BTreeMap<String, usize>,
+}
+
 /// Explore the reachable state graph without resource bounds.
 pub fn check<S>(model: &TransitionSystem<S>) -> Result<CheckResult<S>, ModelError>
 where
@@ -110,6 +132,82 @@ pub fn check_with_limits<S>(
 where
     S: Clone + Eq + Hash + fmt::Debug,
 {
+    let search = search_with_probes(
+        model,
+        limits,
+        |state| {
+            model.invariants().iter().find_map(|invariant| {
+                (!invariant.holds(state)).then(|| invariant.name().to_owned())
+            })
+        },
+        |_state, _transitions| None,
+    )?;
+
+    let GraphSearchResult {
+        outcome,
+        discovered_states,
+        checked_states,
+        explored_transitions,
+        max_depth_reached,
+        transitions_by_action,
+    } = search;
+
+    Ok(match outcome {
+        GraphSearchOutcome::Exhausted => CheckResult {
+            status: VerificationStatus::Safe,
+            discovered_states,
+            checked_states,
+            explored_transitions,
+            max_depth_reached,
+            transitions_by_action,
+            counterexample: None,
+            inconclusive_reason: None,
+        },
+        GraphSearchOutcome::Match { label, trace } => CheckResult {
+            status: VerificationStatus::Violated,
+            discovered_states,
+            checked_states,
+            explored_transitions,
+            max_depth_reached,
+            transitions_by_action,
+            counterexample: Some(Counterexample {
+                invariant: label,
+                trace,
+            }),
+            inconclusive_reason: None,
+        },
+        GraphSearchOutcome::Inconclusive(reason) => CheckResult {
+            status: VerificationStatus::Inconclusive,
+            discovered_states,
+            checked_states,
+            explored_transitions,
+            max_depth_reached,
+            transitions_by_action,
+            counterexample: None,
+            inconclusive_reason: Some(reason),
+        },
+    })
+}
+
+/// Canonical deterministic BFS used by both safety checking and higher-level
+/// finite-state properties.
+///
+/// `before_successors` runs after a state is dequeued but before its transition
+/// relation is evaluated. `after_successors` runs after exactly one successful
+/// `successors()` call and before those edges are counted or expanded. A match
+/// from either probe therefore inherits the same shortest-path ordering and
+/// predecessor trace reconstruction as safety violations.
+pub(crate) fn search_with_probes<S, Before, After>(
+    model: &TransitionSystem<S>,
+    limits: ExplorationLimits,
+    mut before_successors: Before,
+    mut after_successors: After,
+) -> Result<GraphSearchResult<S>, ModelError>
+where
+    S: Clone + Eq + Hash,
+    Before: FnMut(&S) -> Option<String>,
+    After: FnMut(&S, &[Transition<S>]) -> Option<String>,
+{
     let mut nodes: Vec<Node<S>> = Vec::new();
     let mut node_by_state: HashMap<S, usize> = HashMap::new();
     let mut queue = VecDeque::new();
@@ -121,7 +219,7 @@ where
             continue;
         }
         if let Some(limit) = limits.max_states.filter(|limit| nodes.len() >= *limit) {
-            return Ok(inconclusive_result(
+            return Ok(graph_inconclusive_result(
                 nodes.len(),
                 0,
                 0,
@@ -149,34 +247,50 @@ where
     while let Some(node_id) = queue.pop_front() {
         checked_states += 1;
         let depth = nodes[node_id].depth;
-        let state = &nodes[node_id].state;
 
-        for invariant in model.invariants() {
-            if !invariant.holds(state) {
-                return Ok(CheckResult {
-                    status: VerificationStatus::Violated,
-                    discovered_states: nodes.len(),
-                    checked_states,
-                    explored_transitions,
-                    max_depth_reached,
-                    transitions_by_action,
-                    counterexample: Some(Counterexample {
-                        invariant: invariant.name().to_owned(),
-                        trace: reconstruct_trace(&nodes, node_id),
-                    }),
-                    inconclusive_reason: None,
-                });
-            }
+        let before_match = {
+            let state = &nodes[node_id].state;
+            before_successors(state)
+        };
+        if let Some(label) = before_match {
+            return Ok(graph_match_result(
+                &nodes,
+                node_id,
+                label,
+                checked_states,
+                explored_transitions,
+                max_depth_reached,
+                transitions_by_action,
+            ));
         }
 
-        let transitions = model.successors(state)?;
+        let transitions = {
+            let state = &nodes[node_id].state;
+            model.successors(state)?
+        };
+
+        let after_match = {
+            let state = &nodes[node_id].state;
+            after_successors(state, &transitions)
+        };
+        if let Some(label) = after_match {
+            return Ok(graph_match_result(
+                &nodes,
+                node_id,
+                label,
+                checked_states,
+                explored_transitions,
+                max_depth_reached,
+                transitions_by_action,
+            ));
+        }
 
         for transition in transitions {
             if let Some(limit) = limits
                 .max_transitions
                 .filter(|limit| explored_transitions >= *limit)
             {
-                return Ok(inconclusive_result(
+                return Ok(graph_inconclusive_result(
                     nodes.len(),
                     checked_states,
                     explored_transitions,
@@ -195,7 +309,7 @@ where
             }
 
             if let Some(limit) = limits.max_depth.filter(|limit| depth >= *limit) {
-                return Ok(inconclusive_result(
+                return Ok(graph_inconclusive_result(
                     nodes.len(),
                     checked_states,
                     explored_transitions,
@@ -206,7 +320,7 @@ where
             }
 
             if let Some(limit) = limits.max_states.filter(|limit| nodes.len() >= *limit) {
-                return Ok(inconclusive_result(
+                return Ok(graph_inconclusive_result(
                     nodes.len(),
                     checked_states,
                     explored_transitions,
@@ -231,35 +345,53 @@ where
         }
     }
 
-    Ok(CheckResult {
-        status: VerificationStatus::Safe,
+    Ok(GraphSearchResult {
+        outcome: GraphSearchOutcome::Exhausted,
         discovered_states: nodes.len(),
         checked_states,
         explored_transitions,
         max_depth_reached,
         transitions_by_action,
-        counterexample: None,
-        inconclusive_reason: None,
     })
 }
 
-fn inconclusive_result<S>(
+fn graph_match_result<S: Clone>(
+    nodes: &[Node<S>],
+    node_id: usize,
+    label: String,
+    checked_states: usize,
+    explored_transitions: usize,
+    max_depth_reached: Option<usize>,
+    transitions_by_action: BTreeMap<String, usize>,
+) -> GraphSearchResult<S> {
+    GraphSearchResult {
+        outcome: GraphSearchOutcome::Match {
+            label,
+            trace: reconstruct_trace(nodes, node_id),
+        },
+        discovered_states: nodes.len(),
+        checked_states,
+        explored_transitions,
+        max_depth_reached,
+        transitions_by_action,
+    }
+}
+
+fn graph_inconclusive_result<S>(
     discovered_states: usize,
     checked_states: usize,
     explored_transitions: usize,
     max_depth_reached: Option<usize>,
     transitions_by_action: BTreeMap<String, usize>,
     reason: InconclusiveReason,
-) -> CheckResult<S> {
-    CheckResult {
-        status: VerificationStatus::Inconclusive,
+) -> GraphSearchResult<S> {
+    GraphSearchResult {
+        outcome: GraphSearchOutcome::Inconclusive(reason),
         discovered_states,
         checked_states,
         explored_transitions,
         max_depth_reached,
         transitions_by_action,
-        counterexample: None,
-        inconclusive_reason: Some(reason),
     }
 }
 
