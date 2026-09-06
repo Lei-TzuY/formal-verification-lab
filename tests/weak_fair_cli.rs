@@ -28,6 +28,24 @@ fn temp_model_path() -> PathBuf {
     ))
 }
 
+fn write_unfair_request_grant_model() -> PathBuf {
+    let path = temp_model_path();
+    fs::write(
+        &path,
+        concat!(
+            "model \"unfair-request-grant-file\"\n",
+            "state \"idle\"\n",
+            "state \"waiting\"\n",
+            "initial \"idle\"\n",
+            "edge \"idle\" \"request\" \"waiting\"\n",
+            "edge \"waiting\" \"wait\" \"waiting\"\n",
+            "edge \"waiting\" \"grant\" \"idle\"\n",
+        ),
+    )
+    .expect("temporary declarative model is written");
+    path
+}
+
 #[test]
 fn fixed_temporal_weak_fairness_excludes_only_the_matching_unfair_lasso() {
     let baseline = run(&["temporal", "pulses-unfair"]);
@@ -127,20 +145,94 @@ fn fairness_declarations_preserve_order_and_fail_closed_on_duplicates() {
 }
 
 #[test]
-fn response_fairness_still_fails_closed_with_or_without_limits() {
-    for extra in [
-        Vec::<&str>::new(),
-        vec!["--max-product-states", "2"],
-        vec!["--max-model-states", "2"],
-    ] {
-        let mut args = vec!["temporal", "request-grant", "--weak-fair-action", "grant"];
-        args.extend(extra);
-        let output = run(&args);
-        assert_eq!(output.status.code(), Some(2));
-        assert!(stderr(&output).contains(
-            "weak fairness is currently supported only for infinitely-often temporal specifications"
-        ));
-    }
+fn response_fairness_routes_fixed_textual_and_declarative_paths() {
+    let baseline = run(&["temporal", "request-grant-unfair"]);
+    assert_eq!(baseline.status.code(), Some(10));
+
+    let fixed = run(&[
+        "temporal",
+        "request-grant-unfair",
+        "--weak-fair-action",
+        "grant",
+    ]);
+    assert_eq!(fixed.status.code(), Some(0));
+    let fixed_out = stdout(&fixed);
+    assert!(fixed_out.contains("backend: RESPONSE"));
+    assert!(fixed_out.contains("temporal: SATISFIED"));
+    assert!(fixed_out.contains("weak-fair action: \"grant\""));
+
+    let expression = "response(\"request\",\"grant\")";
+    let textual = run(&[
+        "temporal",
+        "check",
+        "request-grant-unfair",
+        expression,
+        "--weak-fair-action",
+        "grant",
+    ]);
+    assert_eq!(textual.status.code(), Some(0));
+    assert!(stdout(&textual).contains("backend: RESPONSE"));
+
+    let path = write_unfair_request_grant_model();
+    let declarative = run(&[
+        "temporal",
+        "file",
+        path.to_str().expect("temporary path is utf-8"),
+        expression,
+        "--weak-fair-action",
+        "grant",
+    ]);
+    let _ = fs::remove_file(&path);
+    assert_eq!(declarative.status.code(), Some(0));
+    let declarative_out = stdout(&declarative);
+    assert!(declarative_out.contains("model: unfair-request-grant-file"));
+    assert!(declarative_out.contains("backend: RESPONSE"));
+    assert!(declarative_out.contains("temporal: SATISFIED"));
+
+    let fair_wait = run(&[
+        "temporal",
+        "request-grant-unfair",
+        "--weak-fair-action",
+        "wait",
+    ]);
+    assert_eq!(fair_wait.status.code(), Some(10));
+    let fair_wait_out = stdout(&fair_wait);
+    assert!(fair_wait_out.contains("temporal: VIOLATED"));
+    assert!(fair_wait_out.contains("obligation: response"));
+    assert!(fair_wait_out.contains("counterexample: INFINITE"));
+}
+
+#[test]
+fn response_fairness_preserves_product_and_model_cutoff_honesty() {
+    let product = run(&[
+        "temporal",
+        "request-grant-unfair",
+        "--weak-fair-action",
+        "grant",
+        "--max-product-transitions",
+        "2",
+    ]);
+    assert_eq!(product.status.code(), Some(3));
+    let product_out = stdout(&product);
+    assert!(product_out.contains("temporal: INCONCLUSIVE"));
+    assert!(product_out.contains("product inconclusive reason:"));
+    assert!(product_out.contains("weak-fair action: \"grant\""));
+    assert!(product_out.contains("counterexample: none (product exploration incomplete)"));
+
+    let staged = run(&[
+        "temporal",
+        "request-grant-unfair",
+        "--weak-fair-action",
+        "grant",
+        "--max-model-transitions",
+        "2",
+    ]);
+    assert_eq!(staged.status.code(), Some(3));
+    let staged_out = stdout(&staged);
+    assert!(staged_out.contains("temporal: INCONCLUSIVE"));
+    assert!(staged_out.contains("analysis inconclusive stage: model"));
+    assert!(staged_out.contains("model completion: INCONCLUSIVE"));
+    assert!(staged_out.contains("weak-fair action: \"grant\""));
 }
 
 #[test]
