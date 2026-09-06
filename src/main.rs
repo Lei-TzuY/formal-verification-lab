@@ -27,15 +27,21 @@ use formal_verification_lab::examples::{
 };
 use formal_verification_lab::fairness::WeakFairness;
 use formal_verification_lab::fairness_report::{
-    render_analysis_weak_fair_temporal_report, render_bounded_weak_fair_temporal_report,
-    render_weak_fair_temporal_report,
+    render_analysis_weak_fair_monitor_report, render_analysis_weak_fair_temporal_report,
+    render_bounded_weak_fair_monitor_report, render_bounded_weak_fair_temporal_report,
+    render_weak_fair_monitor_report, render_weak_fair_temporal_report,
 };
 use formal_verification_lab::monitor::{
     check_monitor, check_monitor_with_limits, check_monitor_with_product_limits, FiniteMonitor,
     MonitorStatus,
 };
 use formal_verification_lab::monitor_examples::{
-    invalid_double_open_protocol, session_monitor, session_protocol, stuck_committed_protocol,
+    invalid_double_open_protocol, open_terminal_protocol, session_monitor, session_protocol,
+    stuck_committed_protocol, unfair_close_enabled_protocol,
+};
+use formal_verification_lab::monitor_fairness::{
+    check_monitor_with_weak_fairness, check_monitor_with_weak_fairness_and_limits,
+    check_monitor_with_weak_fairness_and_product_limits,
 };
 use formal_verification_lab::monitor_report::{
     render_analysis_monitor_report, render_bounded_monitor_report, render_monitor_report,
@@ -509,8 +515,18 @@ fn monitor_command(args: &[String]) -> Result<ExitCode, String> {
             session_monitor().map_err(|error| error.to_string())?,
             option_args,
         ),
+        "session-unfair-close" => run_monitor(
+            unfair_close_enabled_protocol().map_err(|error| error.to_string())?,
+            session_monitor().map_err(|error| error.to_string())?,
+            option_args,
+        ),
+        "session-open-terminal" => run_monitor(
+            open_terminal_protocol().map_err(|error| error.to_string())?,
+            session_monitor().map_err(|error| error.to_string())?,
+            option_args,
+        ),
         _ => Err(format!(
-            "unknown monitor query '{query}'; expected session-ok, session-double-open, or session-stuck"
+            "unknown monitor query '{query}'; expected session-ok, session-double-open, session-stuck, session-unfair-close, or session-open-terminal"
         )),
     }
 }
@@ -524,17 +540,62 @@ where
     S: Clone + Eq + std::hash::Hash + std::fmt::Debug,
     M: Clone + Eq + std::hash::Hash + std::fmt::Debug,
 {
-    if option_args.is_empty() {
-        let result = check_monitor(&model, &monitor).map_err(|error| error.to_string())?;
-        print!("{}", render_monitor_report(model.name(), &result));
+    let options = parse_temporal_options(option_args)?;
+
+    if !options.fairness.is_empty() {
+        if options.has_model_limits {
+            let limits = AnalysisLimits::new(options.model_limits, options.product_limits);
+            let result = check_monitor_with_weak_fairness_and_limits(
+                &model,
+                &monitor,
+                &options.fairness,
+                limits,
+            )
+            .map_err(|error| error.to_string())?;
+            print!(
+                "{}",
+                render_analysis_weak_fair_monitor_report(model.name(), &result, &options.fairness)
+            );
+            return Ok(match &result.outcome {
+                AnalysisOutcome::Conclusive(MonitorStatus::Satisfied) => ExitCode::SUCCESS,
+                AnalysisOutcome::Conclusive(MonitorStatus::Violated) => ExitCode::from(8),
+                AnalysisOutcome::Inconclusive(_) => ExitCode::from(3),
+            });
+        }
+
+        if options.has_product_limits {
+            let result = check_monitor_with_weak_fairness_and_product_limits(
+                &model,
+                &monitor,
+                &options.fairness,
+                options.product_limits,
+            )
+            .map_err(|error| error.to_string())?;
+            print!(
+                "{}",
+                render_bounded_weak_fair_monitor_report(model.name(), &result, &options.fairness)
+            );
+            return Ok(match &result.outcome {
+                BoundedOutcome::Conclusive(MonitorStatus::Satisfied) => ExitCode::SUCCESS,
+                BoundedOutcome::Conclusive(MonitorStatus::Violated) => ExitCode::from(8),
+                BoundedOutcome::Inconclusive(_) => ExitCode::from(3),
+            });
+        }
+
+        let result = check_monitor_with_weak_fairness(&model, &monitor, &options.fairness)
+            .map_err(|error| error.to_string())?;
+        print!(
+            "{}",
+            render_weak_fair_monitor_report(model.name(), &result, &options.fairness)
+        );
         return Ok(match result.status {
             MonitorStatus::Satisfied => ExitCode::SUCCESS,
             MonitorStatus::Violated => ExitCode::from(8),
         });
     }
 
-    if contains_model_limit_flag(option_args) {
-        let limits = parse_analysis_limits(option_args)?;
+    if options.has_model_limits {
+        let limits = AnalysisLimits::new(options.model_limits, options.product_limits);
         let result = check_monitor_with_limits(&model, &monitor, limits)
             .map_err(|error| error.to_string())?;
         print!("{}", render_analysis_monitor_report(model.name(), &result));
@@ -545,14 +606,22 @@ where
         });
     }
 
-    let limits = parse_product_limits(option_args)?;
-    let result = check_monitor_with_product_limits(&model, &monitor, limits)
-        .map_err(|error| error.to_string())?;
-    print!("{}", render_bounded_monitor_report(model.name(), &result));
-    Ok(match &result.outcome {
-        BoundedOutcome::Conclusive(MonitorStatus::Satisfied) => ExitCode::SUCCESS,
-        BoundedOutcome::Conclusive(MonitorStatus::Violated) => ExitCode::from(8),
-        BoundedOutcome::Inconclusive(_) => ExitCode::from(3),
+    if options.has_product_limits {
+        let result = check_monitor_with_product_limits(&model, &monitor, options.product_limits)
+            .map_err(|error| error.to_string())?;
+        print!("{}", render_bounded_monitor_report(model.name(), &result));
+        return Ok(match &result.outcome {
+            BoundedOutcome::Conclusive(MonitorStatus::Satisfied) => ExitCode::SUCCESS,
+            BoundedOutcome::Conclusive(MonitorStatus::Violated) => ExitCode::from(8),
+            BoundedOutcome::Inconclusive(_) => ExitCode::from(3),
+        });
+    }
+
+    let result = check_monitor(&model, &monitor).map_err(|error| error.to_string())?;
+    print!("{}", render_monitor_report(model.name(), &result));
+    Ok(match result.status {
+        MonitorStatus::Satisfied => ExitCode::SUCCESS,
+        MonitorStatus::Violated => ExitCode::from(8),
     })
 }
 
@@ -1221,7 +1290,7 @@ fn status_exit_code(status: VerificationStatus) -> ExitCode {
 }
 
 fn usage() -> String {
-    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | eventually <counter-three|counter-four|traffic-never> | respond <request-grant|request-grant-unfair|dual-grant|dual-grant-unfair-b> [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | monitor <session-ok|session-double-open|session-stuck> [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | buchi <pulses|pulses-unfair|finite-ignore|finite-strict> [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal <request-grant|request-grant-unfair|pulses|pulses-unfair> [--weak-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal check <request-grant|request-grant-unfair|pulses|pulses-unfair> <expression> [--weak-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal file <path> <expression> [--weak-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | state file <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition file <path> <reachable|all-eventually> <proposition> [--max-states N] [--max-transitions N] [--max-depth N] | proposition expr <path> <reachable|all-eventually> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition always <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N]]"
+    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | eventually <counter-three|counter-four|traffic-never> | respond <request-grant|request-grant-unfair|dual-grant|dual-grant-unfair-b> [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | monitor <session-ok|session-double-open|session-stuck|session-unfair-close|session-open-terminal> [--weak-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | buchi <pulses|pulses-unfair|finite-ignore|finite-strict> [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal <request-grant|request-grant-unfair|pulses|pulses-unfair> [--weak-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal check <request-grant|request-grant-unfair|pulses|pulses-unfair> <expression> [--weak-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal file <path> <expression> [--weak-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | state file <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition file <path> <reachable|all-eventually> <proposition> [--max-states N] [--max-transitions N] [--max-depth N] | proposition expr <path> <reachable|all-eventually> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition always <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N]]"
         .to_owned()
 }
 
