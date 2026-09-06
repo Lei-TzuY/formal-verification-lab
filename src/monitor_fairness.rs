@@ -11,8 +11,8 @@ use crate::graph::{
 use crate::model::TransitionSystem;
 use crate::monitor::{
     check_monitor, check_monitor_with_limits, check_monitor_with_product_limits,
-    AnalysisMonitorResult, BoundedMonitorResult, FiniteMonitor, MonitorCounterexample, MonitorError,
-    MonitorProductState, MonitorResult, MonitorStatus,
+    AnalysisMonitorResult, BoundedMonitorResult, FiniteMonitor, MonitorCounterexample,
+    MonitorError, MonitorProductState, MonitorResult, MonitorStatus,
 };
 use crate::product::{
     build_action_product, build_action_product_from_prefix_with_limits,
@@ -316,9 +316,10 @@ where
                 stem,
                 cycle,
             };
-            if best.as_ref().is_none_or(|current| {
-                candidate_key(&candidate) < candidate_key(current)
-            }) {
+            if best
+                .as_ref()
+                .is_none_or(|current| candidate_key(&candidate) < candidate_key(current))
+            {
                 best = Some(candidate);
             }
         }
