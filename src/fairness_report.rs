@@ -126,12 +126,8 @@ fn append_fairness(output: &mut String, strength: &str, actions: &[String]) {
     writeln!(output, "{strength} fairness actions: {}", actions.len())
         .expect("writing to String cannot fail");
     for action in actions {
-        writeln!(
-            output,
-            "{strength}-fair action: {}",
-            quote_action(action)
-        )
-        .expect("writing to String cannot fail");
+        writeln!(output, "{strength}-fair action: {}", quote_action(action))
+            .expect("writing to String cannot fail");
     }
 }
 
