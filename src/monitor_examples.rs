@@ -77,10 +77,13 @@ pub fn unfair_close_enabled_protocol() -> Result<TransitionSystem<SessionState>,
 /// progress condition is still active at the true terminal, so weak fairness
 /// must not excuse this violation.
 pub fn open_terminal_protocol() -> Result<TransitionSystem<SessionState>, ModelError> {
-    TransitionSystemBuilder::new("session-open-terminal", |state: &SessionState| match state {
-        SessionState::Closed => Ok(vec![Transition::new("open", SessionState::Open)]),
-        SessionState::Open | SessionState::Committed => Ok(Vec::new()),
-    })
+    TransitionSystemBuilder::new(
+        "session-open-terminal",
+        |state: &SessionState| match state {
+            SessionState::Closed => Ok(vec![Transition::new("open", SessionState::Open)]),
+            SessionState::Open | SessionState::Committed => Ok(Vec::new()),
+        },
+    )
     .state_variable("session", "session lifecycle with an open terminal")
     .initial_state(SessionState::Closed)
     .safety_invariant("recognized-session-state", |_state: &SessionState| true)
