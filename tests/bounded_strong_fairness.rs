@@ -8,8 +8,9 @@ use formal_verification_lab::buchi_examples::{
 use formal_verification_lab::{
     check_buchi_with_strong_fairness, check_buchi_with_strong_fairness_and_limits,
     check_buchi_with_strong_fairness_and_product_limits, AnalysisInconclusiveReason,
-    AnalysisLimits, AnalysisOutcome, AnalysisStage, BoundedOutcome, ExplorationLimits, Invariant,
-    InconclusiveReason, StateVariable, StrongFairness, TraceStep, Transition, TransitionSystem,
+    AnalysisLimits, AnalysisOutcome, AnalysisStage, BoundedOutcome, ExplorationLimits,
+    InconclusiveReason, Invariant, StateVariable, StrongFairness, TraceStep, Transition,
+    TransitionSystem,
 };
 use std::collections::VecDeque;
 
@@ -429,10 +430,7 @@ fn restricted_reachable(
     seen[goal]
 }
 
-fn subset_is_cyclic_strongly_connected(
-    retained: &[[bool; N]; N],
-    subset: usize,
-) -> bool {
+fn subset_is_cyclic_strongly_connected(retained: &[[bool; N]; N], subset: usize) -> bool {
     let members = (0..N)
         .filter(|node| subset_contains(subset, *node))
         .collect::<Vec<_>>();
@@ -579,9 +577,9 @@ fn two_node_graph_actions_and_transition_limits_match_independent_prefix_oracle(
                 } else {
                     assert_eq!(
                         result.outcome,
-                        BoundedOutcome::Inconclusive(
-                            InconclusiveReason::TransitionLimitReached { limit }
-                        ),
+                        BoundedOutcome::Inconclusive(InconclusiveReason::TransitionLimitReached {
+                            limit
+                        }),
                         "inconclusive graph={graph_mask} assignment={assignment} limit={limit}"
                     );
                     assert!(result.counterexample.is_none());
