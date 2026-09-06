@@ -46,8 +46,12 @@ pub fn render_analysis_weak_fair_temporal_report<S: Debug>(
 }
 
 fn append_weak_fairness(output: &mut String, fairness: &WeakFairness) {
-    writeln!(output, "weak fairness actions: {}", fairness.actions().len())
-        .expect("writing to String cannot fail");
+    writeln!(
+        output,
+        "weak fairness actions: {}",
+        fairness.actions().len()
+    )
+    .expect("writing to String cannot fail");
     for action in fairness.actions() {
         writeln!(output, "weak-fair action: {}", quote_action(action))
             .expect("writing to String cannot fail");
