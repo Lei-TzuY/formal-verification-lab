@@ -221,9 +221,9 @@ fn reachable_nodes(mask: usize) -> [bool; N] {
             if !reachable[from] {
                 continue;
             }
-            for to in 0..N {
+            for (to, target_reachable) in reachable.iter_mut().enumerate() {
                 if has_edge(mask, from, to) {
-                    reachable[to] = true;
+                    *target_reachable = true;
                 }
             }
         }
@@ -246,9 +246,9 @@ fn restricted_reachable(mask: usize, subset: usize, start: usize, goal: usize) -
             if !seen[from] || !subset_contains(subset, from) {
                 continue;
             }
-            for to in 0..N {
+            for (to, target_seen) in seen.iter_mut().enumerate() {
                 if subset_contains(subset, to) && has_edge(mask, from, to) {
-                    seen[to] = true;
+                    *target_seen = true;
                 }
             }
         }
