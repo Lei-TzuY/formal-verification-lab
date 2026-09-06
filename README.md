@@ -56,7 +56,7 @@ The model is captured once and the monitor runs over the captured labeled graph.
 
 `MultiResponseProperty` composes multiple named `trigger_i -> eventually response_i` clauses in one explicit product `(model_state, pending_bits)`. Each action updates every clause independently.
 
-Infinite failure is checked **per clause** by inducing the subgraph where `pending[i] = true`. This avoids the unsound shortcut of treating any cycle containing any pending bit as a violation if every individual clause is repeatedly discharged. Finite pending terminals take precedence; infinite witnesses identify the violated clause and contain a shortest global stem plus a deterministic closed cycle on which that clause stays pending.
+Infinite failure is checked **per clause** by inducing the subgraph where `pending[i] = true`. This avoids the unsound shortcut of treating any cycle containing any pending bit as a violation. Finite pending terminals take precedence; infinite witnesses identify the violated clause and contain a shortest global stem plus a deterministic closed cycle on which that clause stays pending.
 
 The M10 single-clause API is a compatibility adapter over this canonical engine. M11's independent generated oracle checks 16 graph masks × `7^4` edge-semantics assignments = **38,416** cases.
 
