@@ -222,10 +222,8 @@ fn empty_strong_fairness_is_exact_compatibility_for_all_limit_surfaces() {
 
     let staged = AnalysisLimits::new(transition_limit(2), transition_limit(2));
     assert_eq!(
-        check_multi_response_with_strong_fairness_and_limits(
-            &model, &property, &fairness, staged,
-        )
-        .unwrap(),
+        check_multi_response_with_strong_fairness_and_limits(&model, &property, &fairness, staged,)
+            .unwrap(),
         check_multi_response_with_limits(&model, &property, staged).unwrap()
     );
 }
