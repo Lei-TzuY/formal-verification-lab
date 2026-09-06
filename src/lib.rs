@@ -4,6 +4,8 @@
 //! from first principles. The semantic core is intentionally independent from
 //! the CLI so it can be reused by tests and future front ends.
 
+pub mod bounded;
+mod bounded_report;
 pub mod buchi;
 pub mod buchi_examples;
 pub mod buchi_report;
@@ -41,6 +43,7 @@ pub mod temporal;
 pub mod temporal_parse;
 pub mod temporal_report;
 
+pub use bounded::BoundedOutcome;
 pub use buchi::{
     check_buchi, AcceptanceSet, BuchiAutomaton, BuchiCounterexample, BuchiError, BuchiProductState,
     BuchiResult, BuchiStatus, FiniteRunPolicy,
@@ -55,14 +58,16 @@ pub use declarative::{
     parse_declarative_document, parse_declarative_model, DeclarativeDocument, DeclarativeModelError,
 };
 pub use eventuality::{
-    check_eventuality, EventualityCounterexample, EventualityError, EventualityProperty,
-    EventualityResult, EventualityStatus,
+    check_eventuality, check_eventuality_with_limits, BoundedEventualityResult,
+    EventualityCounterexample, EventualityError, EventualityProperty, EventualityResult,
+    EventualityStatus,
 };
 pub use eventuality_report::render_eventuality_report;
 pub use exact_state::{
-    check_exact_state_property, parse_exact_state_property, ExactStateBackend, ExactStateError,
-    ExactStateEvidence, ExactStateParseError, ExactStateParseErrorKind, ExactStatePropertySpec,
-    ExactStateResult, ExactStateStatus,
+    check_exact_state_property, check_exact_state_property_with_limits, parse_exact_state_property,
+    BoundedExactStateResult, ExactStateBackend, ExactStateError, ExactStateEvidence,
+    ExactStateParseError, ExactStateParseErrorKind, ExactStatePropertySpec, ExactStateResult,
+    ExactStateStatus,
 };
 pub use exact_state_report::render_exact_state_report;
 pub use model::{Invariant, ModelError, StateVariable, Transition, TransitionSystem};
@@ -77,15 +82,17 @@ pub use multi_response::{
 };
 pub use multi_response_report::render_multi_response_report;
 pub use property::{
-    check_deadlock, check_reachability, DeadlockError, DeadlockProperty, DeadlockResult,
-    DeadlockStatus, ReachabilityError, ReachabilityProperty, ReachabilityResult,
-    ReachabilityStatus,
+    check_deadlock, check_reachability, check_reachability_with_limits, BoundedReachabilityResult,
+    DeadlockError, DeadlockProperty, DeadlockResult, DeadlockStatus, ReachabilityError,
+    ReachabilityProperty, ReachabilityResult, ReachabilityStatus,
 };
 pub use proposition::{
-    check_proposition_property, PropositionError, PropositionPropertySpec, PropositionResult,
+    check_proposition_property, check_proposition_property_with_limits, BoundedPropositionResult,
+    PropositionError, PropositionPropertySpec, PropositionResult,
 };
 pub use proposition_expr::{
-    check_proposition_expression_property, parse_proposition_expression, PropositionExpression,
+    check_proposition_expression_property, check_proposition_expression_property_with_limits,
+    parse_proposition_expression, BoundedPropositionExpressionResult, PropositionExpression,
     PropositionExpressionError, PropositionExpressionParseError,
     PropositionExpressionParseErrorKind, PropositionExpressionPropertySpec,
     PropositionExpressionResult,
@@ -106,7 +113,8 @@ pub use response::{
 };
 pub use response_report::render_response_report;
 pub use safety::{
-    check_safety_assertion, PropositionSafetySpec, SafetyError, SafetyResult, SafetyStatus,
+    check_safety_assertion, check_safety_assertion_with_limits, BoundedSafetyResult,
+    PropositionSafetySpec, SafetyError, SafetyResult, SafetyStatus,
 };
 pub use safety_report::render_safety_report;
 pub use temporal::{

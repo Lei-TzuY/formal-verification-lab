@@ -1,4 +1,6 @@
-use crate::checker::{search_with_probes, ExplorationLimits, GraphSearchOutcome, TraceStep};
+use crate::checker::{
+    search_with_probes, ExplorationLimits, GraphSearchOutcome, InconclusiveReason, TraceStep,
+};
 use crate::model::{ModelError, Transition, TransitionSystem};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::hash::Hash;
@@ -22,6 +24,30 @@ pub(crate) struct CapturedReachableGraph<S> {
     pub(crate) discovered_states: usize,
     pub(crate) explored_transitions: usize,
     pub(crate) max_depth_reached: Option<usize>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum GraphCaptureCompletion {
+    Complete,
+    Inconclusive(InconclusiveReason),
+}
+
+/// A reachable-graph prefix produced by the canonical bounded BFS.
+///
+/// `graph` contains only transitions that were actually counted and whose
+/// targets were retained by the search. `known_terminal[id]` is true only when
+/// the model's full successor vector for that retained state was evaluated and
+/// proved empty. This lets higher-level properties use real finite/cycle
+/// counterexamples without mistaking an exploration cutoff for a terminal.
+#[derive(Debug, Clone)]
+pub(crate) struct BoundedCapturedReachableGraph<S> {
+    pub(crate) graph: ReachableGraph<S>,
+    pub(crate) discovered_states: usize,
+    pub(crate) checked_states: usize,
+    pub(crate) explored_transitions: usize,
+    pub(crate) max_depth_reached: Option<usize>,
+    pub(crate) completion: GraphCaptureCompletion,
+    pub(crate) known_terminal: Vec<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -66,6 +92,51 @@ where
         discovered_states: search.discovered_states,
         explored_transitions: search.explored_transitions,
         max_depth_reached: search.max_depth_reached,
+    })
+}
+
+/// Materialize the portion of the reachable graph that is justified by one
+/// canonical bounded BFS. The transition function is still called at most once
+/// per checked state. A cutoff never fabricates an absent edge or terminal.
+pub(crate) fn capture_reachable_graph_with_limits<S>(
+    model: &TransitionSystem<S>,
+    limits: ExplorationLimits,
+) -> Result<BoundedCapturedReachableGraph<S>, GraphCaptureError>
+where
+    S: Clone + Eq + Hash,
+{
+    let mut captured: Vec<(S, Vec<Transition<S>>)> = Vec::new();
+    let search = search_with_probes(
+        model,
+        limits,
+        |_state| None,
+        |state, transitions| {
+            captured.push((state.clone(), transitions.to_vec()));
+            None
+        },
+    )?;
+
+    let completion = match search.outcome {
+        GraphSearchOutcome::Exhausted => GraphCaptureCompletion::Complete,
+        GraphSearchOutcome::Inconclusive(reason) => GraphCaptureCompletion::Inconclusive(reason),
+        GraphSearchOutcome::Match { .. } => return Err(GraphCaptureError::UnexpectedInconclusive),
+    };
+    let (graph, known_terminal) = build_bounded_graph(
+        model,
+        captured,
+        search.discovered_states,
+        search.explored_transitions,
+        limits,
+    )?;
+
+    Ok(BoundedCapturedReachableGraph {
+        graph,
+        discovered_states: search.discovered_states,
+        checked_states: search.checked_states,
+        explored_transitions: search.explored_transitions,
+        max_depth_reached: search.max_depth_reached,
+        completion,
+        known_terminal,
     })
 }
 
@@ -122,6 +193,97 @@ where
         outgoing,
         initial_ids,
     })
+}
+
+fn build_bounded_graph<S>(
+    model: &TransitionSystem<S>,
+    captured: Vec<(S, Vec<Transition<S>>)>,
+    discovered_states: usize,
+    explored_transitions: usize,
+    limits: ExplorationLimits,
+) -> Result<(ReachableGraph<S>, Vec<bool>), GraphCaptureError>
+where
+    S: Clone + Eq + Hash,
+{
+    let mut states = Vec::new();
+    let mut state_to_id = HashMap::new();
+    let mut depths = Vec::new();
+    let mut outgoing: Vec<Vec<SnapshotEdge>> = Vec::new();
+    let mut known_terminal = Vec::new();
+    let mut initial_ids = Vec::new();
+
+    for initial in model.initial_states() {
+        if state_to_id.contains_key(initial) {
+            continue;
+        }
+        if states.len() >= discovered_states {
+            break;
+        }
+        let id = states.len();
+        states.push(initial.clone());
+        state_to_id.insert(initial.clone(), id);
+        depths.push(0_usize);
+        outgoing.push(Vec::new());
+        known_terminal.push(false);
+        initial_ids.push(id);
+    }
+
+    let mut remaining_transitions = explored_transitions;
+    for (state, transitions) in captured {
+        let source = state_to_id
+            .get(&state)
+            .copied()
+            .ok_or(GraphCaptureError::SnapshotTargetMissing)?;
+        if transitions.is_empty() {
+            known_terminal[source] = true;
+        }
+
+        for transition in transitions {
+            if remaining_transitions == 0 {
+                break;
+            }
+            remaining_transitions -= 1;
+
+            let target = if let Some(target) = state_to_id.get(&transition.next).copied() {
+                Some(target)
+            } else {
+                let blocked_by_depth = limits
+                    .max_depth
+                    .is_some_and(|limit| depths[source] >= limit);
+                if blocked_by_depth || states.len() >= discovered_states {
+                    None
+                } else {
+                    let id = states.len();
+                    states.push(transition.next.clone());
+                    state_to_id.insert(transition.next.clone(), id);
+                    depths.push(depths[source] + 1);
+                    outgoing.push(Vec::new());
+                    known_terminal.push(false);
+                    Some(id)
+                }
+            };
+
+            if let Some(target) = target {
+                outgoing[source].push(SnapshotEdge {
+                    action: transition.action,
+                    target,
+                });
+            }
+        }
+    }
+
+    if remaining_transitions != 0 || states.len() != discovered_states {
+        return Err(GraphCaptureError::SnapshotTargetMissing);
+    }
+
+    Ok((
+        ReachableGraph {
+            states,
+            outgoing,
+            initial_ids,
+        },
+        known_terminal,
+    ))
 }
 
 /// Build a dense graph induced by `included`, preserving original discovery

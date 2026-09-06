@@ -1,3 +1,4 @@
+use formal_verification_lab::bounded::BoundedOutcome;
 use formal_verification_lab::buchi::{check_buchi, BuchiAutomaton, BuchiStatus, FiniteRunPolicy};
 use formal_verification_lab::buchi_examples::{
     alternating_pulses, finite_quiet_run, pulse_automaton, unfair_second_pulse,
@@ -9,9 +10,12 @@ use formal_verification_lab::eventuality::{
 };
 use formal_verification_lab::eventuality_report::render_eventuality_report;
 use formal_verification_lab::exact_state::{
-    check_exact_state_property, parse_exact_state_property, ExactStateStatus,
+    check_exact_state_property, check_exact_state_property_with_limits, parse_exact_state_property,
+    ExactStateStatus,
 };
-use formal_verification_lab::exact_state_report::render_exact_state_report;
+use formal_verification_lab::exact_state_report::{
+    render_bounded_exact_state_report, render_exact_state_report,
+};
 use formal_verification_lab::examples::{
     bounded_counter, buggy_mutex, buggy_peterson_mutex, commuting_counters, peterson_mutex,
     traffic_light, CounterState, TrafficLightState,
@@ -32,13 +36,19 @@ use formal_verification_lab::property::{
     check_deadlock, check_reachability, DeadlockProperty, DeadlockStatus, ReachabilityProperty,
     ReachabilityStatus,
 };
-use formal_verification_lab::proposition::{check_proposition_property, PropositionPropertySpec};
-use formal_verification_lab::proposition_expr::{
-    check_proposition_expression_property, parse_proposition_expression,
-    PropositionExpressionPropertySpec,
+use formal_verification_lab::proposition::{
+    check_proposition_property, check_proposition_property_with_limits, PropositionPropertySpec,
 };
-use formal_verification_lab::proposition_expr_report::render_proposition_expression_report;
-use formal_verification_lab::proposition_report::render_proposition_report;
+use formal_verification_lab::proposition_expr::{
+    check_proposition_expression_property, check_proposition_expression_property_with_limits,
+    parse_proposition_expression, PropositionExpressionPropertySpec,
+};
+use formal_verification_lab::proposition_expr_report::{
+    render_bounded_proposition_expression_report, render_proposition_expression_report,
+};
+use formal_verification_lab::proposition_report::{
+    render_bounded_proposition_report, render_proposition_report,
+};
 use formal_verification_lab::recurrence::analyze_recurrence;
 use formal_verification_lab::reduction::{audit_sleep_set_reduction, IndependenceRelation};
 use formal_verification_lab::report::{
@@ -50,9 +60,9 @@ use formal_verification_lab::response_examples::{
 };
 use formal_verification_lab::response_report::render_response_report;
 use formal_verification_lab::safety::{
-    check_safety_assertion, PropositionSafetySpec, SafetyStatus,
+    check_safety_assertion, check_safety_assertion_with_limits, PropositionSafetySpec, SafetyStatus,
 };
-use formal_verification_lab::safety_report::render_safety_report;
+use formal_verification_lab::safety_report::{render_bounded_safety_report, render_safety_report};
 use formal_verification_lab::temporal::{
     check_action_temporal, ActionAtom, ActionTemporalSpec, TemporalStatus,
 };
@@ -570,47 +580,71 @@ where
 
 fn state_command(args: &[String]) -> Result<ExitCode, String> {
     match args {
-        [command, path, expression] if command == "file" => run_state_file(path, expression),
+        [command, path, expression, option_args @ ..] if command == "file" => {
+            run_state_file(path, expression, option_args)
+        }
         [query] => Err(format!(
-            "unknown state query '{query}'; expected 'file <path> <expression>'"
+            "unknown state query '{query}'; expected 'file <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N]'"
         )),
         _ => Err(usage()),
     }
 }
 
-fn run_state_file(path: &str, expression: &str) -> Result<ExitCode, String> {
+fn run_state_file(
+    path: &str,
+    expression: &str,
+    option_args: &[String],
+) -> Result<ExitCode, String> {
     let input = fs::read_to_string(path)
         .map_err(|error| format!("failed to read declarative model '{path}': {error}"))?;
     let model = parse_declarative_model(&input).map_err(|error| error.to_string())?;
     let spec =
         parse_exact_state_property("cli-state", expression).map_err(|error| error.to_string())?;
-    let result = check_exact_state_property(&model, &spec).map_err(|error| error.to_string())?;
-    print!("{}", render_exact_state_report(model.name(), &result));
-    Ok(match result.status {
-        ExactStateStatus::Satisfied => ExitCode::SUCCESS,
-        ExactStateStatus::Violated => ExitCode::from(11),
-    })
+
+    if option_args.is_empty() {
+        let result =
+            check_exact_state_property(&model, &spec).map_err(|error| error.to_string())?;
+        print!("{}", render_exact_state_report(model.name(), &result));
+        return Ok(match result.status {
+            ExactStateStatus::Satisfied => ExitCode::SUCCESS,
+            ExactStateStatus::Violated => ExitCode::from(11),
+        });
+    }
+
+    let limits = parse_limits(option_args)?;
+    let result = check_exact_state_property_with_limits(&model, &spec, limits)
+        .map_err(|error| error.to_string())?;
+    print!(
+        "{}",
+        render_bounded_exact_state_report(model.name(), &result)
+    );
+    Ok(bounded_state_exit_code(&result.outcome))
 }
 
 fn proposition_command(args: &[String]) -> Result<ExitCode, String> {
     match args {
-        [command, path, mode, proposition] if command == "file" => {
-            run_proposition_file(path, mode, proposition)
+        [command, path, mode, proposition, option_args @ ..] if command == "file" => {
+            run_proposition_file(path, mode, proposition, option_args)
         }
-        [command, path, mode, expression] if command == "expr" => {
-            run_proposition_expression_file(path, mode, expression)
+        [command, path, mode, expression, option_args @ ..] if command == "expr" => {
+            run_proposition_expression_file(path, mode, expression, option_args)
         }
-        [command, path, expression] if command == "always" => {
-            run_safety_file(path, expression)
+        [command, path, expression, option_args @ ..] if command == "always" => {
+            run_safety_file(path, expression, option_args)
         }
         [query] => Err(format!(
-            "unknown proposition query '{query}'; expected 'file <path> <reachable|all-eventually> <proposition>', 'expr <path> <reachable|all-eventually> <expression>', or 'always <path> <expression>'"
+            "unknown proposition query '{query}'; expected 'file <path> <reachable|all-eventually> <proposition> [limits]', 'expr <path> <reachable|all-eventually> <expression> [limits]', or 'always <path> <expression> [limits]'"
         )),
         _ => Err(usage()),
     }
 }
 
-fn run_proposition_file(path: &str, mode: &str, proposition: &str) -> Result<ExitCode, String> {
+fn run_proposition_file(
+    path: &str,
+    mode: &str,
+    proposition: &str,
+    option_args: &[String],
+) -> Result<ExitCode, String> {
     let input = fs::read_to_string(path)
         .map_err(|error| format!("failed to read declarative model '{path}': {error}"))?;
     let document = parse_declarative_document(&input).map_err(|error| error.to_string())?;
@@ -624,21 +658,35 @@ fn run_proposition_file(path: &str, mode: &str, proposition: &str) -> Result<Exi
         }
     }
     .map_err(|error| error.to_string())?;
-    let result = check_proposition_property(&document, &spec).map_err(|error| error.to_string())?;
+
+    if option_args.is_empty() {
+        let result =
+            check_proposition_property(&document, &spec).map_err(|error| error.to_string())?;
+        print!(
+            "{}",
+            render_proposition_report(document.model().name(), &result)
+        );
+        return Ok(match result.status {
+            ExactStateStatus::Satisfied => ExitCode::SUCCESS,
+            ExactStateStatus::Violated => ExitCode::from(11),
+        });
+    }
+
+    let limits = parse_limits(option_args)?;
+    let result = check_proposition_property_with_limits(&document, &spec, limits)
+        .map_err(|error| error.to_string())?;
     print!(
         "{}",
-        render_proposition_report(document.model().name(), &result)
+        render_bounded_proposition_report(document.model().name(), &result)
     );
-    Ok(match result.status {
-        ExactStateStatus::Satisfied => ExitCode::SUCCESS,
-        ExactStateStatus::Violated => ExitCode::from(11),
-    })
+    Ok(bounded_state_exit_code(&result.outcome))
 }
 
 fn run_proposition_expression_file(
     path: &str,
     mode: &str,
     expression: &str,
+    option_args: &[String],
 ) -> Result<ExitCode, String> {
     let input = fs::read_to_string(path)
         .map_err(|error| format!("failed to read declarative model '{path}': {error}"))?;
@@ -659,31 +707,71 @@ fn run_proposition_expression_file(
         }
     }
     .map_err(|error| error.to_string())?;
-    let result = check_proposition_expression_property(&document, &spec)
+
+    if option_args.is_empty() {
+        let result = check_proposition_expression_property(&document, &spec)
+            .map_err(|error| error.to_string())?;
+        print!(
+            "{}",
+            render_proposition_expression_report(document.model().name(), &result)
+        );
+        return Ok(match result.status {
+            ExactStateStatus::Satisfied => ExitCode::SUCCESS,
+            ExactStateStatus::Violated => ExitCode::from(11),
+        });
+    }
+
+    let limits = parse_limits(option_args)?;
+    let result = check_proposition_expression_property_with_limits(&document, &spec, limits)
         .map_err(|error| error.to_string())?;
     print!(
         "{}",
-        render_proposition_expression_report(document.model().name(), &result)
+        render_bounded_proposition_expression_report(document.model().name(), &result)
     );
-    Ok(match result.status {
-        ExactStateStatus::Satisfied => ExitCode::SUCCESS,
-        ExactStateStatus::Violated => ExitCode::from(11),
-    })
+    Ok(bounded_state_exit_code(&result.outcome))
 }
 
-fn run_safety_file(path: &str, expression: &str) -> Result<ExitCode, String> {
+fn run_safety_file(
+    path: &str,
+    expression: &str,
+    option_args: &[String],
+) -> Result<ExitCode, String> {
     let input = fs::read_to_string(path)
         .map_err(|error| format!("failed to read declarative model '{path}': {error}"))?;
     let document = parse_declarative_document(&input).map_err(|error| error.to_string())?;
     let expression = parse_proposition_expression(expression).map_err(|error| error.to_string())?;
     let spec = PropositionSafetySpec::always("cli-safety", expression)
         .map_err(|error| error.to_string())?;
-    let result = check_safety_assertion(&document, &spec).map_err(|error| error.to_string())?;
-    print!("{}", render_safety_report(document.model().name(), &result));
-    Ok(match result.status {
-        SafetyStatus::Safe => ExitCode::SUCCESS,
-        SafetyStatus::Violated => ExitCode::from(12),
+
+    if option_args.is_empty() {
+        let result = check_safety_assertion(&document, &spec).map_err(|error| error.to_string())?;
+        print!("{}", render_safety_report(document.model().name(), &result));
+        return Ok(match result.status {
+            SafetyStatus::Safe => ExitCode::SUCCESS,
+            SafetyStatus::Violated => ExitCode::from(12),
+        });
+    }
+
+    let limits = parse_limits(option_args)?;
+    let result = check_safety_assertion_with_limits(&document, &spec, limits)
+        .map_err(|error| error.to_string())?;
+    print!(
+        "{}",
+        render_bounded_safety_report(document.model().name(), &result)
+    );
+    Ok(match &result.outcome {
+        BoundedOutcome::Conclusive(SafetyStatus::Safe) => ExitCode::SUCCESS,
+        BoundedOutcome::Conclusive(SafetyStatus::Violated) => ExitCode::from(12),
+        BoundedOutcome::Inconclusive(_) => ExitCode::from(3),
     })
+}
+
+fn bounded_state_exit_code(outcome: &BoundedOutcome<ExactStateStatus>) -> ExitCode {
+    match outcome {
+        BoundedOutcome::Conclusive(ExactStateStatus::Satisfied) => ExitCode::SUCCESS,
+        BoundedOutcome::Conclusive(ExactStateStatus::Violated) => ExitCode::from(11),
+        BoundedOutcome::Inconclusive(_) => ExitCode::from(3),
+    }
 }
 
 fn parse_limits(args: &[String]) -> Result<ExplorationLimits, String> {
@@ -749,7 +837,7 @@ fn status_exit_code(status: VerificationStatus) -> ExitCode {
 }
 
 fn usage() -> String {
-    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | eventually <counter-three|counter-four|traffic-never> | respond <request-grant|request-grant-unfair|dual-grant|dual-grant-unfair-b> | monitor <session-ok|session-double-open|session-stuck> | buchi <pulses|pulses-unfair|finite-ignore|finite-strict> | temporal <request-grant|request-grant-unfair|pulses|pulses-unfair> | temporal check <request-grant|request-grant-unfair|pulses|pulses-unfair> <expression> | temporal file <path> <expression> | state file <path> <expression> | proposition file <path> <reachable|all-eventually> <proposition> | proposition expr <path> <reachable|all-eventually> <expression> | proposition always <path> <expression>]"
+    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | eventually <counter-three|counter-four|traffic-never> | respond <request-grant|request-grant-unfair|dual-grant|dual-grant-unfair-b> | monitor <session-ok|session-double-open|session-stuck> | buchi <pulses|pulses-unfair|finite-ignore|finite-strict> | temporal <request-grant|request-grant-unfair|pulses|pulses-unfair> | temporal check <request-grant|request-grant-unfair|pulses|pulses-unfair> <expression> | temporal file <path> <expression> | state file <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition file <path> <reachable|all-eventually> <proposition> [--max-states N] [--max-transitions N] [--max-depth N] | proposition expr <path> <reachable|all-eventually> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition always <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N]]"
         .to_owned()
 }
 

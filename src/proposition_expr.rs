@@ -1,11 +1,14 @@
+use crate::bounded::BoundedOutcome;
+use crate::checker::ExplorationLimits;
 use crate::declarative::DeclarativeDocument;
 use crate::eventuality::{
-    check_eventuality, EventualityCounterexample, EventualityError, EventualityProperty,
-    EventualityStatus,
+    check_eventuality, check_eventuality_with_limits, EventualityCounterexample, EventualityError,
+    EventualityProperty, EventualityStatus,
 };
 use crate::exact_state::{ExactStateBackend, ExactStateEvidence, ExactStateStatus};
 use crate::property::{
-    check_reachability, ReachabilityError, ReachabilityProperty, ReachabilityStatus,
+    check_reachability, check_reachability_with_limits, ReachabilityError, ReachabilityProperty,
+    ReachabilityStatus,
 };
 use std::collections::{HashMap, HashSet};
 use std::fmt;
@@ -244,6 +247,19 @@ pub struct PropositionExpressionResult {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BoundedPropositionExpressionResult {
+    pub property: String,
+    pub expression: String,
+    pub backend: ExactStateBackend,
+    pub outcome: BoundedOutcome<ExactStateStatus>,
+    pub discovered_states: usize,
+    pub checked_states: usize,
+    pub explored_transitions: usize,
+    pub max_depth_reached: Option<usize>,
+    pub evidence: Option<ExactStateEvidence>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PropositionExpressionError {
     EmptyPropertyName,
     EmptyProposition,
@@ -295,6 +311,22 @@ pub fn check_proposition_expression_property(
     }
 }
 
+pub fn check_proposition_expression_property_with_limits(
+    document: &DeclarativeDocument,
+    spec: &PropositionExpressionPropertySpec,
+    limits: ExplorationLimits,
+) -> Result<BoundedPropositionExpressionResult, PropositionExpressionError> {
+    let members = resolve_expression(document, &spec.expression)?;
+    match spec.kind {
+        PropositionExpressionPropertyKind::Reachable => {
+            check_reachable_with_limits(document, spec, members, limits)
+        }
+        PropositionExpressionPropertyKind::AllEventually => {
+            check_all_eventually_with_limits(document, spec, members, limits)
+        }
+    }
+}
+
 fn check_reachable(
     document: &DeclarativeDocument,
     spec: &PropositionExpressionPropertySpec,
@@ -324,6 +356,43 @@ fn check_reachable(
     })
 }
 
+fn check_reachable_with_limits(
+    document: &DeclarativeDocument,
+    spec: &PropositionExpressionPropertySpec,
+    members: HashMap<String, HashSet<String>>,
+    limits: ExplorationLimits,
+) -> Result<BoundedPropositionExpressionResult, PropositionExpressionError> {
+    let expression = spec.expression.clone();
+    let property = ReachabilityProperty::new(spec.name.clone(), move |state: &String| {
+        expression.evaluate_resolved(&members, state)
+    })?;
+    let result = check_reachability_with_limits(document.model(), &property, limits)?;
+    let evidence = result
+        .witness
+        .map(|trace| ExactStateEvidence::ReachabilityWitness { trace });
+    let outcome = match result.outcome {
+        BoundedOutcome::Conclusive(ReachabilityStatus::Reachable) => {
+            BoundedOutcome::Conclusive(ExactStateStatus::Satisfied)
+        }
+        BoundedOutcome::Conclusive(ReachabilityStatus::Unreachable) => {
+            BoundedOutcome::Conclusive(ExactStateStatus::Violated)
+        }
+        BoundedOutcome::Inconclusive(reason) => BoundedOutcome::Inconclusive(reason),
+    };
+
+    Ok(BoundedPropositionExpressionResult {
+        property: result.property,
+        expression: spec.expression.canonical_expression(),
+        backend: ExactStateBackend::Reachability,
+        outcome,
+        discovered_states: result.discovered_states,
+        checked_states: result.checked_states,
+        explored_transitions: result.explored_transitions,
+        max_depth_reached: result.max_depth_reached,
+        evidence,
+    })
+}
+
 fn check_all_eventually(
     document: &DeclarativeDocument,
     spec: &PropositionExpressionPropertySpec,
@@ -334,15 +403,7 @@ fn check_all_eventually(
         expression.evaluate_resolved(&members, state)
     })?;
     let result = check_eventuality(document.model(), &property)?;
-    let evidence = match result.counterexample {
-        None => None,
-        Some(EventualityCounterexample::Finite { trace }) => {
-            Some(ExactStateEvidence::EventualityFiniteCounterexample { trace })
-        }
-        Some(EventualityCounterexample::Infinite { stem, cycle }) => {
-            Some(ExactStateEvidence::EventualityInfiniteCounterexample { stem, cycle })
-        }
-    };
+    let evidence = normalize_eventuality_evidence(result.counterexample);
 
     Ok(PropositionExpressionResult {
         property: result.property,
@@ -357,6 +418,55 @@ fn check_all_eventually(
         max_depth_reached: result.max_depth_reached,
         evidence,
     })
+}
+
+fn check_all_eventually_with_limits(
+    document: &DeclarativeDocument,
+    spec: &PropositionExpressionPropertySpec,
+    members: HashMap<String, HashSet<String>>,
+    limits: ExplorationLimits,
+) -> Result<BoundedPropositionExpressionResult, PropositionExpressionError> {
+    let expression = spec.expression.clone();
+    let property = EventualityProperty::new(spec.name.clone(), move |state: &String| {
+        expression.evaluate_resolved(&members, state)
+    })?;
+    let result = check_eventuality_with_limits(document.model(), &property, limits)?;
+    let evidence = normalize_eventuality_evidence(result.counterexample);
+    let outcome = match result.outcome {
+        BoundedOutcome::Conclusive(EventualityStatus::Satisfied) => {
+            BoundedOutcome::Conclusive(ExactStateStatus::Satisfied)
+        }
+        BoundedOutcome::Conclusive(EventualityStatus::Violated) => {
+            BoundedOutcome::Conclusive(ExactStateStatus::Violated)
+        }
+        BoundedOutcome::Inconclusive(reason) => BoundedOutcome::Inconclusive(reason),
+    };
+
+    Ok(BoundedPropositionExpressionResult {
+        property: result.property,
+        expression: spec.expression.canonical_expression(),
+        backend: ExactStateBackend::Eventuality,
+        outcome,
+        discovered_states: result.discovered_states,
+        checked_states: result.checked_states,
+        explored_transitions: result.explored_transitions,
+        max_depth_reached: result.max_depth_reached,
+        evidence,
+    })
+}
+
+fn normalize_eventuality_evidence(
+    counterexample: Option<EventualityCounterexample<String>>,
+) -> Option<ExactStateEvidence> {
+    match counterexample {
+        None => None,
+        Some(EventualityCounterexample::Finite { trace }) => {
+            Some(ExactStateEvidence::EventualityFiniteCounterexample { trace })
+        }
+        Some(EventualityCounterexample::Infinite { stem, cycle }) => {
+            Some(ExactStateEvidence::EventualityInfiniteCounterexample { stem, cycle })
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
