@@ -249,9 +249,7 @@ fn strong_fair_response_violation_remains_normalized_to_response_obligation() {
     assert_eq!(result.backend, TemporalBackend::Response);
     assert_eq!(result.status, TemporalStatus::Violated);
     let Some(formal_verification_lab::TemporalCounterexample::Infinite {
-        obligation,
-        cycle,
-        ..
+        obligation, cycle, ..
     }) = result.counterexample
     else {
         panic!("expected normalized response lasso");
