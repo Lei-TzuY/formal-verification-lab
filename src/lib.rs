@@ -5,6 +5,7 @@
 //! the CLI so it can be reused by tests and future front ends.
 
 pub mod bounded;
+pub mod bounded_fairness;
 mod bounded_report;
 pub mod buchi;
 pub mod buchi_examples;
@@ -48,6 +49,7 @@ pub mod temporal_report;
 pub use bounded::{
     AnalysisInconclusiveReason, AnalysisLimits, AnalysisOutcome, AnalysisStage, BoundedOutcome,
 };
+pub use bounded_fairness::check_buchi_with_weak_fairness_and_product_limits;
 pub use buchi::{
     check_buchi, check_buchi_with_limits, AcceptanceSet, AnalysisBuchiResult, BuchiAutomaton,
     BuchiCounterexample, BuchiError, BuchiProductState, BuchiResult, BuchiStatus, FiniteRunPolicy,
