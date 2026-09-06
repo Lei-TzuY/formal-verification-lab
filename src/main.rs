@@ -25,6 +25,8 @@ use formal_verification_lab::examples::{
     bounded_counter, buggy_mutex, buggy_peterson_mutex, commuting_counters, peterson_mutex,
     traffic_light, CounterState, TrafficLightState,
 };
+use formal_verification_lab::fairness::WeakFairness;
+use formal_verification_lab::fairness_report::render_weak_fair_temporal_report;
 use formal_verification_lab::monitor::{
     check_monitor, check_monitor_with_limits, check_monitor_with_product_limits, FiniteMonitor,
     MonitorStatus,
@@ -85,7 +87,8 @@ use formal_verification_lab::safety::{
 use formal_verification_lab::safety_report::{render_bounded_safety_report, render_safety_report};
 use formal_verification_lab::temporal::{
     check_action_temporal, check_action_temporal_with_limits,
-    check_action_temporal_with_product_limits, ActionAtom, ActionTemporalSpec, TemporalStatus,
+    check_action_temporal_with_product_limits, check_action_temporal_with_weak_fairness,
+    ActionAtom, ActionTemporalSpec, TemporalStatus,
 };
 use formal_verification_lab::temporal_parse::parse_action_temporal;
 use formal_verification_lab::temporal_report::{
@@ -729,6 +732,26 @@ fn run_temporal<S>(
 where
     S: Clone + Eq + std::hash::Hash + std::fmt::Debug,
 {
+    if contains_weak_fairness_flag(option_args) {
+        if contains_temporal_limit_flag(option_args) {
+            return Err(
+                "weak fairness cannot be combined with bounded or staged temporal limits"
+                    .to_owned(),
+            );
+        }
+        let fairness = parse_weak_fairness(option_args)?;
+        let result = check_action_temporal_with_weak_fairness(&model, &spec, &fairness)
+            .map_err(|error| error.to_string())?;
+        print!(
+            "{}",
+            render_weak_fair_temporal_report(model.name(), &result, &fairness)
+        );
+        return Ok(match result.status {
+            TemporalStatus::Satisfied => ExitCode::SUCCESS,
+            TemporalStatus::Violated => ExitCode::from(10),
+        });
+    }
+
     if option_args.is_empty() {
         let result = check_action_temporal(&model, &spec).map_err(|error| error.to_string())?;
         print!("{}", render_temporal_report(model.name(), &result));
@@ -979,6 +1002,41 @@ fn contains_model_limit_flag(args: &[String]) -> bool {
     })
 }
 
+fn contains_weak_fairness_flag(args: &[String]) -> bool {
+    args.iter().any(|arg| arg == "--weak-fair-action")
+}
+
+fn contains_temporal_limit_flag(args: &[String]) -> bool {
+    args.iter().any(|arg| {
+        matches!(
+            arg.as_str(),
+            "--max-model-states"
+                | "--max-model-transitions"
+                | "--max-model-depth"
+                | "--max-product-states"
+                | "--max-product-transitions"
+                | "--max-product-depth"
+        )
+    })
+}
+
+fn parse_weak_fairness(args: &[String]) -> Result<WeakFairness, String> {
+    let mut actions = Vec::new();
+    let mut index = 0;
+    while index < args.len() {
+        let flag = args[index].as_str();
+        if flag != "--weak-fair-action" {
+            return Err(format!("unknown option '{flag}'\n{}", usage()));
+        }
+        let action = args
+            .get(index + 1)
+            .ok_or_else(|| "option '--weak-fair-action' requires an action value".to_owned())?;
+        actions.push(action.clone());
+        index += 2;
+    }
+    WeakFairness::new(actions).map_err(|error| error.to_string())
+}
+
 fn parse_analysis_limits(args: &[String]) -> Result<AnalysisLimits, String> {
     let mut model = ExplorationLimits::unbounded();
     let mut product = ExplorationLimits::unbounded();
@@ -1080,7 +1138,7 @@ fn status_exit_code(status: VerificationStatus) -> ExitCode {
 }
 
 fn usage() -> String {
-    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | eventually <counter-three|counter-four|traffic-never> | respond <request-grant|request-grant-unfair|dual-grant|dual-grant-unfair-b> [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | monitor <session-ok|session-double-open|session-stuck> [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | buchi <pulses|pulses-unfair|finite-ignore|finite-strict> [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal <request-grant|request-grant-unfair|pulses|pulses-unfair> [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal check <request-grant|request-grant-unfair|pulses|pulses-unfair> <expression> [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal file <path> <expression> [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | state file <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition file <path> <reachable|all-eventually> <proposition> [--max-states N] [--max-transitions N] [--max-depth N] | proposition expr <path> <reachable|all-eventually> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition always <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N]]"
+    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | eventually <counter-three|counter-four|traffic-never> | respond <request-grant|request-grant-unfair|dual-grant|dual-grant-unfair-b> [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | monitor <session-ok|session-double-open|session-stuck> [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | buchi <pulses|pulses-unfair|finite-ignore|finite-strict> [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal <request-grant|request-grant-unfair|pulses|pulses-unfair> [--weak-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal check <request-grant|request-grant-unfair|pulses|pulses-unfair> <expression> [--weak-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal file <path> <expression> [--weak-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | state file <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition file <path> <reachable|all-eventually> <proposition> [--max-states N] [--max-transitions N] [--max-depth N] | proposition expr <path> <reachable|all-eventually> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition always <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N]]"
         .to_owned()
 }
 
