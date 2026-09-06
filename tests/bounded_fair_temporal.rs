@@ -1,11 +1,12 @@
 use formal_verification_lab::buchi_examples::unfair_second_pulse;
+use formal_verification_lab::response_examples::unfair_request_grant_protocol;
 use formal_verification_lab::{
     check_action_temporal_with_limits, check_action_temporal_with_product_limits,
     check_action_temporal_with_weak_fairness, check_action_temporal_with_weak_fairness_and_limits,
     check_action_temporal_with_weak_fairness_and_product_limits, ActionAtom, ActionTemporalSpec,
     AnalysisInconclusiveReason, AnalysisLimits, AnalysisOutcome, AnalysisStage, BoundedOutcome,
-    ExplorationLimits, InconclusiveReason, TemporalError, TemporalObligation, TemporalStatus,
-    WeakFairness,
+    ExplorationLimits, InconclusiveReason, TemporalCounterexample, TemporalObligation,
+    TemporalStatus, WeakFairness,
 };
 
 fn recurring_spec() -> ActionTemporalSpec {
@@ -96,7 +97,7 @@ fn retained_taken_fair_cycle_stays_conclusive_through_temporal_frontend() {
         BoundedOutcome::Conclusive(TemporalStatus::Violated)
     );
     let counterexample = result.counterexample.expect("real retained lasso");
-    let formal_verification_lab::TemporalCounterexample::Infinite {
+    let TemporalCounterexample::Infinite {
         obligation, cycle, ..
     } = counterexample
     else {
@@ -182,30 +183,81 @@ fn generous_staged_limits_match_unbounded_weak_fair_temporal_result() {
 }
 
 #[test]
-fn response_fairness_still_fails_closed_under_both_limit_surfaces() {
-    let model = unfair_second_pulse().unwrap();
+fn response_fairness_product_limits_preserve_cutoff_honesty_and_real_cycles() {
+    let model = unfair_request_grant_protocol().unwrap();
     let spec = response_spec();
-    let fairness = WeakFairness::new(["grant"]).unwrap();
 
-    let product = check_action_temporal_with_weak_fairness_and_product_limits(
+    let hidden_grant = check_action_temporal_with_weak_fairness_and_product_limits(
         &model,
         &spec,
-        &fairness,
-        ExplorationLimits::unbounded(),
+        &WeakFairness::new(["grant"]).unwrap(),
+        transition_limit(2),
+    )
+    .unwrap();
+    assert_eq!(
+        hidden_grant.outcome,
+        BoundedOutcome::Inconclusive(InconclusiveReason::TransitionLimitReached { limit: 2 })
+    );
+    assert!(hidden_grant.counterexample.is_none());
+
+    let retained_wait = check_action_temporal_with_weak_fairness_and_product_limits(
+        &model,
+        &spec,
+        &WeakFairness::new(["wait"]).unwrap(),
+        transition_limit(2),
+    )
+    .unwrap();
+    assert_eq!(
+        retained_wait.outcome,
+        BoundedOutcome::Conclusive(TemporalStatus::Violated)
     );
     assert!(matches!(
-        product,
-        Err(TemporalError::WeakFairnessUnsupportedForResponse)
+        retained_wait.counterexample,
+        Some(TemporalCounterexample::Infinite {
+            obligation: TemporalObligation::Response,
+            ..
+        })
     ));
+}
 
-    let staged = check_action_temporal_with_weak_fairness_and_limits(
+#[test]
+fn response_fairness_staged_limits_preserve_enablement_provenance() {
+    let model = unfair_request_grant_protocol().unwrap();
+    let spec = response_spec();
+    let limits = AnalysisLimits::new(transition_limit(2), ExplorationLimits::unbounded());
+
+    let hidden_grant = check_action_temporal_with_weak_fairness_and_limits(
         &model,
         &spec,
-        &fairness,
-        AnalysisLimits::unbounded(),
+        &WeakFairness::new(["grant"]).unwrap(),
+        limits,
+    )
+    .unwrap();
+    assert_eq!(
+        hidden_grant.outcome,
+        AnalysisOutcome::Inconclusive(AnalysisInconclusiveReason {
+            stage: AnalysisStage::Model,
+            reason: InconclusiveReason::TransitionLimitReached { limit: 2 },
+        })
+    );
+    assert!(hidden_grant.counterexample.is_none());
+
+    let retained_wait = check_action_temporal_with_weak_fairness_and_limits(
+        &model,
+        &spec,
+        &WeakFairness::new(["wait"]).unwrap(),
+        limits,
+    )
+    .unwrap();
+    assert_eq!(
+        retained_wait.outcome,
+        AnalysisOutcome::Conclusive(TemporalStatus::Violated)
     );
     assert!(matches!(
-        staged,
-        Err(TemporalError::WeakFairnessUnsupportedForResponse)
+        retained_wait.counterexample,
+        Some(TemporalCounterexample::Infinite {
+            obligation: TemporalObligation::Response,
+            ..
+        })
     ));
 }
