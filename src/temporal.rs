@@ -12,7 +12,9 @@ use crate::fairness::{check_buchi_with_weak_fairness, WeakFairness};
 use crate::model::TransitionSystem;
 use crate::response::{
     check_response, check_response_with_limits, check_response_with_product_limits,
-    ObligationState, ResponseCounterexample, ResponseError, ResponseProperty, ResponseStatus,
+    check_response_with_weak_fairness, check_response_with_weak_fairness_and_limits,
+    check_response_with_weak_fairness_and_product_limits, ObligationState, ResponseCounterexample,
+    ResponseError, ResponseProperty, ResponseStatus,
 };
 use std::collections::HashSet;
 use std::fmt;
@@ -231,7 +233,11 @@ pub enum TemporalError {
     EmptyPropertyName,
     EmptyActionName,
     NoRecurringActions,
-    DuplicateRecurringAction { action: String },
+    DuplicateRecurringAction {
+        action: String,
+    },
+    /// Legacy compatibility marker retained for callers that matched this
+    /// variant before weak-fair response semantics were implemented.
     WeakFairnessUnsupportedForResponse,
     Response(ResponseError),
     Buchi(BuchiError),
@@ -252,7 +258,7 @@ impl fmt::Display for TemporalError {
             }
             Self::WeakFairnessUnsupportedForResponse => write!(
                 f,
-                "weak fairness is currently supported only for infinitely-often temporal specifications"
+                "legacy weak-fair response unsupported marker is no longer emitted"
             ),
             Self::Response(error) => write!(f, "response backend failed: {error}"),
             Self::Buchi(error) => write!(f, "Buchi backend failed: {error}"),
@@ -300,13 +306,12 @@ where
     }
 }
 
-/// Verify the typed infinite recurring-action form while quantifying only over
-/// executions admitted by exact-action weak fairness.
+/// Verify a typed action-temporal specification while quantifying only over
+/// executions admitted by explicit exact-action weak fairness.
 ///
-/// Response fairness is intentionally not inferred from this API. Passing a
-/// response specification fails closed until that backend receives an explicit
-/// fairness design of its own. The empty fairness set exactly preserves the
-/// existing recurring-action semantics.
+/// Response specifications route through the M34 pending-obligation backend;
+/// recurring-action specifications route through the generalized Büchi backend.
+/// Empty fairness preserves each corresponding historical no-fairness path.
 pub fn check_action_temporal_with_weak_fairness<S>(
     model: &TransitionSystem<S>,
     spec: &ActionTemporalSpec,
@@ -316,8 +321,8 @@ where
     S: Clone + Eq + Hash,
 {
     match &spec.kind {
-        ActionTemporalKind::Response { .. } => {
-            Err(TemporalError::WeakFairnessUnsupportedForResponse)
+        ActionTemporalKind::Response { trigger, response } => {
+            check_response_spec_with_weak_fairness(model, spec, trigger, response, fairness)
         }
         ActionTemporalKind::AllInfinitelyOften { actions } => {
             check_recurring_spec_with_weak_fairness(model, spec, actions, fairness)
@@ -337,8 +342,10 @@ where
     S: Clone + Eq + Hash,
 {
     match &spec.kind {
-        ActionTemporalKind::Response { .. } => {
-            Err(TemporalError::WeakFairnessUnsupportedForResponse)
+        ActionTemporalKind::Response { trigger, response } => {
+            check_response_spec_with_weak_fairness_and_product_limits(
+                model, spec, trigger, response, fairness, limits,
+            )
         }
         ActionTemporalKind::AllInfinitelyOften { actions } => {
             check_recurring_spec_with_weak_fairness_and_product_limits(
@@ -360,8 +367,10 @@ where
     S: Clone + Eq + Hash,
 {
     match &spec.kind {
-        ActionTemporalKind::Response { .. } => {
-            Err(TemporalError::WeakFairnessUnsupportedForResponse)
+        ActionTemporalKind::Response { trigger, response } => {
+            check_response_spec_with_weak_fairness_and_limits(
+                model, spec, trigger, response, fairness, limits,
+            )
         }
         ActionTemporalKind::AllInfinitelyOften { actions } => {
             check_recurring_spec_with_weak_fairness_and_limits(
@@ -422,8 +431,28 @@ where
 {
     let property = response_property(spec, trigger, response)?;
     let result = check_response(model, &property)?;
-    let counterexample = normalize_response_counterexample(result.counterexample);
+    temporal_result_from_response(result)
+}
 
+fn check_response_spec_with_weak_fairness<S>(
+    model: &TransitionSystem<S>,
+    spec: &ActionTemporalSpec,
+    trigger: &ActionAtom,
+    response: &ActionAtom,
+    fairness: &WeakFairness,
+) -> Result<TemporalResult<S>, TemporalError>
+where
+    S: Clone + Eq + Hash,
+{
+    let property = response_property(spec, trigger, response)?;
+    let result = check_response_with_weak_fairness(model, &property, fairness)?;
+    temporal_result_from_response(result)
+}
+
+fn temporal_result_from_response<S>(
+    result: crate::response::ResponseResult<S>,
+) -> Result<TemporalResult<S>, TemporalError> {
+    let counterexample = normalize_response_counterexample(result.counterexample);
     Ok(TemporalResult {
         property: result.property,
         backend: TemporalBackend::Response,
@@ -448,8 +477,30 @@ where
 {
     let property = response_property(spec, trigger, response)?;
     let result = check_response_with_product_limits(model, &property, limits)?;
-    let counterexample = normalize_response_counterexample(result.counterexample);
+    bounded_temporal_result_from_response(result)
+}
 
+fn check_response_spec_with_weak_fairness_and_product_limits<S>(
+    model: &TransitionSystem<S>,
+    spec: &ActionTemporalSpec,
+    trigger: &ActionAtom,
+    response: &ActionAtom,
+    fairness: &WeakFairness,
+    limits: ExplorationLimits,
+) -> Result<BoundedTemporalResult<S>, TemporalError>
+where
+    S: Clone + Eq + Hash,
+{
+    let property = response_property(spec, trigger, response)?;
+    let result =
+        check_response_with_weak_fairness_and_product_limits(model, &property, fairness, limits)?;
+    bounded_temporal_result_from_response(result)
+}
+
+fn bounded_temporal_result_from_response<S>(
+    result: crate::response::BoundedResponseResult<S>,
+) -> Result<BoundedTemporalResult<S>, TemporalError> {
+    let counterexample = normalize_response_counterexample(result.counterexample);
     Ok(BoundedTemporalResult {
         property: result.property,
         backend: TemporalBackend::Response,
@@ -477,8 +528,29 @@ where
 {
     let property = response_property(spec, trigger, response)?;
     let result = check_response_with_limits(model, &property, limits)?;
-    let counterexample = normalize_response_counterexample(result.counterexample);
+    analysis_temporal_result_from_response(result)
+}
 
+fn check_response_spec_with_weak_fairness_and_limits<S>(
+    model: &TransitionSystem<S>,
+    spec: &ActionTemporalSpec,
+    trigger: &ActionAtom,
+    response: &ActionAtom,
+    fairness: &WeakFairness,
+    limits: AnalysisLimits,
+) -> Result<AnalysisTemporalResult<S>, TemporalError>
+where
+    S: Clone + Eq + Hash,
+{
+    let property = response_property(spec, trigger, response)?;
+    let result = check_response_with_weak_fairness_and_limits(model, &property, fairness, limits)?;
+    analysis_temporal_result_from_response(result)
+}
+
+fn analysis_temporal_result_from_response<S>(
+    result: crate::response::AnalysisResponseResult<S>,
+) -> Result<AnalysisTemporalResult<S>, TemporalError> {
+    let counterexample = normalize_response_counterexample(result.counterexample);
     Ok(AnalysisTemporalResult {
         property: result.property,
         backend: TemporalBackend::Response,

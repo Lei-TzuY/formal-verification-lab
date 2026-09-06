@@ -121,8 +121,11 @@ pub use reduction::{
     ReductionAudit, ReductionAuditError,
 };
 pub use response::{
-    check_response, check_response_with_limits, AnalysisResponseResult, ObligationState,
-    ResponseCounterexample, ResponseError, ResponseProperty, ResponseResult, ResponseStatus,
+    check_response, check_response_with_limits, check_response_with_product_limits,
+    check_response_with_weak_fairness, check_response_with_weak_fairness_and_limits,
+    check_response_with_weak_fairness_and_product_limits, AnalysisResponseResult,
+    BoundedResponseResult, ObligationState, ResponseCounterexample, ResponseError,
+    ResponseProperty, ResponseResult, ResponseStatus,
 };
 pub use response_report::render_response_report;
 pub use safety::{

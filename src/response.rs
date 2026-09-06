@@ -1,5 +1,13 @@
 use crate::bounded::{AnalysisLimits, AnalysisOutcome, BoundedOutcome};
+use crate::bounded_fairness::{
+    check_buchi_with_weak_fairness_and_limits, check_buchi_with_weak_fairness_and_product_limits,
+};
+use crate::buchi::{
+    AcceptanceSet, AnalysisBuchiResult, BoundedBuchiResult, BuchiAutomaton, BuchiCounterexample,
+    BuchiError, BuchiProductState, BuchiResult, BuchiStatus, FiniteRunPolicy,
+};
 use crate::checker::{ExplorationLimits, TraceStep};
+use crate::fairness::{check_buchi_with_weak_fairness, WeakFairness};
 use crate::model::TransitionSystem;
 use crate::multi_response::{
     check_multi_response, check_multi_response_with_limits,
@@ -138,6 +146,7 @@ pub struct AnalysisResponseResult<S> {
 pub enum ResponseError {
     EmptyPropertyName,
     Graph(RecurrenceError),
+    Buchi(BuchiError),
     MissingFiniteWitness,
     MissingCycleWitness,
     AdapterInvariant,
@@ -148,6 +157,7 @@ impl fmt::Display for ResponseError {
         match self {
             Self::EmptyPropertyName => write!(f, "response property name must not be empty"),
             Self::Graph(error) => write!(f, "response graph analysis failed: {error}"),
+            Self::Buchi(error) => write!(f, "response fairness analysis failed: {error}"),
             Self::MissingFiniteWitness => write!(
                 f,
                 "pending terminal product state did not yield a counterexample trace"
@@ -169,6 +179,12 @@ impl std::error::Error for ResponseError {}
 impl From<RecurrenceError> for ResponseError {
     fn from(value: RecurrenceError) -> Self {
         Self::Graph(value)
+    }
+}
+
+impl From<BuchiError> for ResponseError {
+    fn from(value: BuchiError) -> Self {
+        Self::Buchi(value)
     }
 }
 
@@ -200,6 +216,34 @@ where
     })
 }
 
+/// Verify one response obligation only over infinite executions admitted by the
+/// exact-action weak-fairness contract.
+///
+/// For non-empty fairness, the response monitor is compiled to one deterministic
+/// pending-bit generalized Buchi automaton. Its acceptance set is `!pending`
+/// and strict finite-terminal policy preserves the ordinary response rule that
+/// a terminal execution with an unanswered trigger is a violation. A response
+/// action wins when it also matches the trigger, exactly as in M10/M11.
+///
+/// Empty fairness deliberately delegates to the canonical M10/M11 adapter so
+/// all historical accounting and witness tie-breaking remain exactly unchanged.
+pub fn check_response_with_weak_fairness<S>(
+    model: &TransitionSystem<S>,
+    property: &ResponseProperty,
+    fairness: &WeakFairness,
+) -> Result<ResponseResult<S>, ResponseError>
+where
+    S: Clone + Eq + Hash,
+{
+    if fairness.actions().is_empty() {
+        return check_response(model, property);
+    }
+
+    let automaton = response_buchi_automaton(property)?;
+    let result = check_buchi_with_weak_fairness(model, &automaton, fairness)?;
+    normalize_fair_buchi_result(property, result)
+}
+
 /// Verify a single response obligation while bounding only shared action-product
 /// construction. A real finite/cyclic violation in the retained product prefix
 /// remains conclusive; satisfaction requires complete product construction.
@@ -215,6 +259,28 @@ where
     let result = check_multi_response_with_product_limits(model, &multi_property, limits)
         .map_err(map_multi_error)?;
     normalize_bounded_result(result)
+}
+
+/// Verify weak-fair single-response semantics while bounding only product
+/// construction after complete model capture. Enablement authority and retained
+/// fair-cycle honesty are inherited from the M33 bounded weak-fair Buchi path.
+pub fn check_response_with_weak_fairness_and_product_limits<S>(
+    model: &TransitionSystem<S>,
+    property: &ResponseProperty,
+    fairness: &WeakFairness,
+    limits: ExplorationLimits,
+) -> Result<BoundedResponseResult<S>, ResponseError>
+where
+    S: Clone + Eq + Hash,
+{
+    if fairness.actions().is_empty() {
+        return check_response_with_product_limits(model, property, limits);
+    }
+
+    let automaton = response_buchi_automaton(property)?;
+    let result =
+        check_buchi_with_weak_fairness_and_product_limits(model, &automaton, fairness, limits)?;
+    normalize_fair_bounded_buchi_result(property, result)
 }
 
 /// Verify a single response obligation under independent model-capture and
@@ -234,12 +300,123 @@ where
     normalize_analysis_result(result)
 }
 
+/// Verify weak-fair single-response semantics under independent model/product
+/// budgets. Unknown model-prefix action enablement remains fail-closed through
+/// the M33 provenance-aware Buchi backend, while real retained fair cycles and
+/// pending terminals may still prove a violation before a later cutoff.
+pub fn check_response_with_weak_fairness_and_limits<S>(
+    model: &TransitionSystem<S>,
+    property: &ResponseProperty,
+    fairness: &WeakFairness,
+    limits: AnalysisLimits,
+) -> Result<AnalysisResponseResult<S>, ResponseError>
+where
+    S: Clone + Eq + Hash,
+{
+    if fairness.actions().is_empty() {
+        return check_response_with_limits(model, property, limits);
+    }
+
+    let automaton = response_buchi_automaton(property)?;
+    let result = check_buchi_with_weak_fairness_and_limits(model, &automaton, fairness, limits)?;
+    normalize_fair_analysis_buchi_result(property, result)
+}
+
+fn response_buchi_automaton(
+    property: &ResponseProperty,
+) -> Result<BuchiAutomaton<bool>, ResponseError> {
+    let trigger = Arc::clone(&property.trigger);
+    let response = Arc::clone(&property.response);
+    let acceptance = AcceptanceSet::new("response-discharged", |pending: &bool| !*pending)?;
+    Ok(BuchiAutomaton::new(
+        format!("{}-weak-fair-response", property.name),
+        false,
+        move |pending, action| {
+            if response(action) {
+                false
+            } else if trigger(action) {
+                true
+            } else {
+                *pending
+            }
+        },
+        vec![acceptance],
+        FiniteRunPolicy::RequireAcceptingTerminal,
+    )?)
+}
+
 fn single_multi_property(property: &ResponseProperty) -> MultiResponseProperty {
     MultiResponseProperty::from_single_shared(
         property.name.clone(),
         Arc::clone(&property.trigger),
         Arc::clone(&property.response),
     )
+}
+
+fn normalize_fair_buchi_result<S>(
+    property: &ResponseProperty,
+    result: BuchiResult<S, bool>,
+) -> Result<ResponseResult<S>, ResponseError> {
+    Ok(ResponseResult {
+        property: property.name.clone(),
+        status: map_buchi_status(result.status),
+        model_states: result.model_states,
+        model_transitions: result.model_transitions,
+        product_states: result.product_states,
+        product_transitions: result.product_transitions,
+        counterexample: collapse_buchi_counterexample(result.counterexample),
+    })
+}
+
+fn normalize_fair_bounded_buchi_result<S>(
+    property: &ResponseProperty,
+    result: BoundedBuchiResult<S, bool>,
+) -> Result<BoundedResponseResult<S>, ResponseError> {
+    Ok(BoundedResponseResult {
+        property: property.name.clone(),
+        outcome: match result.outcome {
+            BoundedOutcome::Conclusive(status) => {
+                BoundedOutcome::Conclusive(map_buchi_status(status))
+            }
+            BoundedOutcome::Inconclusive(reason) => BoundedOutcome::Inconclusive(reason),
+        },
+        model_states: result.model_states,
+        model_transitions: result.model_transitions,
+        product_states: result.product_states,
+        checked_product_states: result.checked_product_states,
+        explored_product_transitions: result.explored_product_transitions,
+        retained_product_transitions: result.retained_product_transitions,
+        max_product_depth_reached: result.max_product_depth_reached,
+        counterexample: collapse_buchi_counterexample(result.counterexample),
+    })
+}
+
+fn normalize_fair_analysis_buchi_result<S>(
+    property: &ResponseProperty,
+    result: AnalysisBuchiResult<S, bool>,
+) -> Result<AnalysisResponseResult<S>, ResponseError> {
+    Ok(AnalysisResponseResult {
+        property: property.name.clone(),
+        outcome: match result.outcome {
+            AnalysisOutcome::Conclusive(status) => {
+                AnalysisOutcome::Conclusive(map_buchi_status(status))
+            }
+            AnalysisOutcome::Inconclusive(reason) => AnalysisOutcome::Inconclusive(reason),
+        },
+        model_completion: result.model_completion,
+        product_completion: result.product_completion,
+        model_states: result.model_states,
+        checked_model_states: result.checked_model_states,
+        explored_model_transitions: result.explored_model_transitions,
+        retained_model_transitions: result.retained_model_transitions,
+        max_model_depth_reached: result.max_model_depth_reached,
+        product_states: result.product_states,
+        checked_product_states: result.checked_product_states,
+        explored_product_transitions: result.explored_product_transitions,
+        retained_product_transitions: result.retained_product_transitions,
+        max_product_depth_reached: result.max_product_depth_reached,
+        counterexample: collapse_buchi_counterexample(result.counterexample),
+    })
 }
 
 fn normalize_bounded_result<S>(
@@ -298,6 +475,47 @@ fn map_status(status: MultiResponseStatus) -> ResponseStatus {
         MultiResponseStatus::Satisfied => ResponseStatus::Satisfied,
         MultiResponseStatus::Violated => ResponseStatus::Violated,
     }
+}
+
+fn map_buchi_status(status: BuchiStatus) -> ResponseStatus {
+    match status {
+        BuchiStatus::Satisfied => ResponseStatus::Satisfied,
+        BuchiStatus::Violated => ResponseStatus::Violated,
+    }
+}
+
+fn collapse_buchi_counterexample<S>(
+    counterexample: Option<BuchiCounterexample<S, bool>>,
+) -> Option<ResponseCounterexample<S>> {
+    match counterexample {
+        None => None,
+        Some(BuchiCounterexample::FiniteTerminal { trace, .. }) => {
+            Some(ResponseCounterexample::Finite {
+                trace: collapse_buchi_trace(trace),
+            })
+        }
+        Some(BuchiCounterexample::AcceptanceAvoidingCycle { stem, cycle, .. }) => {
+            Some(ResponseCounterexample::Infinite {
+                stem: collapse_buchi_trace(stem),
+                cycle: collapse_buchi_trace(cycle),
+            })
+        }
+    }
+}
+
+fn collapse_buchi_trace<S>(
+    trace: Vec<TraceStep<BuchiProductState<S, bool>>>,
+) -> Vec<TraceStep<ObligationState<S>>> {
+    trace
+        .into_iter()
+        .map(|step| TraceStep {
+            action: step.action,
+            state: ObligationState {
+                state: step.state.state,
+                pending: step.state.automaton,
+            },
+        })
+        .collect()
 }
 
 fn collapse_counterexample<S>(
