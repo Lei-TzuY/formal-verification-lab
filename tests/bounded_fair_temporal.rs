@@ -97,9 +97,7 @@ fn retained_taken_fair_cycle_stays_conclusive_through_temporal_frontend() {
     );
     let counterexample = result.counterexample.expect("real retained lasso");
     let formal_verification_lab::TemporalCounterexample::Infinite {
-        obligation,
-        cycle,
-        ..
+        obligation, cycle, ..
     } = counterexample
     else {
         panic!("expected infinite temporal counterexample");
