@@ -44,6 +44,7 @@ pub mod response_examples;
 pub mod response_report;
 pub mod safety;
 pub mod safety_report;
+pub mod strong_fairness;
 pub mod temporal;
 pub mod temporal_parse;
 pub mod temporal_report;
@@ -143,6 +144,9 @@ pub use safety::{
     PropositionSafetySpec, SafetyError, SafetyResult, SafetyStatus,
 };
 pub use safety_report::render_safety_report;
+pub use strong_fairness::{
+    check_buchi_with_strong_fairness, StrongFairness, StrongFairnessError,
+};
 pub use temporal::{
     check_action_temporal, check_action_temporal_with_limits,
     check_action_temporal_with_product_limits, check_action_temporal_with_weak_fairness,
