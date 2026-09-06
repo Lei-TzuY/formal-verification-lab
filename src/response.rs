@@ -2,6 +2,10 @@ use crate::bounded::{AnalysisLimits, AnalysisOutcome, BoundedOutcome};
 use crate::bounded_fairness::{
     check_buchi_with_weak_fairness_and_limits, check_buchi_with_weak_fairness_and_product_limits,
 };
+use crate::bounded_strong_fairness::{
+    check_buchi_with_strong_fairness_and_limits,
+    check_buchi_with_strong_fairness_and_product_limits,
+};
 use crate::buchi::{
     AcceptanceSet, AnalysisBuchiResult, BoundedBuchiResult, BuchiAutomaton, BuchiCounterexample,
     BuchiError, BuchiProductState, BuchiResult, BuchiStatus, FiniteRunPolicy,
@@ -16,6 +20,7 @@ use crate::multi_response::{
     MultiResponseError, MultiResponseProperty, MultiResponseStatus,
 };
 use crate::recurrence::RecurrenceError;
+use crate::strong_fairness::{check_buchi_with_strong_fairness, StrongFairness};
 use std::fmt;
 use std::hash::Hash;
 use std::sync::Arc;
@@ -244,6 +249,29 @@ where
     normalize_fair_buchi_result(property, result)
 }
 
+/// Verify one response obligation over executions admitted by exact-action
+/// strong fairness. An action enabled infinitely often must also be taken
+/// infinitely often; finite pending terminals remain violations because the
+/// response automaton uses strict terminal acceptance.
+///
+/// Empty strong fairness delegates exactly to the historical response backend.
+pub fn check_response_with_strong_fairness<S>(
+    model: &TransitionSystem<S>,
+    property: &ResponseProperty,
+    fairness: &StrongFairness,
+) -> Result<ResponseResult<S>, ResponseError>
+where
+    S: Clone + Eq + Hash,
+{
+    if fairness.is_empty() {
+        return check_response(model, property);
+    }
+
+    let automaton = response_buchi_automaton(property)?;
+    let result = check_buchi_with_strong_fairness(model, &automaton, fairness)?;
+    normalize_fair_buchi_result(property, result)
+}
+
 /// Verify a single response obligation while bounding only shared action-product
 /// construction. A real finite/cyclic violation in the retained product prefix
 /// remains conclusive; satisfaction requires complete product construction.
@@ -280,6 +308,28 @@ where
     let automaton = response_buchi_automaton(property)?;
     let result =
         check_buchi_with_weak_fairness_and_product_limits(model, &automaton, fairness, limits)?;
+    normalize_fair_bounded_buchi_result(property, result)
+}
+
+/// Verify strong-fair single-response semantics while bounding only product
+/// construction after complete model capture. Strong-fair enablement authority
+/// and retained-cycle honesty are inherited from the M39 bounded backend.
+pub fn check_response_with_strong_fairness_and_product_limits<S>(
+    model: &TransitionSystem<S>,
+    property: &ResponseProperty,
+    fairness: &StrongFairness,
+    limits: ExplorationLimits,
+) -> Result<BoundedResponseResult<S>, ResponseError>
+where
+    S: Clone + Eq + Hash,
+{
+    if fairness.is_empty() {
+        return check_response_with_product_limits(model, property, limits);
+    }
+
+    let automaton = response_buchi_automaton(property)?;
+    let result =
+        check_buchi_with_strong_fairness_and_product_limits(model, &automaton, fairness, limits)?;
     normalize_fair_bounded_buchi_result(property, result)
 }
 
@@ -322,6 +372,28 @@ where
     normalize_fair_analysis_buchi_result(property, result)
 }
 
+/// Verify strong-fair single-response semantics under independent model/product
+/// budgets. Unknown model-prefix enablement remains conservative through M39;
+/// finite pending terminals keep precedence and a retained recurrent witness is
+/// conclusive only when it satisfies the configured strong-fair obligations.
+pub fn check_response_with_strong_fairness_and_limits<S>(
+    model: &TransitionSystem<S>,
+    property: &ResponseProperty,
+    fairness: &StrongFairness,
+    limits: AnalysisLimits,
+) -> Result<AnalysisResponseResult<S>, ResponseError>
+where
+    S: Clone + Eq + Hash,
+{
+    if fairness.is_empty() {
+        return check_response_with_limits(model, property, limits);
+    }
+
+    let automaton = response_buchi_automaton(property)?;
+    let result = check_buchi_with_strong_fairness_and_limits(model, &automaton, fairness, limits)?;
+    normalize_fair_analysis_buchi_result(property, result)
+}
+
 fn response_buchi_automaton(
     property: &ResponseProperty,
 ) -> Result<BuchiAutomaton<bool>, ResponseError> {
@@ -329,7 +401,7 @@ fn response_buchi_automaton(
     let response = Arc::clone(&property.response);
     let acceptance = AcceptanceSet::new("response-discharged", |pending: &bool| !*pending)?;
     Ok(BuchiAutomaton::new(
-        format!("{}-weak-fair-response", property.name),
+        format!("{}-response-obligation", property.name),
         false,
         move |pending, action| {
             if response(action) {
