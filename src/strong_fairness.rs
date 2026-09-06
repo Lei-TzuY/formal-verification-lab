@@ -181,12 +181,9 @@ where
         }
 
         let residual = induced_graph(product, &included);
-        for component in strongly_fair_components(
-            product,
-            &residual,
-            &residual_to_product,
-            fairness,
-        ) {
+        for component in
+            strongly_fair_components(product, &residual, &residual_to_product, fairness)
+        {
             let Some((entry, product_entry, stem)) =
                 nearest_component_entry(product, &residual_to_product, &component)
             else {
@@ -214,15 +211,15 @@ where
         }
     }
 
-    Ok(best.map(
-        |candidate| BuchiCounterexample::AcceptanceAvoidingCycle {
+    Ok(
+        best.map(|candidate| BuchiCounterexample::AcceptanceAvoidingCycle {
             acceptance: automaton.acceptance_sets()[candidate.acceptance_index]
                 .name()
                 .to_owned(),
             stem: candidate.stem,
             cycle: candidate.cycle,
-        },
-    ))
+        }),
+    )
 }
 
 struct StrongFairCandidate<S, A> {
