@@ -1,4 +1,7 @@
 use crate::bounded::{AnalysisLimits, AnalysisOutcome, BoundedOutcome};
+use crate::bounded_fairness::{
+    check_buchi_with_weak_fairness_and_limits, check_buchi_with_weak_fairness_and_product_limits,
+};
 use crate::buchi::{
     check_buchi, check_buchi_with_limits, check_buchi_with_product_limits, AcceptanceSet,
     BuchiAutomaton, BuchiCounterexample, BuchiError, BuchiProductState, BuchiStatus,
@@ -322,6 +325,52 @@ where
     }
 }
 
+/// Verify exact-action weak fairness while bounding only action-product
+/// construction after complete model capture.
+pub fn check_action_temporal_with_weak_fairness_and_product_limits<S>(
+    model: &TransitionSystem<S>,
+    spec: &ActionTemporalSpec,
+    fairness: &WeakFairness,
+    limits: ExplorationLimits,
+) -> Result<BoundedTemporalResult<S>, TemporalError>
+where
+    S: Clone + Eq + Hash,
+{
+    match &spec.kind {
+        ActionTemporalKind::Response { .. } => {
+            Err(TemporalError::WeakFairnessUnsupportedForResponse)
+        }
+        ActionTemporalKind::AllInfinitelyOften { actions } => {
+            check_recurring_spec_with_weak_fairness_and_product_limits(
+                model, spec, actions, fairness, limits,
+            )
+        }
+    }
+}
+
+/// Verify exact-action weak fairness under independent deterministic model and
+/// product budgets, preserving stage-qualified incompleteness.
+pub fn check_action_temporal_with_weak_fairness_and_limits<S>(
+    model: &TransitionSystem<S>,
+    spec: &ActionTemporalSpec,
+    fairness: &WeakFairness,
+    limits: AnalysisLimits,
+) -> Result<AnalysisTemporalResult<S>, TemporalError>
+where
+    S: Clone + Eq + Hash,
+{
+    match &spec.kind {
+        ActionTemporalKind::Response { .. } => {
+            Err(TemporalError::WeakFairnessUnsupportedForResponse)
+        }
+        ActionTemporalKind::AllInfinitelyOften { actions } => {
+            check_recurring_spec_with_weak_fairness_and_limits(
+                model, spec, actions, fairness, limits,
+            )
+        }
+    }
+}
+
 /// Compile and verify one typed action-temporal specification while bounding
 /// only the shared action-product phase of the selected backend.
 pub fn check_action_temporal_with_product_limits<S>(
@@ -539,6 +588,38 @@ where
     temporal_result_from_buchi(result)
 }
 
+fn check_recurring_spec_with_weak_fairness_and_product_limits<S>(
+    model: &TransitionSystem<S>,
+    spec: &ActionTemporalSpec,
+    actions: &[ActionAtom],
+    fairness: &WeakFairness,
+    limits: ExplorationLimits,
+) -> Result<BoundedTemporalResult<S>, TemporalError>
+where
+    S: Clone + Eq + Hash,
+{
+    let automaton = recurring_automaton(spec, actions)?;
+    let result = check_buchi_with_weak_fairness_and_product_limits(
+        model, &automaton, fairness, limits,
+    )?;
+    bounded_temporal_result_from_buchi(result)
+}
+
+fn check_recurring_spec_with_weak_fairness_and_limits<S>(
+    model: &TransitionSystem<S>,
+    spec: &ActionTemporalSpec,
+    actions: &[ActionAtom],
+    fairness: &WeakFairness,
+    limits: AnalysisLimits,
+) -> Result<AnalysisTemporalResult<S>, TemporalError>
+where
+    S: Clone + Eq + Hash,
+{
+    let automaton = recurring_automaton(spec, actions)?;
+    let result = check_buchi_with_weak_fairness_and_limits(model, &automaton, fairness, limits)?;
+    analysis_temporal_result_from_buchi(result)
+}
+
 fn temporal_result_from_buchi<S>(
     result: crate::buchi::BuchiResult<S, LastObservedAction>,
 ) -> Result<TemporalResult<S>, TemporalError> {
@@ -566,8 +647,13 @@ where
 {
     let automaton = recurring_automaton(spec, actions)?;
     let result = check_buchi_with_product_limits(model, &automaton, limits)?;
-    let counterexample = normalize_buchi_counterexample(result.counterexample)?;
+    bounded_temporal_result_from_buchi(result)
+}
 
+fn bounded_temporal_result_from_buchi<S>(
+    result: crate::buchi::BoundedBuchiResult<S, LastObservedAction>,
+) -> Result<BoundedTemporalResult<S>, TemporalError> {
+    let counterexample = normalize_buchi_counterexample(result.counterexample)?;
     Ok(BoundedTemporalResult {
         property: result.automaton,
         backend: TemporalBackend::Buchi,
@@ -594,8 +680,13 @@ where
 {
     let automaton = recurring_automaton(spec, actions)?;
     let result = check_buchi_with_limits(model, &automaton, limits)?;
-    let counterexample = normalize_buchi_counterexample(result.counterexample)?;
+    analysis_temporal_result_from_buchi(result)
+}
 
+fn analysis_temporal_result_from_buchi<S>(
+    result: crate::buchi::AnalysisBuchiResult<S, LastObservedAction>,
+) -> Result<AnalysisTemporalResult<S>, TemporalError> {
+    let counterexample = normalize_buchi_counterexample(result.counterexample)?;
     Ok(AnalysisTemporalResult {
         property: result.automaton,
         backend: TemporalBackend::Buchi,
