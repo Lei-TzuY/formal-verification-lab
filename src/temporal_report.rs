@@ -46,8 +46,7 @@ pub fn render_bounded_temporal_report<S: Debug>(
                 .expect("writing to String cannot fail");
         }
         BoundedOutcome::Inconclusive(reason) => {
-            writeln!(&mut output, "temporal: INCONCLUSIVE")
-                .expect("writing to String cannot fail");
+            writeln!(&mut output, "temporal: INCONCLUSIVE").expect("writing to String cannot fail");
             writeln!(
                 &mut output,
                 "product inconclusive reason: {}",
@@ -95,12 +94,7 @@ pub fn render_bounded_temporal_report<S: Debug>(
     output
 }
 
-fn render_header(
-    output: &mut String,
-    model_name: &str,
-    property: &str,
-    backend: TemporalBackend,
-) {
+fn render_header(output: &mut String, model_name: &str, property: &str, backend: TemporalBackend) {
     writeln!(output, "model: {model_name}").expect("writing to String cannot fail");
     writeln!(output, "property: {property}").expect("writing to String cannot fail");
     writeln!(
@@ -132,9 +126,7 @@ fn render_counterexample<S: Debug>(
             "counterexample: none (product exploration incomplete)"
         )
         .expect("writing to String cannot fail"),
-        None => {
-            writeln!(output, "counterexample: none").expect("writing to String cannot fail")
-        }
+        None => writeln!(output, "counterexample: none").expect("writing to String cannot fail"),
         Some(TemporalCounterexample::Finite { obligation, trace }) => {
             writeln!(output, "counterexample: FINITE").expect("writing to String cannot fail");
             render_obligation(output, obligation);
