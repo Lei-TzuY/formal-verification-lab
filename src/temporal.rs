@@ -392,7 +392,9 @@ fn map_bounded_response_outcome(
     outcome: BoundedOutcome<ResponseStatus>,
 ) -> BoundedOutcome<TemporalStatus> {
     match outcome {
-        BoundedOutcome::Conclusive(status) => BoundedOutcome::Conclusive(map_response_status(status)),
+        BoundedOutcome::Conclusive(status) => {
+            BoundedOutcome::Conclusive(map_response_status(status))
+        }
         BoundedOutcome::Inconclusive(reason) => BoundedOutcome::Inconclusive(reason),
     }
 }
