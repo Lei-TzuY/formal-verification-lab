@@ -1,7 +1,10 @@
-use crate::checker::TraceStep;
+use crate::bounded::BoundedOutcome;
+use crate::checker::{ExplorationLimits, TraceStep};
 use crate::graph::{capture_reachable_graph, induced_graph, shortest_path, ReachableGraph};
 use crate::model::TransitionSystem;
-use crate::product::build_action_product;
+use crate::product::{
+    build_action_product, build_action_product_with_limits, BoundedActionProduct,
+};
 use crate::recurrence::{
     component_is_cyclic, cycle_witness, strongly_connected_components, RecurrenceError,
 };
@@ -247,6 +250,24 @@ pub struct MonitorResult<S, M> {
     pub counterexample: Option<MonitorCounterexample<S, M>>,
 }
 
+/// Finite-monitor verification under deterministic product-space limits.
+///
+/// The model graph is captured exhaustively before these limits are applied;
+/// the accounting below therefore describes only action-product construction.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BoundedMonitorResult<S, M> {
+    pub monitor: String,
+    pub outcome: BoundedOutcome<MonitorStatus>,
+    pub model_states: usize,
+    pub model_transitions: usize,
+    pub product_states: usize,
+    pub checked_product_states: usize,
+    pub explored_product_transitions: usize,
+    pub retained_product_transitions: usize,
+    pub max_product_depth_reached: Option<usize>,
+    pub counterexample: Option<MonitorCounterexample<S, M>>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MonitorError {
     EmptyMonitorName,
@@ -311,46 +332,122 @@ where
         |state, monitor| MonitorProductState { state, monitor },
     );
     let product_transitions = product.outgoing.iter().map(Vec::len).sum();
+    let known_terminal = product
+        .outgoing
+        .iter()
+        .map(Vec::is_empty)
+        .collect::<Vec<_>>();
+    let counterexample = find_counterexample(&product, &known_terminal, monitor)?;
 
+    Ok(MonitorResult {
+        monitor: monitor.name.clone(),
+        status: if counterexample.is_some() {
+            MonitorStatus::Violated
+        } else {
+            MonitorStatus::Satisfied
+        },
+        model_states: captured.discovered_states,
+        model_transitions: captured.explored_transitions,
+        product_states: product.states.len(),
+        product_transitions,
+        counterexample,
+    })
+}
+
+/// Verify finite-monitor semantics while bounding only deterministic action-
+/// product construction.
+///
+/// A retained rejecting state, true active model terminal, or closed active
+/// cycle is sufficient to prove `Violated`, even if product construction later
+/// reaches a resource limit. If no such witness is established, satisfaction is
+/// returned only when product construction completes; otherwise the exact
+/// product-space cutoff is returned as `Inconclusive`.
+///
+/// Because model capture remains exhaustive in this milestone slice, these
+/// limits must not be described as whole-analysis resource bounds.
+pub fn check_monitor_with_product_limits<S, M>(
+    model: &TransitionSystem<S>,
+    monitor: &FiniteMonitor<M>,
+    limits: ExplorationLimits,
+) -> Result<BoundedMonitorResult<S, M>, MonitorError>
+where
+    S: Clone + Eq + Hash,
+    M: Clone + Eq + Hash,
+{
+    let captured = capture_reachable_graph(model).map_err(RecurrenceError::from)?;
+    let BoundedActionProduct {
+        graph: product,
+        checked_states,
+        explored_transitions,
+        max_depth_reached,
+        completion,
+        known_terminal,
+    } = build_action_product_with_limits(
+        &captured.graph,
+        &monitor.initial,
+        |state, action| (monitor.step)(state, action),
+        |state, monitor| MonitorProductState { state, monitor },
+        limits,
+    );
+    let retained_product_transitions = product.outgoing.iter().map(Vec::len).sum();
+    let counterexample = find_counterexample(&product, &known_terminal, monitor)?;
+    let outcome = if counterexample.is_some() {
+        BoundedOutcome::Conclusive(MonitorStatus::Violated)
+    } else {
+        match completion {
+            BoundedOutcome::Conclusive(()) => BoundedOutcome::Conclusive(MonitorStatus::Satisfied),
+            BoundedOutcome::Inconclusive(reason) => BoundedOutcome::Inconclusive(reason),
+        }
+    };
+
+    Ok(BoundedMonitorResult {
+        monitor: monitor.name.clone(),
+        outcome,
+        model_states: captured.discovered_states,
+        model_transitions: captured.explored_transitions,
+        product_states: product.states.len(),
+        checked_product_states: checked_states,
+        explored_product_transitions: explored_transitions,
+        retained_product_transitions,
+        max_product_depth_reached: max_depth_reached,
+        counterexample,
+    })
+}
+
+fn find_counterexample<S, M>(
+    product: &ReachableGraph<MonitorProductState<S, M>>,
+    known_terminal: &[bool],
+    monitor: &FiniteMonitor<M>,
+) -> Result<Option<MonitorCounterexample<S, M>>, MonitorError>
+where
+    S: Clone + Eq + Hash,
+    M: Clone + Eq + Hash,
+{
     for (product_id, state) in product.states.iter().enumerate() {
         for condition in &monitor.rejecting {
             if (condition.predicate)(&state.monitor) {
-                let trace = shortest_path(&product, &product.initial_ids, product_id, None)
+                let trace = shortest_path(product, &product.initial_ids, product_id, None)
                     .ok_or(MonitorError::MissingWitness)?;
-                return Ok(result(
-                    monitor,
-                    captured.discovered_states,
-                    captured.explored_transitions,
-                    &product,
-                    product_transitions,
-                    MonitorCounterexample::Rejecting {
-                        condition: condition.name.clone(),
-                        trace,
-                    },
-                ));
+                return Ok(Some(MonitorCounterexample::Rejecting {
+                    condition: condition.name.clone(),
+                    trace,
+                }));
             }
         }
     }
 
     for (product_id, state) in product.states.iter().enumerate() {
-        if !product.outgoing[product_id].is_empty() {
+        if !known_terminal[product_id] {
             continue;
         }
         for condition in &monitor.progress {
             if (condition.active)(&state.monitor) {
-                let trace = shortest_path(&product, &product.initial_ids, product_id, None)
+                let trace = shortest_path(product, &product.initial_ids, product_id, None)
                     .ok_or(MonitorError::MissingWitness)?;
-                return Ok(result(
-                    monitor,
-                    captured.discovered_states,
-                    captured.explored_transitions,
-                    &product,
-                    product_transitions,
-                    MonitorCounterexample::ProgressTerminal {
-                        condition: condition.name.clone(),
-                        trace,
-                    },
-                ));
+                return Ok(Some(MonitorCounterexample::ProgressTerminal {
+                    condition: condition.name.clone(),
+                    trace,
+                }));
             }
         }
     }
@@ -372,7 +469,7 @@ where
             continue;
         }
 
-        let residual = induced_graph(&product, &included);
+        let residual = induced_graph(product, &included);
         let components = strongly_connected_components(&residual);
         for (component_index, component) in components.iter().enumerate() {
             if !component_is_cyclic(&residual, component) {
@@ -380,7 +477,7 @@ where
             }
             let entry = *component.first().ok_or(MonitorError::MissingWitness)?;
             let product_entry = old_ids[entry];
-            let stem = shortest_path(&product, &product.initial_ids, product_entry, None)
+            let stem = shortest_path(product, &product.initial_ids, product_entry, None)
                 .ok_or(MonitorError::MissingWitness)?;
             let candidate = ProgressCandidate {
                 condition_index,
@@ -411,48 +508,14 @@ where
             &candidate.component,
         )?
         .ok_or(MonitorError::MissingWitness)?;
-        return Ok(result(
-            monitor,
-            captured.discovered_states,
-            captured.explored_transitions,
-            &product,
-            product_transitions,
-            MonitorCounterexample::ProgressCycle {
-                condition: monitor.progress[candidate.condition_index].name.clone(),
-                stem: candidate.stem,
-                cycle: witness.cycle,
-            },
-        ));
+        return Ok(Some(MonitorCounterexample::ProgressCycle {
+            condition: monitor.progress[candidate.condition_index].name.clone(),
+            stem: candidate.stem,
+            cycle: witness.cycle,
+        }));
     }
 
-    Ok(MonitorResult {
-        monitor: monitor.name.clone(),
-        status: MonitorStatus::Satisfied,
-        model_states: captured.discovered_states,
-        model_transitions: captured.explored_transitions,
-        product_states: product.states.len(),
-        product_transitions,
-        counterexample: None,
-    })
-}
-
-fn result<S, M>(
-    monitor: &FiniteMonitor<M>,
-    model_states: usize,
-    model_transitions: usize,
-    product: &ReachableGraph<MonitorProductState<S, M>>,
-    product_transitions: usize,
-    counterexample: MonitorCounterexample<S, M>,
-) -> MonitorResult<S, M> {
-    MonitorResult {
-        monitor: monitor.name.clone(),
-        status: MonitorStatus::Violated,
-        model_states,
-        model_transitions,
-        product_states: product.states.len(),
-        product_transitions,
-        counterexample: Some(counterexample),
-    }
+    Ok(None)
 }
 
 struct ProgressCandidate<S, M> {
