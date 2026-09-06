@@ -1,8 +1,9 @@
 use formal_verification_lab::buchi_examples::unfair_second_pulse;
-use formal_verification_lab::response_examples::request_grant_protocol;
+use formal_verification_lab::response_examples::unfair_request_grant_protocol;
 use formal_verification_lab::{
     check_action_temporal, check_action_temporal_with_weak_fairness, ActionAtom,
-    ActionTemporalSpec, TemporalCounterexample, TemporalError, TemporalStatus, WeakFairness,
+    ActionTemporalSpec, TemporalBackend, TemporalCounterexample, TemporalObligation, TemporalStatus,
+    WeakFairness,
 };
 
 fn pulse_spec() -> ActionTemporalSpec {
@@ -12,6 +13,15 @@ fn pulse_spec() -> ActionTemporalSpec {
             ActionAtom::exact("pulse-a").unwrap(),
             ActionAtom::exact("pulse-b").unwrap(),
         ],
+    )
+    .unwrap()
+}
+
+fn response_spec() -> ActionTemporalSpec {
+    ActionTemporalSpec::response(
+        "request-eventually-grant",
+        ActionAtom::exact("request").unwrap(),
+        ActionAtom::exact("grant").unwrap(),
     )
     .unwrap()
 }
@@ -60,18 +70,43 @@ fn weak_fair_counterexample_retains_required_taken_action() {
 }
 
 #[test]
-fn response_fairness_fails_closed_until_response_semantics_are_defined() {
-    let model = request_grant_protocol().unwrap();
-    let spec = ActionTemporalSpec::response(
-        "request-eventually-grant",
-        ActionAtom::exact("request").unwrap(),
-        ActionAtom::exact("grant").unwrap(),
+fn weak_fair_response_routes_through_the_response_backend() {
+    let model = unfair_request_grant_protocol().unwrap();
+    let spec = response_spec();
+
+    let baseline = check_action_temporal(&model, &spec).unwrap();
+    assert_eq!(baseline.backend, TemporalBackend::Response);
+    assert_eq!(baseline.status, TemporalStatus::Violated);
+
+    let fair_grant = check_action_temporal_with_weak_fairness(
+        &model,
+        &spec,
+        &WeakFairness::new(["grant"]).unwrap(),
     )
     .unwrap();
-    let fairness = WeakFairness::new(["grant"]).unwrap();
+    assert_eq!(fair_grant.backend, TemporalBackend::Response);
+    assert_eq!(fair_grant.status, TemporalStatus::Satisfied);
+    assert!(fair_grant.counterexample.is_none());
 
-    assert_eq!(
-        check_action_temporal_with_weak_fairness(&model, &spec, &fairness).unwrap_err(),
-        TemporalError::WeakFairnessUnsupportedForResponse
-    );
+    let fair_wait = check_action_temporal_with_weak_fairness(
+        &model,
+        &spec,
+        &WeakFairness::new(["wait"]).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(fair_wait.status, TemporalStatus::Violated);
+    let Some(TemporalCounterexample::Infinite {
+        obligation,
+        cycle,
+        ..
+    }) = fair_wait.counterexample
+    else {
+        panic!("expected weakly fair response lasso");
+    };
+    assert_eq!(obligation, TemporalObligation::Response);
+    assert!(cycle
+        .iter()
+        .skip(1)
+        .any(|step| step.action.as_deref() == Some("wait")));
+    assert_eq!(cycle.first().unwrap().state, cycle.last().unwrap().state);
 }
