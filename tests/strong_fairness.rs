@@ -48,11 +48,8 @@ fn two_state_intermittent_enablement_model() -> TransitionSystem<usize> {
 #[test]
 fn strong_fairness_excludes_intermittently_enabled_starvation_that_weak_fairness_allows() {
     let model = two_state_intermittent_enablement_model();
-    let automaton = sticky_action_automaton(
-        "serve-observed",
-        "serve",
-        FiniteRunPolicy::IgnoreTerminals,
-    );
+    let automaton =
+        sticky_action_automaton("serve-observed", "serve", FiniteRunPolicy::IgnoreTerminals);
     let weak = WeakFairness::new(["serve"]).unwrap();
     let strong = StrongFairness::new(["serve"]).unwrap();
 
@@ -63,7 +60,9 @@ fn strong_fairness_excludes_intermittently_enabled_starvation_that_weak_fairness
     else {
         panic!("weak fairness should retain the intermittent starvation lasso");
     };
-    assert!(cycle.iter().all(|step| step.action.as_deref() != Some("serve")));
+    assert!(cycle
+        .iter()
+        .all(|step| step.action.as_deref() != Some("serve")));
 
     let strong_result = check_buchi_with_strong_fairness(&model, &automaton, &strong).unwrap();
     assert_eq!(strong_result.status, BuchiStatus::Satisfied);
@@ -90,11 +89,8 @@ fn streett_pruning_keeps_a_fair_subcycle_after_removing_bad_enabled_states() {
         vec![Invariant::new("well-formed", |state: &usize| *state < 2)],
     )
     .unwrap();
-    let automaton = sticky_action_automaton(
-        "serve-observed",
-        "serve",
-        FiniteRunPolicy::IgnoreTerminals,
-    );
+    let automaton =
+        sticky_action_automaton("serve-observed", "serve", FiniteRunPolicy::IgnoreTerminals);
     let fairness = StrongFairness::new(["serve"]).unwrap();
 
     let result = check_buchi_with_strong_fairness(&model, &automaton, &fairness).unwrap();
@@ -111,7 +107,9 @@ fn streett_pruning_keeps_a_fair_subcycle_after_removing_bad_enabled_states() {
     assert_eq!(stem.last().unwrap().state.state, 1);
     assert_eq!(cycle.first().unwrap().state, cycle.last().unwrap().state);
     assert!(cycle.iter().all(|step| step.state.state == 1));
-    assert!(cycle.iter().any(|step| step.action.as_deref() == Some("idle")));
+    assert!(cycle
+        .iter()
+        .any(|step| step.action.as_deref() == Some("idle")));
 }
 
 #[test]
@@ -278,17 +276,12 @@ fn subset_is_cyclic_strongly_connected(mask: usize, subset: usize) -> bool {
     })
 }
 
-fn subset_satisfies_strong_fairness(
-    mask: usize,
-    actions: [u8; EDGE_COUNT],
-    subset: usize,
-) -> bool {
+fn subset_satisfies_strong_fairness(mask: usize, actions: [u8; EDGE_COUNT], subset: usize) -> bool {
     [1u8, 2u8].into_iter().all(|fair_code| {
         let enabled = (0..N).any(|from| {
             subset_contains(subset, from)
                 && (0..N).any(|to| {
-                    has_edge(mask, from, to)
-                        && actions[edge_index(from, to)] == fair_code
+                    has_edge(mask, from, to) && actions[edge_index(from, to)] == fair_code
                 })
         });
         let internally_taken = (0..N).any(|from| {
@@ -315,7 +308,9 @@ fn oracle_has_strong_fair_infinite_run(mask: usize, actions: [u8; EDGE_COUNT]) -
 fn assert_real_strong_fair_cycle(
     mask: usize,
     actions: [u8; EDGE_COUNT],
-    cycle: &[formal_verification_lab::TraceStep<formal_verification_lab::BuchiProductState<usize, ()>>],
+    cycle: &[formal_verification_lab::TraceStep<
+        formal_verification_lab::BuchiProductState<usize, ()>,
+    >],
 ) {
     assert!(cycle.len() >= 2);
     assert_eq!(cycle.first().unwrap().state, cycle.last().unwrap().state);
@@ -336,9 +331,7 @@ fn assert_real_strong_fair_cycle(
         let fair_action = action_label(fair_code);
         let enabled_on_cycle = cycle.iter().any(|step| {
             let from = step.state.state;
-            (0..N).any(|to| {
-                has_edge(mask, from, to) && actions[edge_index(from, to)] == fair_code
-            })
+            (0..N).any(|to| has_edge(mask, from, to) && actions[edge_index(from, to)] == fair_code)
         });
         let taken_on_cycle = cycle
             .iter()
@@ -357,10 +350,8 @@ fn all_two_node_graph_action_assignments_match_independent_strong_fair_oracle() 
             let actions = decode_actions(assignment);
             let expected_violation = oracle_has_strong_fair_infinite_run(graph_mask, actions);
             let model = generated_model(graph_mask, actions);
-            let result =
-                check_buchi_with_strong_fairness(&model, &automaton, &fairness).unwrap();
-            let repeated =
-                check_buchi_with_strong_fairness(&model, &automaton, &fairness).unwrap();
+            let result = check_buchi_with_strong_fairness(&model, &automaton, &fairness).unwrap();
+            let repeated = check_buchi_with_strong_fairness(&model, &automaton, &fairness).unwrap();
             assert_eq!(
                 result, repeated,
                 "determinism graph={graph_mask} assignment={assignment}"
