@@ -1,9 +1,12 @@
-use crate::bounded::BoundedOutcome;
+use crate::bounded::{
+    AnalysisInconclusiveReason, AnalysisLimits, AnalysisOutcome, AnalysisStage, BoundedOutcome,
+};
 use crate::checker::{ExplorationLimits, TraceStep};
 use crate::graph::{capture_reachable_graph, induced_graph, shortest_path, ReachableGraph};
 use crate::model::TransitionSystem;
 use crate::product::{
-    build_action_product, build_action_product_with_limits, BoundedActionProduct,
+    build_action_product, build_action_product_with_analysis_limits,
+    build_action_product_with_limits, BoundedActionProduct, StagedActionProduct,
 };
 use crate::recurrence::{
     component_is_cyclic, cycle_witness, strongly_connected_components, RecurrenceError,
@@ -208,6 +211,28 @@ pub struct BoundedMultiResponseResult<S> {
     pub counterexample: Option<MultiResponseCounterexample<S>>,
 }
 
+/// Multi-response verification under independently configured model-capture and
+/// product-construction limits.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AnalysisMultiResponseResult<S> {
+    pub property: String,
+    pub outcome: AnalysisOutcome<MultiResponseStatus>,
+    pub model_completion: BoundedOutcome<()>,
+    pub product_completion: BoundedOutcome<()>,
+    pub model_states: usize,
+    pub checked_model_states: usize,
+    pub explored_model_transitions: usize,
+    pub retained_model_transitions: usize,
+    pub max_model_depth_reached: Option<usize>,
+    pub product_states: usize,
+    pub checked_product_states: usize,
+    pub explored_product_transitions: usize,
+    pub retained_product_transitions: usize,
+    pub max_product_depth_reached: Option<usize>,
+    pub clause_count: usize,
+    pub counterexample: Option<MultiResponseCounterexample<S>>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MultiResponseError {
     EmptyPropertyName,
@@ -366,6 +391,101 @@ where
         clause_count: property.clauses.len(),
         counterexample,
     })
+}
+
+/// Verify multi-response semantics under a staged whole-analysis envelope.
+///
+/// Model limits are applied first by the canonical bounded BFS; product limits
+/// then apply to the justified retained model prefix. A real pending terminal or
+/// real closed pending cycle is conclusive even if either stage is incomplete.
+/// Without such a witness, `SATISFIED` requires both stages to complete.
+///
+/// If both stages are incomplete and no conclusive witness exists, the overall
+/// reason deterministically reports the earlier model stage. Both stage-specific
+/// completions remain available in the returned result.
+pub fn check_multi_response_with_limits<S>(
+    model: &TransitionSystem<S>,
+    property: &MultiResponseProperty,
+    limits: AnalysisLimits,
+) -> Result<AnalysisMultiResponseResult<S>, MultiResponseError>
+where
+    S: Clone + Eq + Hash,
+{
+    let initial_pending = vec![false; property.clauses.len()];
+    let StagedActionProduct {
+        product:
+            BoundedActionProduct {
+                graph: product,
+                checked_states: checked_product_states,
+                explored_transitions: explored_product_transitions,
+                max_depth_reached: max_product_depth_reached,
+                completion: product_completion,
+                known_terminal,
+            },
+        model_discovered_states,
+        model_checked_states,
+        model_explored_transitions,
+        model_retained_transitions,
+        model_max_depth_reached,
+        model_completion,
+    } = build_action_product_with_analysis_limits(
+        model,
+        &initial_pending,
+        |pending, action| next_pending(property, pending, action),
+        |state, pending| MultiObligationState { state, pending },
+        limits,
+    )
+    .map_err(RecurrenceError::from)?;
+
+    let retained_product_transitions = product.outgoing.iter().map(Vec::len).sum();
+    let counterexample = find_counterexample(&product, &known_terminal, property)?;
+    let outcome = analysis_outcome(
+        counterexample.is_some(),
+        &model_completion,
+        &product_completion,
+    );
+
+    Ok(AnalysisMultiResponseResult {
+        property: property.name.clone(),
+        outcome,
+        model_completion,
+        product_completion,
+        model_states: model_discovered_states,
+        checked_model_states: model_checked_states,
+        explored_model_transitions,
+        retained_model_transitions: model_retained_transitions,
+        max_model_depth_reached: model_max_depth_reached,
+        product_states: product.states.len(),
+        checked_product_states,
+        explored_product_transitions,
+        retained_product_transitions,
+        max_product_depth_reached,
+        clause_count: property.clauses.len(),
+        counterexample,
+    })
+}
+
+fn analysis_outcome(
+    violated: bool,
+    model_completion: &BoundedOutcome<()>,
+    product_completion: &BoundedOutcome<()>,
+) -> AnalysisOutcome<MultiResponseStatus> {
+    if violated {
+        return AnalysisOutcome::Conclusive(MultiResponseStatus::Violated);
+    }
+    if let BoundedOutcome::Inconclusive(reason) = model_completion {
+        return AnalysisOutcome::Inconclusive(AnalysisInconclusiveReason {
+            stage: AnalysisStage::Model,
+            reason: *reason,
+        });
+    }
+    if let BoundedOutcome::Inconclusive(reason) = product_completion {
+        return AnalysisOutcome::Inconclusive(AnalysisInconclusiveReason {
+            stage: AnalysisStage::Product,
+            reason: *reason,
+        });
+    }
+    AnalysisOutcome::Conclusive(MultiResponseStatus::Satisfied)
 }
 
 fn next_pending(property: &MultiResponseProperty, pending: &[bool], action: &str) -> Vec<bool> {
