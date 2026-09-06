@@ -1,6 +1,7 @@
 use formal_verification_lab::multi_response::{
-    check_multi_response, check_multi_response_with_limits, check_multi_response_with_product_limits,
-    MultiResponseCounterexample, MultiResponseProperty, MultiResponseStatus, ResponseClause,
+    check_multi_response, check_multi_response_with_limits,
+    check_multi_response_with_product_limits, MultiResponseCounterexample, MultiResponseProperty,
+    MultiResponseStatus, ResponseClause,
 };
 use formal_verification_lab::{
     AnalysisInconclusiveReason, AnalysisLimits, AnalysisOutcome, AnalysisStage, BoundedOutcome,
@@ -82,10 +83,7 @@ fn model_depth_cutoff_does_not_fabricate_a_pending_terminal() {
 #[test]
 fn proven_pending_terminal_survives_a_later_model_cutoff() {
     let model = model("terminal-before-model-cutoff", |state| match *state {
-        0 => vec![
-            Transition::new("request", 1),
-            Transition::new("branch", 2),
-        ],
+        0 => vec![Transition::new("request", 1), Transition::new("branch", 2)],
         1 => Vec::new(),
         2 => vec![Transition::new("later", 3)],
         _ => Vec::new(),
@@ -118,10 +116,7 @@ fn proven_pending_terminal_survives_a_later_model_cutoff() {
 #[test]
 fn retained_pending_cycle_survives_a_later_model_cutoff() {
     let model = model("cycle-before-model-cutoff", |state| match *state {
-        0 => vec![
-            Transition::new("request", 1),
-            Transition::new("branch", 2),
-        ],
+        0 => vec![Transition::new("request", 1), Transition::new("branch", 2)],
         1 => vec![Transition::new("wait", 1)],
         2 => vec![Transition::new("later", 3)],
         _ => Vec::new(),
@@ -170,10 +165,7 @@ fn model_stage_has_deterministic_precedence_when_both_stages_cut_off() {
     let result = check_multi_response_with_limits(
         &model,
         &response_property(),
-        AnalysisLimits::new(
-            limits(None, None, Some(1)),
-            limits(Some(1), None, None),
-        ),
+        AnalysisLimits::new(limits(None, None, Some(1)), limits(Some(1), None, None)),
     )
     .unwrap();
 
@@ -290,13 +282,13 @@ fn fully_unbounded_composed_analysis_is_exactly_legacy_equivalent() {
     let composed =
         check_multi_response_with_limits(&model, &property, AnalysisLimits::unbounded()).unwrap();
 
-    assert_eq!(
-        composed.outcome,
-        AnalysisOutcome::Conclusive(direct.status)
-    );
+    assert_eq!(composed.outcome, AnalysisOutcome::Conclusive(direct.status));
     assert_eq!(composed.property, direct.property);
     assert_eq!(composed.model_states, direct.model_states);
-    assert_eq!(composed.explored_model_transitions, direct.model_transitions);
+    assert_eq!(
+        composed.explored_model_transitions,
+        direct.model_transitions
+    );
     assert_eq!(composed.product_states, direct.product_states);
     assert_eq!(
         composed.explored_product_transitions,
