@@ -32,8 +32,9 @@ use formal_verification_lab::monitor_report::{
     render_bounded_monitor_report, render_monitor_report,
 };
 use formal_verification_lab::multi_response::{
-    check_multi_response, check_multi_response_with_limits, check_multi_response_with_product_limits,
-    MultiResponseProperty, MultiResponseStatus, ResponseClause,
+    check_multi_response, check_multi_response_with_limits,
+    check_multi_response_with_product_limits, MultiResponseProperty, MultiResponseStatus,
+    ResponseClause,
 };
 use formal_verification_lab::multi_response_examples::{
     dual_response_protocol, unfair_dual_response_protocol,
@@ -65,8 +66,8 @@ use formal_verification_lab::report::{
     render_deadlock_report, render_reachability_report, render_recurrence_report, render_report,
 };
 use formal_verification_lab::response::{
-    check_response, check_response_with_limits, check_response_with_product_limits, ResponseProperty,
-    ResponseStatus,
+    check_response, check_response_with_limits, check_response_with_product_limits,
+    ResponseProperty, ResponseStatus,
 };
 use formal_verification_lab::response_examples::{
     request_grant_protocol, unfair_request_grant_protocol,
@@ -411,8 +412,8 @@ where
 
     if contains_model_limit_flag(option_args) {
         let limits = parse_analysis_limits(option_args)?;
-        let result =
-            check_response_with_limits(&model, &property, limits).map_err(|error| error.to_string())?;
+        let result = check_response_with_limits(&model, &property, limits)
+            .map_err(|error| error.to_string())?;
         print!("{}", render_analysis_response_report(model.name(), &result));
         return Ok(match &result.outcome {
             AnalysisOutcome::Conclusive(ResponseStatus::Satisfied) => ExitCode::SUCCESS,
