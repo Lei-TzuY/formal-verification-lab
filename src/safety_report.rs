@@ -6,7 +6,12 @@ use std::fmt::Write;
 
 pub fn render_safety_report(model_name: &str, result: &SafetyResult) -> String {
     let mut output = String::new();
-    render_header(&mut output, model_name, &result.property, &result.expression);
+    render_header(
+        &mut output,
+        model_name,
+        &result.property,
+        &result.expression,
+    );
     writeln!(&mut output, "safety: {}", status_label(result.status))
         .expect("writing to String cannot fail");
     render_accounting(
@@ -22,15 +27,19 @@ pub fn render_safety_report(model_name: &str, result: &SafetyResult) -> String {
 
 pub fn render_bounded_safety_report(model_name: &str, result: &BoundedSafetyResult) -> String {
     let mut output = String::new();
-    render_header(&mut output, model_name, &result.property, &result.expression);
+    render_header(
+        &mut output,
+        model_name,
+        &result.property,
+        &result.expression,
+    );
     match result.outcome {
         BoundedOutcome::Conclusive(status) => {
             writeln!(&mut output, "safety: {}", status_label(status))
                 .expect("writing to String cannot fail");
         }
         BoundedOutcome::Inconclusive(reason) => {
-            writeln!(&mut output, "safety: INCONCLUSIVE")
-                .expect("writing to String cannot fail");
+            writeln!(&mut output, "safety: INCONCLUSIVE").expect("writing to String cannot fail");
             writeln!(
                 &mut output,
                 "inconclusive reason: {}",
