@@ -17,18 +17,11 @@ fn stderr(output: &std::process::Output) -> String {
 
 #[test]
 fn monitor_cli_exposes_honest_product_space_inconclusive() {
-    let output = run(&[
-        "monitor",
-        "session-ok",
-        "--max-product-states",
-        "1",
-    ]);
+    let output = run(&["monitor", "session-ok", "--max-product-states", "1"]);
     assert_eq!(output.status.code(), Some(3));
     let output_stdout = stdout(&output);
     assert!(output_stdout.contains("monitor verification: INCONCLUSIVE"));
-    assert!(
-        output_stdout.contains("product inconclusive reason: state limit reached (max 1)")
-    );
+    assert!(output_stdout.contains("product inconclusive reason: state limit reached (max 1)"));
     assert!(output_stdout.contains("model states: 3"));
     assert!(output_stdout.contains("model transitions: 3"));
     assert!(output_stdout.contains("product states: 1"));
@@ -51,12 +44,7 @@ fn bounded_monitor_cli_preserves_real_rejecting_and_cycle_violations() {
     assert!(rejecting_stdout.contains("violated condition: legal-action-order"));
     assert!(rejecting_stdout.contains("explored product transitions: 2"));
 
-    let cycle = run(&[
-        "monitor",
-        "session-stuck",
-        "--max-product-transitions",
-        "3",
-    ]);
+    let cycle = run(&["monitor", "session-stuck", "--max-product-transitions", "3"]);
     assert_eq!(cycle.status.code(), Some(8));
     let cycle_stdout = stdout(&cycle);
     assert!(cycle_stdout.contains("monitor verification: VIOLATED"));
