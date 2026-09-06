@@ -93,12 +93,7 @@ fn declarative_temporal_file_accepts_staged_model_limits() {
 
 #[test]
 fn product_only_temporal_cli_keeps_the_existing_report_contract() {
-    let output = run(&[
-        "temporal",
-        "request-grant",
-        "--max-product-states",
-        "1",
-    ]);
+    let output = run(&["temporal", "request-grant", "--max-product-states", "1"]);
     assert_eq!(output.status.code(), Some(3));
     let output_stdout = stdout(&output);
     assert!(output_stdout.contains("product inconclusive reason: state limit reached (max 1)"));
@@ -127,12 +122,7 @@ fn response_cycle_remains_conclusive_before_a_later_model_transition_cutoff() {
 
 #[test]
 fn buchi_cycle_remains_conclusive_before_a_later_model_transition_cutoff() {
-    let output = run(&[
-        "buchi",
-        "pulses-unfair",
-        "--max-model-transitions",
-        "2",
-    ]);
+    let output = run(&["buchi", "pulses-unfair", "--max-model-transitions", "2"]);
     assert_eq!(output.status.code(), Some(9));
     let output_stdout = stdout(&output);
     assert!(output_stdout.contains("Buchi verification: VIOLATED"));
