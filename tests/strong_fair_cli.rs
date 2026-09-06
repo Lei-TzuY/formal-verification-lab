@@ -145,14 +145,9 @@ fn malformed_and_mixed_fairness_fail_closed() {
     assert_eq!(duplicate.status.code(), Some(2));
     assert!(stderr(&duplicate).contains("duplicate strong-fair action 'grant'"));
 
-    let missing = fvlab(&[
-        "temporal",
-        "request-grant-unfair",
-        "--strong-fair-action",
-    ]);
+    let missing = fvlab(&["temporal", "request-grant-unfair", "--strong-fair-action"]);
     assert_eq!(missing.status.code(), Some(2));
-    assert!(stderr(&missing)
-        .contains("option '--strong-fair-action' requires an action value"));
+    assert!(stderr(&missing).contains("option '--strong-fair-action' requires an action value"));
 
     let mixed = fvlab(&[
         "temporal",
