@@ -4,6 +4,10 @@ use crate::bounded::{
 use crate::bounded_fairness::{
     check_buchi_with_weak_fairness_and_limits, check_buchi_with_weak_fairness_and_product_limits,
 };
+use crate::bounded_strong_fairness::{
+    check_buchi_with_strong_fairness_and_limits,
+    check_buchi_with_strong_fairness_and_product_limits,
+};
 use crate::buchi::{
     AcceptanceSet, AnalysisBuchiResult, BoundedBuchiResult, BuchiAutomaton, BuchiCounterexample,
     BuchiError, BuchiProductState, BuchiResult, BuchiStatus, FiniteRunPolicy,
@@ -19,6 +23,7 @@ use crate::product::{
 use crate::recurrence::{
     component_is_cyclic, cycle_witness, strongly_connected_components, RecurrenceError,
 };
+use crate::strong_fairness::{check_buchi_with_strong_fairness, StrongFairness};
 use std::collections::HashSet;
 use std::fmt;
 use std::hash::Hash;
@@ -264,7 +269,7 @@ impl fmt::Display for MultiResponseError {
                 write!(f, "duplicate response clause name '{name}'")
             }
             Self::Graph(error) => write!(f, "multi-response graph analysis failed: {error}"),
-            Self::Buchi(error) => write!(f, "weak-fair multi-response analysis failed: {error}"),
+            Self::Buchi(error) => write!(f, "fair multi-response analysis failed: {error}"),
             Self::MissingFiniteWitness => write!(
                 f,
                 "pending terminal product state did not yield a counterexample trace"
@@ -275,7 +280,7 @@ impl fmt::Display for MultiResponseError {
             ),
             Self::FairnessAdapterInvariant => write!(
                 f,
-                "weak-fair multi-response adapter observed inconsistent clause state"
+                "fair multi-response adapter observed inconsistent clause state"
             ),
         }
     }
@@ -512,6 +517,30 @@ where
     normalize_fair_buchi_result(property, result)
 }
 
+/// Verify the conjunction of response clauses over executions admitted by an
+/// explicit exact-action strong-fairness contract.
+///
+/// Clause obligations retain one generalized Buchi acceptance set each. Strong
+/// fairness constrains only infinite executions, so strict accepting-terminal
+/// semantics continue to report any real finite pending terminal as a violation.
+/// Empty strong fairness delegates exactly to the historical M11 engine.
+pub fn check_multi_response_with_strong_fairness<S>(
+    model: &TransitionSystem<S>,
+    property: &MultiResponseProperty,
+    fairness: &StrongFairness,
+) -> Result<MultiResponseResult<S>, MultiResponseError>
+where
+    S: Clone + Eq + Hash,
+{
+    if fairness.is_empty() {
+        return check_multi_response(model, property);
+    }
+
+    let automaton = fair_multi_response_automaton(property)?;
+    let result = check_buchi_with_strong_fairness(model, &automaton, fairness)?;
+    normalize_fair_buchi_result(property, result)
+}
+
 /// Product-bounded weak-fair multi-response verification after complete model
 /// capture. Unknown product work remains `INCONCLUSIVE` unless a real weakly
 /// fair violating terminal/cycle is already justified by the retained prefix.
@@ -531,6 +560,28 @@ where
     let automaton = fair_multi_response_automaton(property)?;
     let result =
         check_buchi_with_weak_fairness_and_product_limits(model, &automaton, fairness, limits)?;
+    normalize_fair_bounded_buchi_result(property, result)
+}
+
+/// Product-bounded strong-fair multi-response verification after complete model
+/// capture. Strong-fair enablement authority and retained-cycle honesty are
+/// inherited from the M39 bounded strong-fair Buchi engine.
+pub fn check_multi_response_with_strong_fairness_and_product_limits<S>(
+    model: &TransitionSystem<S>,
+    property: &MultiResponseProperty,
+    fairness: &StrongFairness,
+    limits: ExplorationLimits,
+) -> Result<BoundedMultiResponseResult<S>, MultiResponseError>
+where
+    S: Clone + Eq + Hash,
+{
+    if fairness.is_empty() {
+        return check_multi_response_with_product_limits(model, property, limits);
+    }
+
+    let automaton = fair_multi_response_automaton(property)?;
+    let result =
+        check_buchi_with_strong_fairness_and_product_limits(model, &automaton, fairness, limits)?;
     normalize_fair_bounded_buchi_result(property, result)
 }
 
@@ -556,6 +607,27 @@ where
     normalize_fair_analysis_buchi_result(property, result)
 }
 
+/// Staged model/product-bounded strong-fair multi-response verification. M39's
+/// conservative enablement provenance is retained, so missing prefix edges can
+/// never prove that an intermittently enabled strong-fair action is disabled.
+pub fn check_multi_response_with_strong_fairness_and_limits<S>(
+    model: &TransitionSystem<S>,
+    property: &MultiResponseProperty,
+    fairness: &StrongFairness,
+    limits: AnalysisLimits,
+) -> Result<AnalysisMultiResponseResult<S>, MultiResponseError>
+where
+    S: Clone + Eq + Hash,
+{
+    if fairness.is_empty() {
+        return check_multi_response_with_limits(model, property, limits);
+    }
+
+    let automaton = fair_multi_response_automaton(property)?;
+    let result = check_buchi_with_strong_fairness_and_limits(model, &automaton, fairness, limits)?;
+    normalize_fair_analysis_buchi_result(property, result)
+}
+
 fn fair_multi_response_automaton(
     property: &MultiResponseProperty,
 ) -> Result<BuchiAutomaton<Vec<bool>>, MultiResponseError> {
@@ -567,7 +639,7 @@ fn fair_multi_response_automaton(
         )?);
     }
 
-    let name = format!("{}-weak-fair-response", property.name);
+    let name = format!("{}-fair-response", property.name);
     let initial = vec![false; property.clauses.len()];
     let step_property = property.clone();
     Ok(BuchiAutomaton::new(
