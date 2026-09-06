@@ -1,12 +1,13 @@
+use crate::bounded::BoundedOutcome;
 use crate::buchi::{
-    check_buchi, AcceptanceSet, BuchiAutomaton, BuchiCounterexample, BuchiError, BuchiProductState,
-    BuchiStatus, FiniteRunPolicy,
+    check_buchi, check_buchi_with_product_limits, AcceptanceSet, BuchiAutomaton,
+    BuchiCounterexample, BuchiError, BuchiProductState, BuchiStatus, FiniteRunPolicy,
 };
-use crate::checker::TraceStep;
+use crate::checker::{ExplorationLimits, TraceStep};
 use crate::model::TransitionSystem;
 use crate::response::{
-    check_response, ObligationState, ResponseCounterexample, ResponseError, ResponseProperty,
-    ResponseStatus,
+    check_response, check_response_with_product_limits, ObligationState, ResponseCounterexample,
+    ResponseError, ResponseProperty, ResponseStatus,
 };
 use std::collections::HashSet;
 use std::fmt;
@@ -182,6 +183,23 @@ pub struct TemporalResult<S> {
     pub counterexample: Option<TemporalCounterexample<S>>,
 }
 
+/// Typed temporal result when only deterministic action-product construction is
+/// resource bounded. Model capture remains exhaustive.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BoundedTemporalResult<S> {
+    pub property: String,
+    pub backend: TemporalBackend,
+    pub outcome: BoundedOutcome<TemporalStatus>,
+    pub model_states: usize,
+    pub model_transitions: usize,
+    pub product_states: usize,
+    pub checked_product_states: usize,
+    pub explored_product_transitions: usize,
+    pub retained_product_transitions: usize,
+    pub max_product_depth_reached: Option<usize>,
+    pub counterexample: Option<TemporalCounterexample<S>>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TemporalError {
     EmptyPropertyName,
@@ -251,6 +269,31 @@ where
     }
 }
 
+/// Compile and verify one typed action-temporal specification while bounding
+/// only the shared action-product phase of the selected backend.
+///
+/// Model capture remains exhaustive. A real response or Büchi counterexample in
+/// the retained product prefix remains conclusive; otherwise an incomplete
+/// product is reported explicitly as `Inconclusive` and is never promoted to
+/// frontend satisfaction.
+pub fn check_action_temporal_with_product_limits<S>(
+    model: &TransitionSystem<S>,
+    spec: &ActionTemporalSpec,
+    limits: ExplorationLimits,
+) -> Result<BoundedTemporalResult<S>, TemporalError>
+where
+    S: Clone + Eq + Hash,
+{
+    match &spec.kind {
+        ActionTemporalKind::Response { trigger, response } => {
+            check_response_spec_with_product_limits(model, spec, trigger, response, limits)
+        }
+        ActionTemporalKind::AllInfinitelyOften { actions } => {
+            check_recurring_spec_with_product_limits(model, spec, actions, limits)
+        }
+    }
+}
+
 fn check_response_spec<S>(
     model: &TransitionSystem<S>,
     spec: &ActionTemporalSpec,
@@ -260,15 +303,69 @@ fn check_response_spec<S>(
 where
     S: Clone + Eq + Hash,
 {
+    let property = response_property(spec, trigger, response)?;
+    let result = check_response(model, &property)?;
+    let counterexample = normalize_response_counterexample(result.counterexample);
+
+    Ok(TemporalResult {
+        property: result.property,
+        backend: TemporalBackend::Response,
+        status: map_response_status(result.status),
+        model_states: result.model_states,
+        model_transitions: result.model_transitions,
+        product_states: result.product_states,
+        product_transitions: result.product_transitions,
+        counterexample,
+    })
+}
+
+fn check_response_spec_with_product_limits<S>(
+    model: &TransitionSystem<S>,
+    spec: &ActionTemporalSpec,
+    trigger: &ActionAtom,
+    response: &ActionAtom,
+    limits: ExplorationLimits,
+) -> Result<BoundedTemporalResult<S>, TemporalError>
+where
+    S: Clone + Eq + Hash,
+{
+    let property = response_property(spec, trigger, response)?;
+    let result = check_response_with_product_limits(model, &property, limits)?;
+    let counterexample = normalize_response_counterexample(result.counterexample);
+
+    Ok(BoundedTemporalResult {
+        property: result.property,
+        backend: TemporalBackend::Response,
+        outcome: map_bounded_response_outcome(result.outcome),
+        model_states: result.model_states,
+        model_transitions: result.model_transitions,
+        product_states: result.product_states,
+        checked_product_states: result.checked_product_states,
+        explored_product_transitions: result.explored_product_transitions,
+        retained_product_transitions: result.retained_product_transitions,
+        max_product_depth_reached: result.max_product_depth_reached,
+        counterexample,
+    })
+}
+
+fn response_property(
+    spec: &ActionTemporalSpec,
+    trigger: &ActionAtom,
+    response: &ActionAtom,
+) -> Result<ResponseProperty, TemporalError> {
     let trigger = trigger.0.clone();
     let response = response.0.clone();
-    let property = ResponseProperty::new(
+    Ok(ResponseProperty::new(
         spec.name.clone(),
         move |action| action == trigger,
         move |action| action == response,
-    )?;
-    let result = check_response(model, &property)?;
-    let counterexample = match result.counterexample {
+    )?)
+}
+
+fn normalize_response_counterexample<S>(
+    counterexample: Option<ResponseCounterexample<S>>,
+) -> Option<TemporalCounterexample<S>> {
+    match counterexample {
         None => None,
         Some(ResponseCounterexample::Finite { trace }) => Some(TemporalCounterexample::Finite {
             obligation: TemporalObligation::Response,
@@ -281,21 +378,23 @@ where
                 cycle: strip_response_trace(cycle),
             })
         }
-    };
+    }
+}
 
-    Ok(TemporalResult {
-        property: result.property,
-        backend: TemporalBackend::Response,
-        status: match result.status {
-            ResponseStatus::Satisfied => TemporalStatus::Satisfied,
-            ResponseStatus::Violated => TemporalStatus::Violated,
-        },
-        model_states: result.model_states,
-        model_transitions: result.model_transitions,
-        product_states: result.product_states,
-        product_transitions: result.product_transitions,
-        counterexample,
-    })
+fn map_response_status(status: ResponseStatus) -> TemporalStatus {
+    match status {
+        ResponseStatus::Satisfied => TemporalStatus::Satisfied,
+        ResponseStatus::Violated => TemporalStatus::Violated,
+    }
+}
+
+fn map_bounded_response_outcome(
+    outcome: BoundedOutcome<ResponseStatus>,
+) -> BoundedOutcome<TemporalStatus> {
+    match outcome {
+        BoundedOutcome::Conclusive(status) => BoundedOutcome::Conclusive(map_response_status(status)),
+        BoundedOutcome::Inconclusive(reason) => BoundedOutcome::Inconclusive(reason),
+    }
 }
 
 fn check_recurring_spec<S>(
@@ -306,6 +405,54 @@ fn check_recurring_spec<S>(
 where
     S: Clone + Eq + Hash,
 {
+    let automaton = recurring_automaton(spec, actions)?;
+    let result = check_buchi(model, &automaton)?;
+    let counterexample = normalize_buchi_counterexample(result.counterexample)?;
+
+    Ok(TemporalResult {
+        property: result.automaton,
+        backend: TemporalBackend::Buchi,
+        status: map_buchi_status(result.status),
+        model_states: result.model_states,
+        model_transitions: result.model_transitions,
+        product_states: result.product_states,
+        product_transitions: result.product_transitions,
+        counterexample,
+    })
+}
+
+fn check_recurring_spec_with_product_limits<S>(
+    model: &TransitionSystem<S>,
+    spec: &ActionTemporalSpec,
+    actions: &[ActionAtom],
+    limits: ExplorationLimits,
+) -> Result<BoundedTemporalResult<S>, TemporalError>
+where
+    S: Clone + Eq + Hash,
+{
+    let automaton = recurring_automaton(spec, actions)?;
+    let result = check_buchi_with_product_limits(model, &automaton, limits)?;
+    let counterexample = normalize_buchi_counterexample(result.counterexample)?;
+
+    Ok(BoundedTemporalResult {
+        property: result.automaton,
+        backend: TemporalBackend::Buchi,
+        outcome: map_bounded_buchi_outcome(result.outcome),
+        model_states: result.model_states,
+        model_transitions: result.model_transitions,
+        product_states: result.product_states,
+        checked_product_states: result.checked_product_states,
+        explored_product_transitions: result.explored_product_transitions,
+        retained_product_transitions: result.retained_product_transitions,
+        max_product_depth_reached: result.max_product_depth_reached,
+        counterexample,
+    })
+}
+
+fn recurring_automaton(
+    spec: &ActionTemporalSpec,
+    actions: &[ActionAtom],
+) -> Result<BuchiAutomaton<LastObservedAction>, TemporalError> {
     let names = actions
         .iter()
         .map(|action| action.0.clone())
@@ -320,7 +467,7 @@ where
             })
         })
         .collect::<Result<Vec<_>, _>>()?;
-    let automaton = BuchiAutomaton::new(
+    Ok(BuchiAutomaton::new(
         spec.name.clone(),
         LastObservedAction(None),
         move |_state, action| {
@@ -328,37 +475,43 @@ where
         },
         acceptance,
         FiniteRunPolicy::IgnoreTerminals,
-    )?;
-    let result = check_buchi(model, &automaton)?;
-    let counterexample = match result.counterexample {
-        None => None,
+    )?)
+}
+
+fn normalize_buchi_counterexample<S>(
+    counterexample: Option<BuchiCounterexample<S, LastObservedAction>>,
+) -> Result<Option<TemporalCounterexample<S>>, TemporalError> {
+    match counterexample {
+        None => Ok(None),
         Some(BuchiCounterexample::FiniteTerminal { .. }) => {
-            return Err(TemporalError::UnexpectedFiniteBuchiCounterexample);
+            Err(TemporalError::UnexpectedFiniteBuchiCounterexample)
         }
         Some(BuchiCounterexample::AcceptanceAvoidingCycle {
             acceptance,
             stem,
             cycle,
-        }) => Some(TemporalCounterexample::Infinite {
+        }) => Ok(Some(TemporalCounterexample::Infinite {
             obligation: TemporalObligation::InfinitelyOftenAction(acceptance),
             stem: strip_buchi_trace(stem),
             cycle: strip_buchi_trace(cycle),
-        }),
-    };
+        })),
+    }
+}
 
-    Ok(TemporalResult {
-        property: result.automaton,
-        backend: TemporalBackend::Buchi,
-        status: match result.status {
-            BuchiStatus::Satisfied => TemporalStatus::Satisfied,
-            BuchiStatus::Violated => TemporalStatus::Violated,
-        },
-        model_states: result.model_states,
-        model_transitions: result.model_transitions,
-        product_states: result.product_states,
-        product_transitions: result.product_transitions,
-        counterexample,
-    })
+fn map_buchi_status(status: BuchiStatus) -> TemporalStatus {
+    match status {
+        BuchiStatus::Satisfied => TemporalStatus::Satisfied,
+        BuchiStatus::Violated => TemporalStatus::Violated,
+    }
+}
+
+fn map_bounded_buchi_outcome(
+    outcome: BoundedOutcome<BuchiStatus>,
+) -> BoundedOutcome<TemporalStatus> {
+    match outcome {
+        BoundedOutcome::Conclusive(status) => BoundedOutcome::Conclusive(map_buchi_status(status)),
+        BoundedOutcome::Inconclusive(reason) => BoundedOutcome::Inconclusive(reason),
+    }
 }
 
 fn strip_response_trace<S>(trace: Vec<TraceStep<ObligationState<S>>>) -> Vec<TraceStep<S>> {
