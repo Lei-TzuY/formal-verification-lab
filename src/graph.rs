@@ -37,8 +37,10 @@ pub(crate) enum GraphCaptureCompletion {
 /// `graph` contains only transitions that were actually counted and whose
 /// targets were retained by the search. `known_terminal[id]` is true only when
 /// the model's full successor vector for that retained state was evaluated and
-/// proved empty. This lets higher-level properties use real finite/cycle
-/// counterexamples without mistaking an exploration cutoff for a terminal.
+/// proved empty. `complete_enabled_actions[id]` is `Some(actions)` exactly when
+/// that full successor vector was evaluated; the action list comes from the
+/// complete vector before transition/depth/state cutoffs discard retained
+/// edges. `None` therefore means action disablement is unknown, not proved.
 #[derive(Debug, Clone)]
 pub(crate) struct BoundedCapturedReachableGraph<S> {
     pub(crate) graph: ReachableGraph<S>,
@@ -48,6 +50,7 @@ pub(crate) struct BoundedCapturedReachableGraph<S> {
     pub(crate) max_depth_reached: Option<usize>,
     pub(crate) completion: GraphCaptureCompletion,
     pub(crate) known_terminal: Vec<bool>,
+    pub(crate) complete_enabled_actions: Vec<Option<Vec<String>>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -121,7 +124,7 @@ where
         GraphSearchOutcome::Inconclusive(reason) => GraphCaptureCompletion::Inconclusive(reason),
         GraphSearchOutcome::Match { .. } => return Err(GraphCaptureError::UnexpectedInconclusive),
     };
-    let (graph, known_terminal) = build_bounded_graph(
+    let (graph, known_terminal, complete_enabled_actions) = build_bounded_graph(
         model,
         captured,
         search.discovered_states,
@@ -137,6 +140,7 @@ where
         max_depth_reached: search.max_depth_reached,
         completion,
         known_terminal,
+        complete_enabled_actions,
     })
 }
 
@@ -201,7 +205,14 @@ fn build_bounded_graph<S>(
     discovered_states: usize,
     explored_transitions: usize,
     limits: ExplorationLimits,
-) -> Result<(ReachableGraph<S>, Vec<bool>), GraphCaptureError>
+) -> Result<
+    (
+        ReachableGraph<S>,
+        Vec<bool>,
+        Vec<Option<Vec<String>>>,
+    ),
+    GraphCaptureError,
+>
 where
     S: Clone + Eq + Hash,
 {
@@ -210,6 +221,7 @@ where
     let mut depths = Vec::new();
     let mut outgoing: Vec<Vec<SnapshotEdge>> = Vec::new();
     let mut known_terminal = Vec::new();
+    let mut complete_enabled_actions = Vec::new();
     let mut initial_ids = Vec::new();
 
     for initial in model.initial_states() {
@@ -225,6 +237,7 @@ where
         depths.push(0_usize);
         outgoing.push(Vec::new());
         known_terminal.push(false);
+        complete_enabled_actions.push(None);
         initial_ids.push(id);
     }
 
@@ -234,6 +247,12 @@ where
             .get(&state)
             .copied()
             .ok_or(GraphCaptureError::SnapshotTargetMissing)?;
+        complete_enabled_actions[source] = Some(
+            transitions
+                .iter()
+                .map(|transition| transition.action.clone())
+                .collect(),
+        );
         if transitions.is_empty() {
             known_terminal[source] = true;
         }
@@ -259,6 +278,7 @@ where
                     depths.push(depths[source] + 1);
                     outgoing.push(Vec::new());
                     known_terminal.push(false);
+                    complete_enabled_actions.push(None);
                     Some(id)
                 }
             };
@@ -283,6 +303,7 @@ where
             initial_ids,
         },
         known_terminal,
+        complete_enabled_actions,
     ))
 }
 
