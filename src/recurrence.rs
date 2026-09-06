@@ -133,42 +133,20 @@ pub(crate) fn strongly_connected_components<S>(graph: &ReachableGraph<S>) -> Vec
         components: Vec<Vec<usize>>,
     }
 
-    fn visit<S>(node: usize, graph: &ReachableGraph<S>, state: &mut TarjanState) {
+    #[derive(Debug, Clone, Copy)]
+    struct DfsFrame {
+        node: usize,
+        next_edge: usize,
+    }
+
+    fn enter_node(node: usize, state: &mut TarjanState, frames: &mut Vec<DfsFrame>) {
         let node_index = state.next_index;
         state.next_index += 1;
         state.index[node] = Some(node_index);
         state.lowlink[node] = node_index;
         state.stack.push(node);
         state.on_stack[node] = true;
-
-        for edge in &graph.outgoing[node] {
-            let target = edge.target;
-            if state.index[target].is_none() {
-                visit(target, graph, state);
-                state.lowlink[node] = state.lowlink[node].min(state.lowlink[target]);
-            } else if state.on_stack[target] {
-                state.lowlink[node] = state.lowlink[node].min(
-                    state.index[target].expect("a node on the Tarjan stack has an assigned index"),
-                );
-            }
-        }
-
-        if state.lowlink[node] == node_index {
-            let mut component = Vec::new();
-            loop {
-                let member = state
-                    .stack
-                    .pop()
-                    .expect("Tarjan root has itself on the stack");
-                state.on_stack[member] = false;
-                component.push(member);
-                if member == node {
-                    break;
-                }
-            }
-            component.sort_unstable();
-            state.components.push(component);
-        }
+        frames.push(DfsFrame { node, next_edge: 0 });
     }
 
     let count = graph.states.len();
@@ -180,10 +158,59 @@ pub(crate) fn strongly_connected_components<S>(graph: &ReachableGraph<S>) -> Vec
         on_stack: vec![false; count],
         components: Vec::new(),
     };
+    let mut frames = Vec::new();
 
-    for node in 0..count {
-        if state.index[node].is_none() {
-            visit(node, graph, &mut state);
+    for root in 0..count {
+        if state.index[root].is_some() {
+            continue;
+        }
+        enter_node(root, &mut state, &mut frames);
+
+        while let Some(frame) = frames.last_mut() {
+            let node = frame.node;
+            if frame.next_edge < graph.outgoing[node].len() {
+                let target = graph.outgoing[node][frame.next_edge].target;
+                frame.next_edge += 1;
+
+                if state.index[target].is_none() {
+                    enter_node(target, &mut state, &mut frames);
+                } else if state.on_stack[target] {
+                    state.lowlink[node] = state.lowlink[node].min(
+                        state.index[target]
+                            .expect("a node on the Tarjan stack has an assigned index"),
+                    );
+                }
+                continue;
+            }
+
+            let finished = frames
+                .pop()
+                .expect("the active Tarjan frame exists while finishing a node");
+            let node = finished.node;
+            let node_index = state.index[node]
+                .expect("an active Tarjan frame has an assigned discovery index");
+
+            if state.lowlink[node] == node_index {
+                let mut component = Vec::new();
+                loop {
+                    let member = state
+                        .stack
+                        .pop()
+                        .expect("Tarjan root has itself on the stack");
+                    state.on_stack[member] = false;
+                    component.push(member);
+                    if member == node {
+                        break;
+                    }
+                }
+                component.sort_unstable();
+                state.components.push(component);
+            }
+
+            if let Some(parent) = frames.last() {
+                let parent = parent.node;
+                state.lowlink[parent] = state.lowlink[parent].min(state.lowlink[node]);
+            }
         }
     }
 
@@ -246,4 +273,157 @@ pub(crate) fn cycle_witness<S: Clone + Eq>(
         stem,
         cycle,
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::strongly_connected_components;
+    use crate::graph::{ReachableGraph, SnapshotEdge};
+
+    const SMALL_N: usize = 3;
+    const SMALL_EDGE_COUNT: usize = SMALL_N * SMALL_N;
+    const DEEP_N: usize = 50_000;
+
+    fn graph_from_mask(mask: usize) -> ReachableGraph<usize> {
+        let mut outgoing = vec![Vec::new(); SMALL_N];
+        for (from, edges) in outgoing.iter_mut().enumerate() {
+            for to in 0..SMALL_N {
+                if mask & (1usize << (from * SMALL_N + to)) != 0 {
+                    edges.push(SnapshotEdge {
+                        action: format!("{from}->{to}"),
+                        target: to,
+                    });
+                }
+            }
+        }
+        ReachableGraph {
+            states: (0..SMALL_N).collect(),
+            outgoing,
+            initial_ids: vec![0],
+        }
+    }
+
+    fn recursive_reference<S>(graph: &ReachableGraph<S>) -> Vec<Vec<usize>> {
+        struct State {
+            next_index: usize,
+            index: Vec<Option<usize>>,
+            lowlink: Vec<usize>,
+            stack: Vec<usize>,
+            on_stack: Vec<bool>,
+            components: Vec<Vec<usize>>,
+        }
+
+        fn visit<S>(node: usize, graph: &ReachableGraph<S>, state: &mut State) {
+            let node_index = state.next_index;
+            state.next_index += 1;
+            state.index[node] = Some(node_index);
+            state.lowlink[node] = node_index;
+            state.stack.push(node);
+            state.on_stack[node] = true;
+
+            for edge in &graph.outgoing[node] {
+                let target = edge.target;
+                if state.index[target].is_none() {
+                    visit(target, graph, state);
+                    state.lowlink[node] = state.lowlink[node].min(state.lowlink[target]);
+                } else if state.on_stack[target] {
+                    state.lowlink[node] = state.lowlink[node].min(
+                        state.index[target]
+                            .expect("a node on the reference Tarjan stack has an index"),
+                    );
+                }
+            }
+
+            if state.lowlink[node] == node_index {
+                let mut component = Vec::new();
+                loop {
+                    let member = state
+                        .stack
+                        .pop()
+                        .expect("reference Tarjan root remains on its stack");
+                    state.on_stack[member] = false;
+                    component.push(member);
+                    if member == node {
+                        break;
+                    }
+                }
+                component.sort_unstable();
+                state.components.push(component);
+            }
+        }
+
+        let count = graph.states.len();
+        let mut state = State {
+            next_index: 0,
+            index: vec![None; count],
+            lowlink: vec![0; count],
+            stack: Vec::new(),
+            on_stack: vec![false; count],
+            components: Vec::new(),
+        };
+        for node in 0..count {
+            if state.index[node].is_none() {
+                visit(node, graph, &mut state);
+            }
+        }
+        state
+            .components
+            .sort_by_key(|component| component.first().copied().unwrap_or(usize::MAX));
+        state.components
+    }
+
+    #[test]
+    fn iterative_tarjan_matches_recursive_order_on_all_three_node_graphs() {
+        for mask in 0..(1usize << SMALL_EDGE_COUNT) {
+            let graph = graph_from_mask(mask);
+            assert_eq!(
+                strongly_connected_components(&graph),
+                recursive_reference(&graph),
+                "mask={mask}"
+            );
+        }
+    }
+
+    #[test]
+    fn iterative_tarjan_handles_deep_chain_without_recursive_dfs() {
+        let mut outgoing = vec![Vec::new(); DEEP_N];
+        for (node, edges) in outgoing.iter_mut().enumerate().take(DEEP_N - 1) {
+            edges.push(SnapshotEdge {
+                action: String::new(),
+                target: node + 1,
+            });
+        }
+        let graph = ReachableGraph {
+            states: (0..DEEP_N).collect::<Vec<_>>(),
+            outgoing,
+            initial_ids: vec![0],
+        };
+
+        let components = strongly_connected_components(&graph);
+        assert_eq!(components.len(), DEEP_N);
+        assert_eq!(components.first(), Some(&vec![0]));
+        assert_eq!(components.last(), Some(&vec![DEEP_N - 1]));
+    }
+
+    #[test]
+    fn iterative_tarjan_handles_deep_cycle_without_recursive_dfs() {
+        let mut outgoing = vec![Vec::new(); DEEP_N];
+        for (node, edges) in outgoing.iter_mut().enumerate() {
+            edges.push(SnapshotEdge {
+                action: String::new(),
+                target: (node + 1) % DEEP_N,
+            });
+        }
+        let graph = ReachableGraph {
+            states: (0..DEEP_N).collect::<Vec<_>>(),
+            outgoing,
+            initial_ids: vec![0],
+        };
+
+        let components = strongly_connected_components(&graph);
+        assert_eq!(components.len(), 1);
+        assert_eq!(components[0].len(), DEEP_N);
+        assert_eq!(components[0].first(), Some(&0));
+        assert_eq!(components[0].last(), Some(&(DEEP_N - 1)));
+    }
 }
