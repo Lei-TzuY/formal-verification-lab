@@ -26,12 +26,15 @@ use formal_verification_lab::monitor_examples::{
 };
 use formal_verification_lab::monitor_report::render_monitor_report;
 use formal_verification_lab::multi_response::{
-    check_multi_response, MultiResponseProperty, MultiResponseStatus, ResponseClause,
+    check_multi_response, check_multi_response_with_product_limits, MultiResponseProperty,
+    MultiResponseStatus, ResponseClause,
 };
 use formal_verification_lab::multi_response_examples::{
     dual_response_protocol, unfair_dual_response_protocol,
 };
-use formal_verification_lab::multi_response_report::render_multi_response_report;
+use formal_verification_lab::multi_response_report::{
+    render_bounded_multi_response_report, render_multi_response_report,
+};
 use formal_verification_lab::property::{
     check_deadlock, check_reachability, DeadlockProperty, DeadlockStatus, ReachabilityProperty,
     ReachabilityStatus,
@@ -54,11 +57,15 @@ use formal_verification_lab::reduction::{audit_sleep_set_reduction, Independence
 use formal_verification_lab::report::{
     render_deadlock_report, render_reachability_report, render_recurrence_report, render_report,
 };
-use formal_verification_lab::response::{check_response, ResponseProperty, ResponseStatus};
+use formal_verification_lab::response::{
+    check_response, check_response_with_product_limits, ResponseProperty, ResponseStatus,
+};
 use formal_verification_lab::response_examples::{
     request_grant_protocol, unfair_request_grant_protocol,
 };
-use formal_verification_lab::response_report::render_response_report;
+use formal_verification_lab::response_report::{
+    render_bounded_response_report, render_response_report,
+};
 use formal_verification_lab::safety::{
     check_safety_assertion, check_safety_assertion_with_limits, PropositionSafetySpec, SafetyStatus,
 };
@@ -316,27 +323,31 @@ where
 }
 
 fn response_command(args: &[String]) -> Result<ExitCode, String> {
-    match args {
-        [query] if query == "request-grant" => run_response(
+    let (query, option_args) = args.split_first().ok_or_else(usage)?;
+    match query.as_str() {
+        "request-grant" => run_response(
             request_grant_protocol().map_err(|error| error.to_string())?,
             single_response_property()?,
+            option_args,
         ),
-        [query] if query == "request-grant-unfair" => run_response(
+        "request-grant-unfair" => run_response(
             unfair_request_grant_protocol().map_err(|error| error.to_string())?,
             single_response_property()?,
+            option_args,
         ),
-        [query] if query == "dual-grant" => run_multi_response(
+        "dual-grant" => run_multi_response(
             dual_response_protocol().map_err(|error| error.to_string())?,
             dual_response_property()?,
+            option_args,
         ),
-        [query] if query == "dual-grant-unfair-b" => run_multi_response(
+        "dual-grant-unfair-b" => run_multi_response(
             unfair_dual_response_protocol().map_err(|error| error.to_string())?,
             dual_response_property()?,
+            option_args,
         ),
-        [query] => Err(format!(
+        _ => Err(format!(
             "unknown response query '{query}'; expected request-grant, request-grant-unfair, dual-grant, or dual-grant-unfair-b"
         )),
-        _ => Err(usage()),
     }
 }
 
@@ -373,30 +384,59 @@ fn dual_response_property() -> Result<MultiResponseProperty, String> {
 fn run_response<S>(
     model: formal_verification_lab::TransitionSystem<S>,
     property: ResponseProperty,
+    option_args: &[String],
 ) -> Result<ExitCode, String>
 where
     S: Clone + Eq + std::hash::Hash + std::fmt::Debug,
 {
-    let result = check_response(&model, &property).map_err(|error| error.to_string())?;
-    print!("{}", render_response_report(model.name(), &result));
-    Ok(match result.status {
-        ResponseStatus::Satisfied => ExitCode::SUCCESS,
-        ResponseStatus::Violated => ExitCode::from(7),
+    if option_args.is_empty() {
+        let result = check_response(&model, &property).map_err(|error| error.to_string())?;
+        print!("{}", render_response_report(model.name(), &result));
+        return Ok(match result.status {
+            ResponseStatus::Satisfied => ExitCode::SUCCESS,
+            ResponseStatus::Violated => ExitCode::from(7),
+        });
+    }
+
+    let limits = parse_product_limits(option_args)?;
+    let result = check_response_with_product_limits(&model, &property, limits)
+        .map_err(|error| error.to_string())?;
+    print!("{}", render_bounded_response_report(model.name(), &result));
+    Ok(match &result.outcome {
+        BoundedOutcome::Conclusive(ResponseStatus::Satisfied) => ExitCode::SUCCESS,
+        BoundedOutcome::Conclusive(ResponseStatus::Violated) => ExitCode::from(7),
+        BoundedOutcome::Inconclusive(_) => ExitCode::from(3),
     })
 }
 
 fn run_multi_response<S>(
     model: formal_verification_lab::TransitionSystem<S>,
     property: MultiResponseProperty,
+    option_args: &[String],
 ) -> Result<ExitCode, String>
 where
     S: Clone + Eq + std::hash::Hash + std::fmt::Debug,
 {
-    let result = check_multi_response(&model, &property).map_err(|error| error.to_string())?;
-    print!("{}", render_multi_response_report(model.name(), &result));
-    Ok(match result.status {
-        MultiResponseStatus::Satisfied => ExitCode::SUCCESS,
-        MultiResponseStatus::Violated => ExitCode::from(7),
+    if option_args.is_empty() {
+        let result = check_multi_response(&model, &property).map_err(|error| error.to_string())?;
+        print!("{}", render_multi_response_report(model.name(), &result));
+        return Ok(match result.status {
+            MultiResponseStatus::Satisfied => ExitCode::SUCCESS,
+            MultiResponseStatus::Violated => ExitCode::from(7),
+        });
+    }
+
+    let limits = parse_product_limits(option_args)?;
+    let result = check_multi_response_with_product_limits(&model, &property, limits)
+        .map_err(|error| error.to_string())?;
+    print!(
+        "{}",
+        render_bounded_multi_response_report(model.name(), &result)
+    );
+    Ok(match &result.outcome {
+        BoundedOutcome::Conclusive(MultiResponseStatus::Satisfied) => ExitCode::SUCCESS,
+        BoundedOutcome::Conclusive(MultiResponseStatus::Violated) => ExitCode::from(7),
+        BoundedOutcome::Inconclusive(_) => ExitCode::from(3),
     })
 }
 
@@ -775,6 +815,24 @@ fn bounded_state_exit_code(outcome: &BoundedOutcome<ExactStateStatus>) -> ExitCo
 }
 
 fn parse_limits(args: &[String]) -> Result<ExplorationLimits, String> {
+    parse_named_limits(args, "--max-states", "--max-transitions", "--max-depth")
+}
+
+fn parse_product_limits(args: &[String]) -> Result<ExplorationLimits, String> {
+    parse_named_limits(
+        args,
+        "--max-product-states",
+        "--max-product-transitions",
+        "--max-product-depth",
+    )
+}
+
+fn parse_named_limits(
+    args: &[String],
+    state_flag: &str,
+    transition_flag: &str,
+    depth_flag: &str,
+) -> Result<ExplorationLimits, String> {
     let mut limits = ExplorationLimits::unbounded();
     let mut index = 0;
 
@@ -787,11 +845,14 @@ fn parse_limits(args: &[String]) -> Result<ExplorationLimits, String> {
             .parse::<usize>()
             .map_err(|_| format!("option '{flag}' requires a non-negative integer"))?;
 
-        match flag {
-            "--max-states" => set_limit(&mut limits.max_states, parsed, flag)?,
-            "--max-transitions" => set_limit(&mut limits.max_transitions, parsed, flag)?,
-            "--max-depth" => set_limit(&mut limits.max_depth, parsed, flag)?,
-            _ => return Err(format!("unknown option '{flag}'\n{}", usage())),
+        if flag == state_flag {
+            set_limit(&mut limits.max_states, parsed, flag)?;
+        } else if flag == transition_flag {
+            set_limit(&mut limits.max_transitions, parsed, flag)?;
+        } else if flag == depth_flag {
+            set_limit(&mut limits.max_depth, parsed, flag)?;
+        } else {
+            return Err(format!("unknown option '{flag}'\n{}", usage()));
         }
 
         index += 2;
@@ -837,7 +898,7 @@ fn status_exit_code(status: VerificationStatus) -> ExitCode {
 }
 
 fn usage() -> String {
-    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | eventually <counter-three|counter-four|traffic-never> | respond <request-grant|request-grant-unfair|dual-grant|dual-grant-unfair-b> | monitor <session-ok|session-double-open|session-stuck> | buchi <pulses|pulses-unfair|finite-ignore|finite-strict> | temporal <request-grant|request-grant-unfair|pulses|pulses-unfair> | temporal check <request-grant|request-grant-unfair|pulses|pulses-unfair> <expression> | temporal file <path> <expression> | state file <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition file <path> <reachable|all-eventually> <proposition> [--max-states N] [--max-transitions N] [--max-depth N] | proposition expr <path> <reachable|all-eventually> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition always <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N]]"
+    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | eventually <counter-three|counter-four|traffic-never> | respond <request-grant|request-grant-unfair|dual-grant|dual-grant-unfair-b> [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | monitor <session-ok|session-double-open|session-stuck> | buchi <pulses|pulses-unfair|finite-ignore|finite-strict> | temporal <request-grant|request-grant-unfair|pulses|pulses-unfair> | temporal check <request-grant|request-grant-unfair|pulses|pulses-unfair> <expression> | temporal file <path> <expression> | state file <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition file <path> <reachable|all-eventually> <proposition> [--max-states N] [--max-transitions N] [--max-depth N] | proposition expr <path> <reachable|all-eventually> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition always <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N]]"
         .to_owned()
 }
 

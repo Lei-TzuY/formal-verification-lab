@@ -1,7 +1,10 @@
-use crate::checker::TraceStep;
+use crate::bounded::BoundedOutcome;
+use crate::checker::{ExplorationLimits, TraceStep};
 use crate::graph::{capture_reachable_graph, induced_graph, shortest_path, ReachableGraph};
 use crate::model::TransitionSystem;
-use crate::product::build_action_product;
+use crate::product::{
+    build_action_product, build_action_product_with_limits, BoundedActionProduct,
+};
 use crate::recurrence::{
     component_is_cyclic, cycle_witness, strongly_connected_components, RecurrenceError,
 };
@@ -186,6 +189,25 @@ pub struct MultiResponseResult<S> {
     pub counterexample: Option<MultiResponseCounterexample<S>>,
 }
 
+/// Multi-response verification under deterministic product-space limits.
+///
+/// The model graph is captured exhaustively before these limits are applied;
+/// the accounting below therefore describes only action-product construction.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BoundedMultiResponseResult<S> {
+    pub property: String,
+    pub outcome: BoundedOutcome<MultiResponseStatus>,
+    pub model_states: usize,
+    pub model_transitions: usize,
+    pub product_states: usize,
+    pub checked_product_states: usize,
+    pub explored_product_transitions: usize,
+    pub retained_product_transitions: usize,
+    pub max_product_depth_reached: Option<usize>,
+    pub clause_count: usize,
+    pub counterexample: Option<MultiResponseCounterexample<S>>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MultiResponseError {
     EmptyPropertyName,
@@ -256,43 +278,129 @@ where
     let product = build_action_product(
         &captured.graph,
         &initial_pending,
-        |pending, action| {
-            let mut next_pending = pending.clone();
-            for (index, clause) in property.clauses.iter().enumerate() {
-                if (clause.response)(action) {
-                    next_pending[index] = false;
-                } else if (clause.trigger)(action) {
-                    next_pending[index] = true;
-                }
-            }
-            next_pending
-        },
+        |pending, action| next_pending(property, pending, action),
         |state, pending| MultiObligationState { state, pending },
     );
     let product_transitions = product.outgoing.iter().map(Vec::len).sum();
+    let known_terminal = product
+        .outgoing
+        .iter()
+        .map(Vec::is_empty)
+        .collect::<Vec<_>>();
+    let counterexample = find_counterexample(&product, &known_terminal, property)?;
 
+    Ok(MultiResponseResult {
+        property: property.name.clone(),
+        status: if counterexample.is_some() {
+            MultiResponseStatus::Violated
+        } else {
+            MultiResponseStatus::Satisfied
+        },
+        model_states: captured.discovered_states,
+        model_transitions: captured.explored_transitions,
+        product_states: product.states.len(),
+        product_transitions,
+        clause_count: property.clauses.len(),
+        counterexample,
+    })
+}
+
+/// Verify multi-response semantics while bounding only deterministic action-
+/// product construction.
+///
+/// A real pending terminal or closed pending cycle contained in the retained
+/// prefix is sufficient to prove `Violated`, even if the product build later
+/// reaches a resource limit. If no such witness is established, satisfaction is
+/// returned only when product construction completes; otherwise the exact
+/// product-space cutoff is returned as `Inconclusive`.
+///
+/// Because model capture remains exhaustive in this milestone slice, these
+/// limits must not be described as whole-analysis resource bounds.
+pub fn check_multi_response_with_product_limits<S>(
+    model: &TransitionSystem<S>,
+    property: &MultiResponseProperty,
+    limits: ExplorationLimits,
+) -> Result<BoundedMultiResponseResult<S>, MultiResponseError>
+where
+    S: Clone + Eq + Hash,
+{
+    let captured = capture_reachable_graph(model).map_err(RecurrenceError::from)?;
+    let initial_pending = vec![false; property.clauses.len()];
+    let BoundedActionProduct {
+        graph: product,
+        checked_states,
+        explored_transitions,
+        max_depth_reached,
+        completion,
+        known_terminal,
+    } = build_action_product_with_limits(
+        &captured.graph,
+        &initial_pending,
+        |pending, action| next_pending(property, pending, action),
+        |state, pending| MultiObligationState { state, pending },
+        limits,
+    );
+    let retained_product_transitions = product.outgoing.iter().map(Vec::len).sum();
+    let counterexample = find_counterexample(&product, &known_terminal, property)?;
+    let outcome = if counterexample.is_some() {
+        BoundedOutcome::Conclusive(MultiResponseStatus::Violated)
+    } else {
+        match completion {
+            BoundedOutcome::Conclusive(()) => {
+                BoundedOutcome::Conclusive(MultiResponseStatus::Satisfied)
+            }
+            BoundedOutcome::Inconclusive(reason) => BoundedOutcome::Inconclusive(reason),
+        }
+    };
+
+    Ok(BoundedMultiResponseResult {
+        property: property.name.clone(),
+        outcome,
+        model_states: captured.discovered_states,
+        model_transitions: captured.explored_transitions,
+        product_states: product.states.len(),
+        checked_product_states: checked_states,
+        explored_product_transitions: explored_transitions,
+        retained_product_transitions,
+        max_product_depth_reached: max_depth_reached,
+        clause_count: property.clauses.len(),
+        counterexample,
+    })
+}
+
+fn next_pending(property: &MultiResponseProperty, pending: &[bool], action: &str) -> Vec<bool> {
+    let mut next_pending = pending.to_vec();
+    for (index, clause) in property.clauses.iter().enumerate() {
+        if (clause.response)(action) {
+            next_pending[index] = false;
+        } else if (clause.trigger)(action) {
+            next_pending[index] = true;
+        }
+    }
+    next_pending
+}
+
+fn find_counterexample<S>(
+    product: &ReachableGraph<MultiObligationState<S>>,
+    known_terminal: &[bool],
+    property: &MultiResponseProperty,
+) -> Result<Option<MultiResponseCounterexample<S>>, MultiResponseError>
+where
+    S: Clone + Eq + Hash,
+{
     for (terminal, state) in product.states.iter().enumerate() {
-        if !product.outgoing[terminal].is_empty() {
+        if !known_terminal[terminal] {
             continue;
         }
         let Some(clause_index) = state.pending.iter().position(|pending| *pending) else {
             continue;
         };
-        let trace = shortest_path(&product, &product.initial_ids, terminal, None)
+        let trace = shortest_path(product, &product.initial_ids, terminal, None)
             .ok_or(MultiResponseError::MissingFiniteWitness)?;
-        return Ok(MultiResponseResult {
-            property: property.name.clone(),
-            status: MultiResponseStatus::Violated,
-            model_states: captured.discovered_states,
-            model_transitions: captured.explored_transitions,
-            product_states: product.states.len(),
-            product_transitions,
-            clause_count: property.clauses.len(),
-            counterexample: Some(MultiResponseCounterexample::Finite {
-                clause: property.clauses[clause_index].name.clone(),
-                trace,
-            }),
-        });
+        return Ok(Some(MultiResponseCounterexample::Finite {
+            clause: property.clauses[clause_index].name.clone(),
+            trace,
+        }));
     }
 
     let mut best: Option<InfiniteCandidate<S>> = None;
@@ -312,7 +420,7 @@ where
             continue;
         }
 
-        let residual = induced_graph(&product, &included);
+        let residual = induced_graph(product, &included);
         let components = strongly_connected_components(&residual);
         let Some((component_index, component)) = components
             .iter()
@@ -325,7 +433,7 @@ where
             .first()
             .ok_or(MultiResponseError::MissingCycleWitness)?;
         let product_entry = old_ids[entry];
-        let stem = shortest_path(&product, &product.initial_ids, product_entry, None)
+        let stem = shortest_path(product, &product.initial_ids, product_entry, None)
             .ok_or(MultiResponseError::MissingCycleWitness)?;
         let candidate = InfiniteCandidate {
             clause_index,
@@ -357,32 +465,14 @@ where
         )?
         .ok_or(MultiResponseError::MissingCycleWitness)?;
 
-        return Ok(MultiResponseResult {
-            property: property.name.clone(),
-            status: MultiResponseStatus::Violated,
-            model_states: captured.discovered_states,
-            model_transitions: captured.explored_transitions,
-            product_states: product.states.len(),
-            product_transitions,
-            clause_count: property.clauses.len(),
-            counterexample: Some(MultiResponseCounterexample::Infinite {
-                clause: property.clauses[candidate.clause_index].name.clone(),
-                stem: candidate.stem,
-                cycle: local.cycle,
-            }),
-        });
+        return Ok(Some(MultiResponseCounterexample::Infinite {
+            clause: property.clauses[candidate.clause_index].name.clone(),
+            stem: candidate.stem,
+            cycle: local.cycle,
+        }));
     }
 
-    Ok(MultiResponseResult {
-        property: property.name.clone(),
-        status: MultiResponseStatus::Satisfied,
-        model_states: captured.discovered_states,
-        model_transitions: captured.explored_transitions,
-        product_states: product.states.len(),
-        product_transitions,
-        clause_count: property.clauses.len(),
-        counterexample: None,
-    })
+    Ok(None)
 }
 
 struct InfiniteCandidate<S> {
