@@ -671,7 +671,8 @@ where
     S: Clone + Eq + Hash,
 {
     let property = response_property(spec, trigger, response)?;
-    let result = check_response_with_strong_fairness_and_limits(model, &property, fairness, limits)?;
+    let result =
+        check_response_with_strong_fairness_and_limits(model, &property, fairness, limits)?;
     analysis_temporal_result_from_response(result)
 }
 
