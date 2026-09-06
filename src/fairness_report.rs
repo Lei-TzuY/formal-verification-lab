@@ -3,6 +3,7 @@ use crate::monitor::{AnalysisMonitorResult, BoundedMonitorResult, MonitorResult}
 use crate::monitor_report::{
     render_analysis_monitor_report, render_bounded_monitor_report, render_monitor_report,
 };
+use crate::strong_fairness::StrongFairness;
 use crate::temporal::{AnalysisTemporalResult, BoundedTemporalResult, TemporalResult};
 use crate::temporal_report::{
     render_analysis_temporal_report, render_bounded_temporal_report, render_temporal_report,
@@ -20,7 +21,7 @@ pub fn render_weak_fair_temporal_report<S: Debug>(
     fairness: &WeakFairness,
 ) -> String {
     let mut output = render_temporal_report(model_name, result);
-    append_weak_fairness(&mut output, fairness);
+    append_fairness(&mut output, "weak", fairness.actions());
     output
 }
 
@@ -32,7 +33,7 @@ pub fn render_bounded_weak_fair_temporal_report<S: Debug>(
     fairness: &WeakFairness,
 ) -> String {
     let mut output = render_bounded_temporal_report(model_name, result);
-    append_weak_fairness(&mut output, fairness);
+    append_fairness(&mut output, "weak", fairness.actions());
     output
 }
 
@@ -45,7 +46,43 @@ pub fn render_analysis_weak_fair_temporal_report<S: Debug>(
     fairness: &WeakFairness,
 ) -> String {
     let mut output = render_analysis_temporal_report(model_name, result);
-    append_weak_fairness(&mut output, fairness);
+    append_fairness(&mut output, "weak", fairness.actions());
+    output
+}
+
+/// Render one unbounded temporal result together with the exact-action strong
+/// fairness assumptions used to filter infinite executions.
+pub fn render_strong_fair_temporal_report<S: Debug>(
+    model_name: &str,
+    result: &TemporalResult<S>,
+    fairness: &StrongFairness,
+) -> String {
+    let mut output = render_temporal_report(model_name, result);
+    append_fairness(&mut output, "strong", fairness.actions());
+    output
+}
+
+/// Render a product-bounded temporal result with explicit strong-fairness
+/// assumptions while preserving canonical product cutoff accounting.
+pub fn render_bounded_strong_fair_temporal_report<S: Debug>(
+    model_name: &str,
+    result: &BoundedTemporalResult<S>,
+    fairness: &StrongFairness,
+) -> String {
+    let mut output = render_bounded_temporal_report(model_name, result);
+    append_fairness(&mut output, "strong", fairness.actions());
+    output
+}
+
+/// Render staged model/product strong-fair temporal analysis. Stage-qualified
+/// cutoff provenance remains owned by the canonical temporal renderer.
+pub fn render_analysis_strong_fair_temporal_report<S: Debug>(
+    model_name: &str,
+    result: &AnalysisTemporalResult<S>,
+    fairness: &StrongFairness,
+) -> String {
+    let mut output = render_analysis_temporal_report(model_name, result);
+    append_fairness(&mut output, "strong", fairness.actions());
     output
 }
 
@@ -57,7 +94,7 @@ pub fn render_weak_fair_monitor_report<S: Debug, M: Debug>(
     fairness: &WeakFairness,
 ) -> String {
     let mut output = render_monitor_report(model_name, result);
-    append_weak_fairness(&mut output, fairness);
+    append_fairness(&mut output, "weak", fairness.actions());
     output
 }
 
@@ -69,7 +106,7 @@ pub fn render_bounded_weak_fair_monitor_report<S: Debug, M: Debug>(
     fairness: &WeakFairness,
 ) -> String {
     let mut output = render_bounded_monitor_report(model_name, result);
-    append_weak_fairness(&mut output, fairness);
+    append_fairness(&mut output, "weak", fairness.actions());
     output
 }
 
@@ -81,20 +118,20 @@ pub fn render_analysis_weak_fair_monitor_report<S: Debug, M: Debug>(
     fairness: &WeakFairness,
 ) -> String {
     let mut output = render_analysis_monitor_report(model_name, result);
-    append_weak_fairness(&mut output, fairness);
+    append_fairness(&mut output, "weak", fairness.actions());
     output
 }
 
-fn append_weak_fairness(output: &mut String, fairness: &WeakFairness) {
-    writeln!(
-        output,
-        "weak fairness actions: {}",
-        fairness.actions().len()
-    )
-    .expect("writing to String cannot fail");
-    for action in fairness.actions() {
-        writeln!(output, "weak-fair action: {}", quote_action(action))
-            .expect("writing to String cannot fail");
+fn append_fairness(output: &mut String, strength: &str, actions: &[String]) {
+    writeln!(output, "{strength} fairness actions: {}", actions.len())
+        .expect("writing to String cannot fail");
+    for action in actions {
+        writeln!(
+            output,
+            "{strength}-fair action: {}",
+            quote_action(action)
+        )
+        .expect("writing to String cannot fail");
     }
 }
 
