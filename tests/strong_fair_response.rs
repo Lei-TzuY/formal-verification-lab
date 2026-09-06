@@ -218,7 +218,10 @@ fn generous_product_and_staged_limits_match_unbounded_strong_fair_response() {
     assert_eq!(product.model_states, unbounded.model_states);
     assert_eq!(product.model_transitions, unbounded.model_transitions);
     assert_eq!(product.product_states, unbounded.product_states);
-    assert_eq!(product.retained_product_transitions, unbounded.product_transitions);
+    assert_eq!(
+        product.retained_product_transitions,
+        unbounded.product_transitions
+    );
     assert_eq!(product.counterexample, unbounded.counterexample);
 
     let staged = check_response_with_strong_fairness_and_limits(
@@ -233,8 +236,14 @@ fn generous_product_and_staged_limits_match_unbounded_strong_fair_response() {
         AnalysisOutcome::Conclusive(unbounded.status)
     );
     assert_eq!(staged.model_states, unbounded.model_states);
-    assert_eq!(staged.explored_model_transitions, unbounded.model_transitions);
+    assert_eq!(
+        staged.explored_model_transitions,
+        unbounded.model_transitions
+    );
     assert_eq!(staged.product_states, unbounded.product_states);
-    assert_eq!(staged.retained_product_transitions, unbounded.product_transitions);
+    assert_eq!(
+        staged.retained_product_transitions,
+        unbounded.product_transitions
+    );
     assert_eq!(staged.counterexample, unbounded.counterexample);
 }
