@@ -5,6 +5,7 @@ use crate::buchi::{
     FiniteRunPolicy,
 };
 use crate::checker::{ExplorationLimits, TraceStep};
+use crate::fairness::{check_buchi_with_weak_fairness, WeakFairness};
 use crate::model::TransitionSystem;
 use crate::response::{
     check_response, check_response_with_limits, check_response_with_product_limits,
@@ -228,6 +229,7 @@ pub enum TemporalError {
     EmptyActionName,
     NoRecurringActions,
     DuplicateRecurringAction { action: String },
+    WeakFairnessUnsupportedForResponse,
     Response(ResponseError),
     Buchi(BuchiError),
     UnexpectedFiniteBuchiCounterexample,
@@ -245,6 +247,10 @@ impl fmt::Display for TemporalError {
             Self::DuplicateRecurringAction { action } => {
                 write!(f, "duplicate infinitely-often action '{action}'")
             }
+            Self::WeakFairnessUnsupportedForResponse => write!(
+                f,
+                "weak fairness is currently supported only for infinitely-often temporal specifications"
+            ),
             Self::Response(error) => write!(f, "response backend failed: {error}"),
             Self::Buchi(error) => write!(f, "Buchi backend failed: {error}"),
             Self::UnexpectedFiniteBuchiCounterexample => write!(
@@ -287,6 +293,29 @@ where
         }
         ActionTemporalKind::AllInfinitelyOften { actions } => {
             check_recurring_spec(model, spec, actions)
+        }
+    }
+}
+
+/// Verify the typed infinite recurring-action form while quantifying only over
+/// executions admitted by exact-action weak fairness.
+///
+/// Response fairness is intentionally not inferred from this API. Passing a
+/// response specification fails closed until that backend receives an explicit
+/// fairness design of its own. The empty fairness set exactly preserves the
+/// existing recurring-action semantics.
+pub fn check_action_temporal_with_weak_fairness<S>(
+    model: &TransitionSystem<S>,
+    spec: &ActionTemporalSpec,
+    fairness: &WeakFairness,
+) -> Result<TemporalResult<S>, TemporalError>
+where
+    S: Clone + Eq + Hash,
+{
+    match &spec.kind {
+        ActionTemporalKind::Response { .. } => Err(TemporalError::WeakFairnessUnsupportedForResponse),
+        ActionTemporalKind::AllInfinitelyOften { actions } => {
+            check_recurring_spec_with_weak_fairness(model, spec, actions, fairness)
         }
     }
 }
@@ -491,8 +520,27 @@ where
 {
     let automaton = recurring_automaton(spec, actions)?;
     let result = check_buchi(model, &automaton)?;
-    let counterexample = normalize_buchi_counterexample(result.counterexample)?;
+    temporal_result_from_buchi(result)
+}
 
+fn check_recurring_spec_with_weak_fairness<S>(
+    model: &TransitionSystem<S>,
+    spec: &ActionTemporalSpec,
+    actions: &[ActionAtom],
+    fairness: &WeakFairness,
+) -> Result<TemporalResult<S>, TemporalError>
+where
+    S: Clone + Eq + Hash,
+{
+    let automaton = recurring_automaton(spec, actions)?;
+    let result = check_buchi_with_weak_fairness(model, &automaton, fairness)?;
+    temporal_result_from_buchi(result)
+}
+
+fn temporal_result_from_buchi<S>(
+    result: crate::buchi::BuchiResult<S, LastObservedAction>,
+) -> Result<TemporalResult<S>, TemporalError> {
+    let counterexample = normalize_buchi_counterexample(result.counterexample)?;
     Ok(TemporalResult {
         property: result.automaton,
         backend: TemporalBackend::Buchi,
