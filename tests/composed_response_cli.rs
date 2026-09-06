@@ -13,12 +13,7 @@ fn stdout(output: &std::process::Output) -> String {
 
 #[test]
 fn model_stage_cutoff_is_reported_with_stage_provenance() {
-    let output = run(&[
-        "respond",
-        "request-grant",
-        "--max-model-depth",
-        "0",
-    ]);
+    let output = run(&["respond", "request-grant", "--max-model-depth", "0"]);
     assert_eq!(output.status.code(), Some(3));
     let output = stdout(&output);
 
