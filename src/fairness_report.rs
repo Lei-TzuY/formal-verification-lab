@@ -1,4 +1,8 @@
 use crate::fairness::WeakFairness;
+use crate::monitor::{AnalysisMonitorResult, BoundedMonitorResult, MonitorResult};
+use crate::monitor_report::{
+    render_analysis_monitor_report, render_bounded_monitor_report, render_monitor_report,
+};
 use crate::temporal::{AnalysisTemporalResult, BoundedTemporalResult, TemporalResult};
 use crate::temporal_report::{
     render_analysis_temporal_report, render_bounded_temporal_report, render_temporal_report,
@@ -41,6 +45,42 @@ pub fn render_analysis_weak_fair_temporal_report<S: Debug>(
     fairness: &WeakFairness,
 ) -> String {
     let mut output = render_analysis_temporal_report(model_name, result);
+    append_weak_fairness(&mut output, fairness);
+    output
+}
+
+/// Render one unbounded finite-monitor result with the exact-action weak
+/// fairness assumptions that filtered only its infinite progress cycles.
+pub fn render_weak_fair_monitor_report<S: Debug, M: Debug>(
+    model_name: &str,
+    result: &MonitorResult<S, M>,
+    fairness: &WeakFairness,
+) -> String {
+    let mut output = render_monitor_report(model_name, result);
+    append_weak_fairness(&mut output, fairness);
+    output
+}
+
+/// Render a product-bounded weak-fair finite-monitor result. Product cutoff
+/// accounting remains owned by the canonical monitor renderer.
+pub fn render_bounded_weak_fair_monitor_report<S: Debug, M: Debug>(
+    model_name: &str,
+    result: &BoundedMonitorResult<S, M>,
+    fairness: &WeakFairness,
+) -> String {
+    let mut output = render_bounded_monitor_report(model_name, result);
+    append_weak_fairness(&mut output, fairness);
+    output
+}
+
+/// Render staged model/product weak-fair monitor analysis while preserving the
+/// canonical stage-qualified cutoff report and appending assumptions separately.
+pub fn render_analysis_weak_fair_monitor_report<S: Debug, M: Debug>(
+    model_name: &str,
+    result: &AnalysisMonitorResult<S, M>,
+    fairness: &WeakFairness,
+) -> String {
+    let mut output = render_analysis_monitor_report(model_name, result);
     append_weak_fairness(&mut output, fairness);
     output
 }
