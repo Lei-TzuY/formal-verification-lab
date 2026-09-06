@@ -2,7 +2,8 @@ use crate::bounded::{
     AnalysisInconclusiveReason, AnalysisLimits, AnalysisOutcome, AnalysisStage, BoundedOutcome,
 };
 use crate::buchi::{
-    AcceptanceSet, BuchiAutomaton, BuchiCounterexample, BuchiProductState, FiniteRunPolicy,
+    AcceptanceSet, BuchiAutomaton, BuchiCounterexample, BuchiError, BuchiProductState,
+    FiniteRunPolicy,
 };
 use crate::checker::{ExplorationLimits, TraceStep};
 use crate::fair_enablement::{bounded_enablement_graph_for_actions, complete_enablement_graph};
@@ -303,7 +304,8 @@ where
         known_terminal,
         &automaton,
         fairness,
-    )?;
+    )
+    .map_err(map_buchi_error)?;
 
     Ok(counterexample.map(map_buchi_counterexample))
 }
@@ -321,7 +323,7 @@ where
             AcceptanceSet::new(name, move |state| !condition.is_active(state))
         })
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|_| MonitorError::MissingWitness)?;
+        .map_err(map_buchi_error)?;
 
     BuchiAutomaton::new(
         format!("{}-strong-fair-progress", monitor.name()),
@@ -330,7 +332,18 @@ where
         acceptance,
         FiniteRunPolicy::RequireAcceptingTerminal,
     )
-    .map_err(|_| MonitorError::MissingWitness)
+    .map_err(map_buchi_error)
+}
+
+fn map_buchi_error(error: BuchiError) -> MonitorError {
+    match error {
+        BuchiError::Graph(error) => MonitorError::Graph(error),
+        BuchiError::EmptyAutomatonName
+        | BuchiError::NoAcceptanceSets
+        | BuchiError::EmptyAcceptanceName
+        | BuchiError::DuplicateAcceptanceName { .. }
+        | BuchiError::MissingWitness => MonitorError::MissingWitness,
+    }
 }
 
 fn as_buchi_graph<S, M>(
