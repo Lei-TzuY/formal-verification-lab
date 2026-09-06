@@ -6,7 +6,8 @@ use formal_verification_lab::{
     check_action_temporal_with_weak_fairness, parse_action_temporal, parse_declarative_model,
     ActionAtom, ActionTemporalSpec, AnalysisLimits, AnalysisOutcome, AnalysisStage, BoundedOutcome,
     ExplorationLimits, InconclusiveReason, Invariant, StateVariable, StrongFairness,
-    TemporalBackend, TemporalObligation, TemporalStatus, Transition, TransitionSystem, WeakFairness,
+    TemporalBackend, TemporalObligation, TemporalStatus, Transition, TransitionSystem,
+    WeakFairness,
 };
 use std::fs;
 use std::path::PathBuf;
@@ -294,11 +295,9 @@ fn textual_declarative_external_file_composes_with_strong_fairness_without_new_g
     let model = parse_declarative_model(&source).unwrap();
     let fairness = StrongFairness::new(["grant"]).unwrap();
 
-    let response = parse_action_temporal(
-        "request-eventually-grant",
-        r#"response("request","grant")"#,
-    )
-    .unwrap();
+    let response =
+        parse_action_temporal("request-eventually-grant", r#"response("request","grant")"#)
+            .unwrap();
     let response_result =
         check_action_temporal_with_strong_fairness(&model, &response, &fairness).unwrap();
     assert_eq!(response_result.backend, TemporalBackend::Response);
