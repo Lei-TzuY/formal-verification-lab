@@ -804,8 +804,9 @@ where
     }
 
     if options.has_product_limits {
-        let result = check_action_temporal_with_product_limits(&model, &spec, options.product_limits)
-            .map_err(|error| error.to_string())?;
+        let result =
+            check_action_temporal_with_product_limits(&model, &spec, options.product_limits)
+                .map_err(|error| error.to_string())?;
         print!("{}", render_bounded_temporal_report(model.name(), &result));
         return Ok(match &result.outcome {
             BoundedOutcome::Conclusive(TemporalStatus::Satisfied) => ExitCode::SUCCESS,
@@ -1074,9 +1075,9 @@ fn parse_temporal_options(args: &[String]) -> Result<TemporalCliOptions, String>
                 let value = args
                     .get(index + 1)
                     .ok_or_else(|| format!("option '{flag}' requires an integer value"))?;
-                let parsed = value.parse::<usize>().map_err(|_| {
-                    format!("option '{flag}' requires a non-negative integer")
-                })?;
+                let parsed = value
+                    .parse::<usize>()
+                    .map_err(|_| format!("option '{flag}' requires a non-negative integer"))?;
                 match flag {
                     "--max-model-states" => {
                         set_limit(&mut model_limits.max_states, parsed, flag)?;
