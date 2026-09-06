@@ -36,16 +36,13 @@ fn response_cli_exposes_honest_product_space_limits() {
     assert!(satisfied_stdout.contains("retained product transitions: 2"));
     assert!(satisfied_stdout.contains("max product depth reached: 1"));
 
-    let inconclusive = run(&[
-        "respond",
-        "request-grant",
-        "--max-product-depth",
-        "0",
-    ]);
+    let inconclusive = run(&["respond", "request-grant", "--max-product-depth", "0"]);
     assert_eq!(inconclusive.status.code(), Some(3));
     let inconclusive_stdout = stdout(&inconclusive);
     assert!(inconclusive_stdout.contains("response: INCONCLUSIVE"));
-    assert!(inconclusive_stdout.contains("product inconclusive reason: depth limit reached (max 0)"));
+    assert!(
+        inconclusive_stdout.contains("product inconclusive reason: depth limit reached (max 0)")
+    );
     assert!(inconclusive_stdout.contains("model states: 2"));
     assert!(inconclusive_stdout.contains("model transitions: 2"));
     assert!(inconclusive_stdout.contains("product states: 1"));
@@ -72,12 +69,7 @@ fn response_cli_exposes_honest_product_space_limits() {
 
 #[test]
 fn multi_response_cli_uses_the_same_product_limit_contract() {
-    let output = run(&[
-        "respond",
-        "dual-grant",
-        "--max-product-states",
-        "1",
-    ]);
+    let output = run(&["respond", "dual-grant", "--max-product-states", "1"]);
     assert_eq!(output.status.code(), Some(3));
     let output_stdout = stdout(&output);
     assert!(output_stdout.contains("multi-response: INCONCLUSIVE"));
@@ -96,8 +88,9 @@ fn response_cli_rejects_model_limit_flags_and_malformed_product_limits() {
 
     let missing_value = run(&["respond", "request-grant", "--max-product-depth"]);
     assert_eq!(missing_value.status.code(), Some(2));
-    assert!(stderr(&missing_value)
-        .contains("option '--max-product-depth' requires an integer value"));
+    assert!(
+        stderr(&missing_value).contains("option '--max-product-depth' requires an integer value")
+    );
 
     let duplicate = run(&[
         "respond",
