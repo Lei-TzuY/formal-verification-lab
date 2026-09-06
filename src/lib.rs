@@ -28,6 +28,7 @@ pub mod monitor;
 pub mod monitor_examples;
 pub mod monitor_fairness;
 pub mod monitor_report;
+pub mod monitor_strong_fairness;
 pub mod multi_response;
 pub mod multi_response_examples;
 pub mod multi_response_report;
@@ -100,6 +101,10 @@ pub use monitor_fairness::{
     check_monitor_with_weak_fairness_and_product_limits,
 };
 pub use monitor_report::{render_bounded_monitor_report, render_monitor_report};
+pub use monitor_strong_fairness::{
+    check_monitor_with_strong_fairness, check_monitor_with_strong_fairness_and_limits,
+    check_monitor_with_strong_fairness_and_product_limits,
+};
 pub use multi_response::{
     check_multi_response, check_multi_response_with_limits,
     check_multi_response_with_product_limits, check_multi_response_with_strong_fairness,
