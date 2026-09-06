@@ -452,7 +452,7 @@ where
         product_completion,
         model_states: model_discovered_states,
         checked_model_states: model_checked_states,
-        explored_model_transitions,
+        explored_model_transitions: model_explored_transitions,
         retained_model_transitions: model_retained_transitions,
         max_model_depth_reached: model_max_depth_reached,
         product_states: product.states.len(),
