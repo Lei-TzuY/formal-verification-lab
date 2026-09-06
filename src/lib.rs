@@ -47,8 +47,8 @@ pub use bounded::{
     AnalysisInconclusiveReason, AnalysisLimits, AnalysisOutcome, AnalysisStage, BoundedOutcome,
 };
 pub use buchi::{
-    check_buchi, AcceptanceSet, BuchiAutomaton, BuchiCounterexample, BuchiError, BuchiProductState,
-    BuchiResult, BuchiStatus, FiniteRunPolicy,
+    check_buchi, check_buchi_with_limits, AcceptanceSet, AnalysisBuchiResult, BuchiAutomaton,
+    BuchiCounterexample, BuchiError, BuchiProductState, BuchiResult, BuchiStatus, FiniteRunPolicy,
 };
 pub use buchi_report::render_buchi_report;
 pub use builder::TransitionSystemBuilder;
