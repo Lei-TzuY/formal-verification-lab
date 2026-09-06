@@ -88,12 +88,8 @@ fn rejecting_state_found_before_later_cutoff_is_conclusive() {
     )
     .unwrap();
 
-    let result = check_monitor_with_product_limits(
-        &model,
-        &monitor,
-        limits(None, Some(1), None),
-    )
-    .unwrap();
+    let result =
+        check_monitor_with_product_limits(&model, &monitor, limits(None, Some(1), None)).unwrap();
 
     assert_eq!(
         result.outcome,
@@ -129,12 +125,8 @@ fn true_active_terminal_found_before_cutoff_is_conclusive() {
     )
     .unwrap();
 
-    let result = check_monitor_with_product_limits(
-        &model,
-        &monitor,
-        limits(None, Some(1), None),
-    )
-    .unwrap();
+    let result =
+        check_monitor_with_product_limits(&model, &monitor, limits(None, Some(1), None)).unwrap();
 
     assert_eq!(
         result.outcome,
@@ -179,7 +171,9 @@ fn active_cycle_found_before_cutoff_is_conclusive() {
     assert_eq!(condition, "must-not-stay-active");
     assert_eq!(stem.len(), 1);
     assert_eq!(cycle.first().unwrap().state, cycle.last().unwrap().state);
-    assert!(cycle.iter().any(|step| step.action.as_deref() == Some("tick")));
+    assert!(cycle
+        .iter()
+        .any(|step| step.action.as_deref() == Some("tick")));
 }
 
 #[test]
@@ -206,14 +200,14 @@ fn generous_product_limits_match_unbounded_monitor_result() {
     let model = stuck_committed_protocol().unwrap();
     let monitor = session_monitor().unwrap();
     let unbounded = check_monitor(&model, &monitor).unwrap();
-    let bounded = check_monitor_with_product_limits(
-        &model,
-        &monitor,
-        limits(Some(32), Some(64), Some(32)),
-    )
-    .unwrap();
+    let bounded =
+        check_monitor_with_product_limits(&model, &monitor, limits(Some(32), Some(64), Some(32)))
+            .unwrap();
 
-    assert_eq!(bounded.outcome, BoundedOutcome::Conclusive(unbounded.status));
+    assert_eq!(
+        bounded.outcome,
+        BoundedOutcome::Conclusive(unbounded.status)
+    );
     assert_eq!(bounded.model_states, unbounded.model_states);
     assert_eq!(bounded.model_transitions, unbounded.model_transitions);
     assert_eq!(bounded.product_states, unbounded.product_states);
