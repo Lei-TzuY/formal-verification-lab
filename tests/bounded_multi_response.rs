@@ -138,7 +138,9 @@ fn real_pending_cycle_before_a_later_transition_cutoff_remains_conclusive() {
     assert!(stem.last().unwrap().state.pending[0]);
     assert!(cycle.iter().all(|step| step.state.pending[0]));
     assert_eq!(cycle.first().unwrap().state, cycle.last().unwrap().state);
-    assert!(cycle.iter().any(|step| step.action.as_deref() == Some("wait")));
+    assert!(cycle
+        .iter()
+        .any(|step| step.action.as_deref() == Some("wait")));
 }
 
 #[test]
@@ -211,17 +213,11 @@ fn unbounded_product_limits_are_exactly_equivalent_to_the_legacy_api() {
     });
     let property = response_property();
     let direct = check_multi_response(&model, &property).unwrap();
-    let bounded = check_multi_response_with_product_limits(
-        &model,
-        &property,
-        ExplorationLimits::unbounded(),
-    )
-    .unwrap();
+    let bounded =
+        check_multi_response_with_product_limits(&model, &property, ExplorationLimits::unbounded())
+            .unwrap();
 
-    assert_eq!(
-        bounded.outcome,
-        BoundedOutcome::Conclusive(direct.status)
-    );
+    assert_eq!(bounded.outcome, BoundedOutcome::Conclusive(direct.status));
     assert_eq!(bounded.property, direct.property);
     assert_eq!(bounded.model_states, direct.model_states);
     assert_eq!(bounded.model_transitions, direct.model_transitions);
