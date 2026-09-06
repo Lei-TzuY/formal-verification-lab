@@ -6,9 +6,7 @@ use crate::buchi::{
     BoundedBuchiResult, BuchiAutomaton, BuchiError, BuchiProductState, BuchiStatus,
 };
 use crate::checker::ExplorationLimits;
-use crate::fair_enablement::{
-    bounded_enablement_graph_for_actions, complete_enablement_graph,
-};
+use crate::fair_enablement::{bounded_enablement_graph_for_actions, complete_enablement_graph};
 use crate::graph::{
     capture_reachable_graph, capture_reachable_graph_with_limits, GraphCaptureCompletion,
 };
