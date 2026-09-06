@@ -17,6 +17,7 @@ pub mod eventuality_report;
 pub mod exact_state;
 pub mod exact_state_report;
 pub mod examples;
+pub mod fairness;
 mod graph;
 pub mod model;
 pub mod monitor;
@@ -72,6 +73,7 @@ pub use exact_state::{
     ExactStateStatus,
 };
 pub use exact_state_report::render_exact_state_report;
+pub use fairness::{check_buchi_with_weak_fairness, FairnessError, WeakFairness};
 pub use model::{Invariant, ModelError, StateVariable, Transition, TransitionSystem};
 pub use monitor::{
     check_monitor, check_monitor_with_limits, check_monitor_with_product_limits,
@@ -124,9 +126,9 @@ pub use safety::{
 pub use safety_report::render_safety_report;
 pub use temporal::{
     check_action_temporal, check_action_temporal_with_limits,
-    check_action_temporal_with_product_limits, ActionAtom, ActionTemporalSpec,
-    AnalysisTemporalResult, BoundedTemporalResult, TemporalBackend, TemporalCounterexample,
-    TemporalError, TemporalObligation, TemporalResult, TemporalStatus,
+    check_action_temporal_with_product_limits, check_action_temporal_with_weak_fairness,
+    ActionAtom, ActionTemporalSpec, AnalysisTemporalResult, BoundedTemporalResult, TemporalBackend,
+    TemporalCounterexample, TemporalError, TemporalObligation, TemporalResult, TemporalStatus,
 };
 pub use temporal_parse::{parse_action_temporal, TemporalParseError, TemporalParseErrorKind};
 pub use temporal_report::{render_bounded_temporal_report, render_temporal_report};
