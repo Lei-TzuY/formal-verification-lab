@@ -2,11 +2,10 @@ use formal_verification_lab::{
     check_eventuality_with_limits, check_exact_state_property_with_limits,
     check_proposition_expression_property_with_limits, check_proposition_property_with_limits,
     check_reachability_with_limits, check_safety_assertion_with_limits, parse_declarative_document,
-    parse_declarative_model, parse_exact_state_property, parse_proposition_expression,
-    BoundedOutcome, EventualityCounterexample, EventualityProperty, EventualityStatus,
-    ExactStatePropertySpec, ExactStateStatus, ExplorationLimits, InconclusiveReason,
-    PropositionExpressionPropertySpec, PropositionPropertySpec, PropositionSafetySpec,
-    ReachabilityProperty, ReachabilityStatus, SafetyStatus,
+    parse_declarative_model, parse_proposition_expression, BoundedOutcome, EventualityCounterexample,
+    EventualityProperty, EventualityStatus, ExactStatePropertySpec, ExplorationLimits,
+    InconclusiveReason, PropositionExpressionPropertySpec, PropositionPropertySpec,
+    PropositionSafetySpec, ReachabilityProperty, ReachabilityStatus, SafetyStatus,
 };
 use std::collections::VecDeque;
 use std::fs;
@@ -29,10 +28,6 @@ struct OracleSearch {
 impl OracleSearch {
     fn discovered_count(&self) -> usize {
         self.discovered.iter().filter(|value| **value).count()
-    }
-
-    fn max_depth(&self) -> Option<usize> {
-        self.depths.iter().flatten().copied().max()
     }
 }
 
@@ -224,9 +219,9 @@ fn oracle_eventuality(
         queue.push_back(0_usize);
     }
     while let Some(from) = queue.pop_front() {
-        for to in 0..2 {
-            if captured.observed[from][to] && target_mask & (1 << to) == 0 && !residual[to] {
-                residual[to] = true;
+        for (to, reachable) in residual.iter_mut().enumerate() {
+            if captured.observed[from][to] && target_mask & (1 << to) == 0 && !*reachable {
+                *reachable = true;
                 queue.push_back(to);
             }
         }
