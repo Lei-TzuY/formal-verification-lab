@@ -77,10 +77,13 @@ use formal_verification_lab::safety::{
 };
 use formal_verification_lab::safety_report::{render_bounded_safety_report, render_safety_report};
 use formal_verification_lab::temporal::{
-    check_action_temporal, ActionAtom, ActionTemporalSpec, TemporalStatus,
+    check_action_temporal, check_action_temporal_with_product_limits, ActionAtom,
+    ActionTemporalSpec, TemporalStatus,
 };
 use formal_verification_lab::temporal_parse::parse_action_temporal;
-use formal_verification_lab::temporal_report::render_temporal_report;
+use formal_verification_lab::temporal_report::{
+    render_bounded_temporal_report, render_temporal_report,
+};
 use formal_verification_lab::{parse_declarative_document, parse_declarative_model};
 use std::env;
 use std::fs;
@@ -560,61 +563,79 @@ where
 
 fn temporal_command(args: &[String]) -> Result<ExitCode, String> {
     match args {
-        [command, path, expression] if command == "file" => run_temporal_file(path, expression),
-        [command, model, expression] if command == "check" => {
-            run_temporal_expression(model, expression)
+        [command, path, expression, option_args @ ..] if command == "file" => {
+            run_temporal_file(path, expression, option_args)
         }
-        [query] if query == "request-grant" => run_temporal(
+        [command, model, expression, option_args @ ..] if command == "check" => {
+            run_temporal_expression(model, expression, option_args)
+        }
+        [query, option_args @ ..] if query == "request-grant" => run_temporal(
             request_grant_protocol().map_err(|error| error.to_string())?,
             typed_response_spec()?,
+            option_args,
         ),
-        [query] if query == "request-grant-unfair" => run_temporal(
+        [query, option_args @ ..] if query == "request-grant-unfair" => run_temporal(
             unfair_request_grant_protocol().map_err(|error| error.to_string())?,
             typed_response_spec()?,
+            option_args,
         ),
-        [query] if query == "pulses" => run_temporal(
+        [query, option_args @ ..] if query == "pulses" => run_temporal(
             alternating_pulses().map_err(|error| error.to_string())?,
             typed_pulse_spec()?,
+            option_args,
         ),
-        [query] if query == "pulses-unfair" => run_temporal(
+        [query, option_args @ ..] if query == "pulses-unfair" => run_temporal(
             unfair_second_pulse().map_err(|error| error.to_string())?,
             typed_pulse_spec()?,
+            option_args,
         ),
-        [query] => Err(format!(
+        [query, ..] => Err(format!(
             "unknown temporal query '{query}'; expected request-grant, request-grant-unfair, pulses, pulses-unfair, 'check <model> <expression>', or 'file <path> <expression>'"
         )),
         _ => Err(usage()),
     }
 }
 
-fn run_temporal_file(path: &str, expression: &str) -> Result<ExitCode, String> {
+fn run_temporal_file(
+    path: &str,
+    expression: &str,
+    option_args: &[String],
+) -> Result<ExitCode, String> {
     let input = fs::read_to_string(path)
         .map_err(|error| format!("failed to read declarative model '{path}': {error}"))?;
     let model = parse_declarative_model(&input).map_err(|error| error.to_string())?;
     let spec =
         parse_action_temporal("cli-temporal", expression).map_err(|error| error.to_string())?;
-    run_temporal(model, spec)
+    run_temporal(model, spec, option_args)
 }
 
-fn run_temporal_expression(model_name: &str, expression: &str) -> Result<ExitCode, String> {
+fn run_temporal_expression(
+    model_name: &str,
+    expression: &str,
+    option_args: &[String],
+) -> Result<ExitCode, String> {
     let spec =
         parse_action_temporal("cli-temporal", expression).map_err(|error| error.to_string())?;
     match model_name {
         "request-grant" => run_temporal(
             request_grant_protocol().map_err(|error| error.to_string())?,
             spec,
+            option_args,
         ),
         "request-grant-unfair" => run_temporal(
             unfair_request_grant_protocol().map_err(|error| error.to_string())?,
             spec,
+            option_args,
         ),
         "pulses" => run_temporal(
             alternating_pulses().map_err(|error| error.to_string())?,
             spec,
+            option_args,
         ),
         "pulses-unfair" => run_temporal(
             unfair_second_pulse().map_err(|error| error.to_string())?,
             spec,
+            option_args,
         ),
         _ => Err(format!(
             "unknown temporal model '{model_name}'; expected request-grant, request-grant-unfair, pulses, or pulses-unfair"
@@ -645,15 +666,31 @@ fn typed_pulse_spec() -> Result<ActionTemporalSpec, String> {
 fn run_temporal<S>(
     model: formal_verification_lab::TransitionSystem<S>,
     spec: ActionTemporalSpec,
+    option_args: &[String],
 ) -> Result<ExitCode, String>
 where
     S: Clone + Eq + std::hash::Hash + std::fmt::Debug,
 {
-    let result = check_action_temporal(&model, &spec).map_err(|error| error.to_string())?;
-    print!("{}", render_temporal_report(model.name(), &result));
-    Ok(match result.status {
-        TemporalStatus::Satisfied => ExitCode::SUCCESS,
-        TemporalStatus::Violated => ExitCode::from(10),
+    if option_args.is_empty() {
+        let result = check_action_temporal(&model, &spec).map_err(|error| error.to_string())?;
+        print!("{}", render_temporal_report(model.name(), &result));
+        return Ok(match result.status {
+            TemporalStatus::Satisfied => ExitCode::SUCCESS,
+            TemporalStatus::Violated => ExitCode::from(10),
+        });
+    }
+
+    let limits = parse_product_limits(option_args)?;
+    let result = check_action_temporal_with_product_limits(&model, &spec, limits)
+        .map_err(|error| error.to_string())?;
+    print!(
+        "{}",
+        render_bounded_temporal_report(model.name(), &result)
+    );
+    Ok(match &result.outcome {
+        BoundedOutcome::Conclusive(TemporalStatus::Satisfied) => ExitCode::SUCCESS,
+        BoundedOutcome::Conclusive(TemporalStatus::Violated) => ExitCode::from(10),
+        BoundedOutcome::Inconclusive(_) => ExitCode::from(3),
     })
 }
 
@@ -937,7 +974,7 @@ fn status_exit_code(status: VerificationStatus) -> ExitCode {
 }
 
 fn usage() -> String {
-    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | eventually <counter-three|counter-four|traffic-never> | respond <request-grant|request-grant-unfair|dual-grant|dual-grant-unfair-b> [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | monitor <session-ok|session-double-open|session-stuck> [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | buchi <pulses|pulses-unfair|finite-ignore|finite-strict> [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal <request-grant|request-grant-unfair|pulses|pulses-unfair> | temporal check <request-grant|request-grant-unfair|pulses|pulses-unfair> <expression> | temporal file <path> <expression> | state file <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition file <path> <reachable|all-eventually> <proposition> [--max-states N] [--max-transitions N] [--max-depth N] | proposition expr <path> <reachable|all-eventually> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition always <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N]]"
+    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | eventually <counter-three|counter-four|traffic-never> | respond <request-grant|request-grant-unfair|dual-grant|dual-grant-unfair-b> [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | monitor <session-ok|session-double-open|session-stuck> [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | buchi <pulses|pulses-unfair|finite-ignore|finite-strict> [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal <request-grant|request-grant-unfair|pulses|pulses-unfair> [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal check <request-grant|request-grant-unfair|pulses|pulses-unfair> <expression> [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal file <path> <expression> [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | state file <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition file <path> <reachable|all-eventually> <proposition> [--max-states N] [--max-transitions N] [--max-depth N] | proposition expr <path> <reachable|all-eventually> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition always <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N]]"
         .to_owned()
 }
 
