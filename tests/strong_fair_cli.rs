@@ -130,9 +130,7 @@ fn product_and_model_cutoffs_remain_inconclusive_with_provenance() {
     let model_report = stdout(&model);
     assert!(model_report.contains("temporal: INCONCLUSIVE"));
     assert!(model_report.contains("analysis inconclusive stage: model"));
-    assert!(
-        model_report.contains("analysis inconclusive reason: transition limit reached (max 1)")
-    );
+    assert!(model_report.contains("analysis inconclusive reason: transition limit reached (max 1)"));
     assert!(model_report.contains("strong-fair action: \"grant\""));
 }
 
