@@ -107,9 +107,7 @@ fn response_cycle_is_normalized_and_conclusive_before_later_model_cutoff() {
         BoundedOutcome::Inconclusive(InconclusiveReason::DepthLimitReached { limit: 1 })
     );
     let Some(TemporalCounterexample::Infinite {
-        obligation,
-        cycle,
-        ..
+        obligation, cycle, ..
     }) = result.counterexample
     else {
         panic!("expected normalized response lasso");
@@ -140,9 +138,7 @@ fn recurring_cycle_is_normalized_and_identifies_missing_action() {
         AnalysisOutcome::Conclusive(TemporalStatus::Violated)
     );
     let Some(TemporalCounterexample::Infinite {
-        obligation,
-        cycle,
-        ..
+        obligation, cycle, ..
     }) = result.counterexample
     else {
         panic!("expected normalized recurring lasso");
@@ -187,14 +183,18 @@ fn fully_unbounded_staged_response_frontend_matches_legacy_result() {
     let model = unfair_request_grant_protocol().unwrap();
     let spec = response_spec();
     let legacy = check_action_temporal(&model, &spec).unwrap();
-    let staged = check_action_temporal_with_limits(&model, &spec, AnalysisLimits::unbounded()).unwrap();
+    let staged =
+        check_action_temporal_with_limits(&model, &spec, AnalysisLimits::unbounded()).unwrap();
 
     assert_eq!(staged.backend, legacy.backend);
     assert_eq!(staged.outcome, AnalysisOutcome::Conclusive(legacy.status));
     assert_eq!(staged.model_states, legacy.model_states);
     assert_eq!(staged.explored_model_transitions, legacy.model_transitions);
     assert_eq!(staged.product_states, legacy.product_states);
-    assert_eq!(staged.explored_product_transitions, legacy.product_transitions);
+    assert_eq!(
+        staged.explored_product_transitions,
+        legacy.product_transitions
+    );
     assert_eq!(staged.counterexample, legacy.counterexample);
 }
 
@@ -203,13 +203,17 @@ fn fully_unbounded_staged_recurring_frontend_matches_legacy_result() {
     let model = unfair_second_pulse().unwrap();
     let spec = recurring_spec();
     let legacy = check_action_temporal(&model, &spec).unwrap();
-    let staged = check_action_temporal_with_limits(&model, &spec, AnalysisLimits::unbounded()).unwrap();
+    let staged =
+        check_action_temporal_with_limits(&model, &spec, AnalysisLimits::unbounded()).unwrap();
 
     assert_eq!(staged.backend, legacy.backend);
     assert_eq!(staged.outcome, AnalysisOutcome::Conclusive(legacy.status));
     assert_eq!(staged.model_states, legacy.model_states);
     assert_eq!(staged.explored_model_transitions, legacy.model_transitions);
     assert_eq!(staged.product_states, legacy.product_states);
-    assert_eq!(staged.explored_product_transitions, legacy.product_transitions);
+    assert_eq!(
+        staged.explored_product_transitions,
+        legacy.product_transitions
+    );
     assert_eq!(staged.counterexample, legacy.counterexample);
 }
