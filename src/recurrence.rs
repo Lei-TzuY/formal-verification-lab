@@ -187,8 +187,8 @@ pub(crate) fn strongly_connected_components<S>(graph: &ReachableGraph<S>) -> Vec
                 .pop()
                 .expect("the active Tarjan frame exists while finishing a node");
             let node = finished.node;
-            let node_index = state.index[node]
-                .expect("an active Tarjan frame has an assigned discovery index");
+            let node_index =
+                state.index[node].expect("an active Tarjan frame has an assigned discovery index");
 
             if state.lowlink[node] == node_index {
                 let mut component = Vec::new();
