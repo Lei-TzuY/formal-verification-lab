@@ -97,9 +97,10 @@ fn model_cutoff_does_not_fabricate_progress_terminal() {
 #[test]
 fn rejecting_state_is_conclusive_before_later_model_cutoff() {
     let model = model("reject-before-cutoff", |state| match *state {
-        0 => vec![Transition::new("start", 1), Transition::new("branch", 2)],
-        1 => vec![Transition::new("bad", 3)],
-        2 => vec![Transition::new("later", 4)],
+        0 => vec![Transition::new("start", 1)],
+        1 => vec![Transition::new("bad", 2), Transition::new("branch", 3)],
+        2 => Vec::new(),
+        3 => vec![Transition::new("later", 4)],
         _ => Vec::new(),
     });
 
@@ -114,10 +115,14 @@ fn rejecting_state_is_conclusive_before_later_model_cutoff() {
         result.outcome,
         AnalysisOutcome::Conclusive(MonitorStatus::Violated)
     );
+    assert_eq!(
+        result.model_completion,
+        BoundedOutcome::Inconclusive(InconclusiveReason::DepthLimitReached { limit: 2 })
+    );
     let Some(MonitorCounterexample::Rejecting { trace, .. }) = result.counterexample else {
         panic!("expected rejecting witness");
     };
-    assert_eq!(trace.last().unwrap().state.state, 3);
+    assert_eq!(trace.last().unwrap().state.state, 2);
     assert_eq!(trace.last().unwrap().state.monitor, Control::Rejected);
 }
 
