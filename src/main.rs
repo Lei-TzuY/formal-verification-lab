@@ -62,9 +62,7 @@ use formal_verification_lab::response_report::render_response_report;
 use formal_verification_lab::safety::{
     check_safety_assertion, check_safety_assertion_with_limits, PropositionSafetySpec, SafetyStatus,
 };
-use formal_verification_lab::safety_report::{
-    render_bounded_safety_report, render_safety_report,
-};
+use formal_verification_lab::safety_report::{render_bounded_safety_report, render_safety_report};
 use formal_verification_lab::temporal::{
     check_action_temporal, ActionAtom, ActionTemporalSpec, TemporalStatus,
 };
@@ -604,7 +602,8 @@ fn run_state_file(
         parse_exact_state_property("cli-state", expression).map_err(|error| error.to_string())?;
 
     if option_args.is_empty() {
-        let result = check_exact_state_property(&model, &spec).map_err(|error| error.to_string())?;
+        let result =
+            check_exact_state_property(&model, &spec).map_err(|error| error.to_string())?;
         print!("{}", render_exact_state_report(model.name(), &result));
         return Ok(match result.status {
             ExactStateStatus::Satisfied => ExitCode::SUCCESS,
