@@ -22,12 +22,7 @@ fn bounded_buchi_cli_reports_inconclusive_product_cutoff() {
 
 #[test]
 fn bounded_buchi_cli_preserves_real_cycle_violation_before_cutoff() {
-    let output = run(&[
-        "buchi",
-        "pulses-unfair",
-        "--max-product-transitions",
-        "2",
-    ]);
+    let output = run(&["buchi", "pulses-unfair", "--max-product-transitions", "2"]);
 
     assert_eq!(output.status.code(), Some(9));
     let stdout = String::from_utf8(output.stdout).unwrap();
