@@ -16,6 +16,13 @@ pub(crate) struct BoundedActionProduct<P> {
     pub(crate) known_terminal: Vec<bool>,
 }
 
+#[derive(Debug, Clone, Copy)]
+struct ProductAccounting {
+    checked_states: usize,
+    explored_transitions: usize,
+    max_depth_reached: Option<usize>,
+}
+
 /// Build the reachable synchronous product of a captured labeled model graph
 /// and one deterministic action-driven control state machine.
 ///
@@ -102,9 +109,11 @@ where
                     outgoing,
                     initial_ids,
                     known_terminal,
-                    0,
-                    0,
-                    max_depth_reached,
+                    ProductAccounting {
+                        checked_states: 0,
+                        explored_transitions: 0,
+                        max_depth_reached,
+                    },
                     Some(InconclusiveReason::StateLimitReached { limit }),
                 );
             }
@@ -144,9 +153,11 @@ where
                     outgoing,
                     initial_ids,
                     known_terminal,
-                    checked_states,
-                    explored_transitions,
-                    max_depth_reached,
+                    ProductAccounting {
+                        checked_states,
+                        explored_transitions,
+                        max_depth_reached,
+                    },
                     Some(InconclusiveReason::TransitionLimitReached { limit }),
                 );
             }
@@ -163,9 +174,11 @@ where
                         outgoing,
                         initial_ids,
                         known_terminal,
-                        checked_states,
-                        explored_transitions,
-                        max_depth_reached,
+                        ProductAccounting {
+                            checked_states,
+                            explored_transitions,
+                            max_depth_reached,
+                        },
                         Some(InconclusiveReason::DepthLimitReached { limit }),
                     );
                 }
@@ -175,9 +188,11 @@ where
                         outgoing,
                         initial_ids,
                         known_terminal,
-                        checked_states,
-                        explored_transitions,
-                        max_depth_reached,
+                        ProductAccounting {
+                            checked_states,
+                            explored_transitions,
+                            max_depth_reached,
+                        },
                         Some(InconclusiveReason::StateLimitReached { limit }),
                     );
                 }
@@ -210,9 +225,11 @@ where
         outgoing,
         initial_ids,
         known_terminal,
-        checked_states,
-        explored_transitions,
-        max_depth_reached,
+        ProductAccounting {
+            checked_states,
+            explored_transitions,
+            max_depth_reached,
+        },
         None,
     )
 }
@@ -222,9 +239,7 @@ fn finish_product<P>(
     outgoing: Vec<Vec<SnapshotEdge>>,
     initial_ids: Vec<usize>,
     known_terminal: Vec<bool>,
-    checked_states: usize,
-    explored_transitions: usize,
-    max_depth_reached: Option<usize>,
+    accounting: ProductAccounting,
     reason: Option<InconclusiveReason>,
 ) -> BoundedActionProduct<P> {
     BoundedActionProduct {
@@ -233,9 +248,9 @@ fn finish_product<P>(
             outgoing,
             initial_ids,
         },
-        checked_states,
-        explored_transitions,
-        max_depth_reached,
+        checked_states: accounting.checked_states,
+        explored_transitions: accounting.explored_transitions,
+        max_depth_reached: accounting.max_depth_reached,
         completion: match reason {
             Some(reason) => BoundedOutcome::Inconclusive(reason),
             None => BoundedOutcome::Conclusive(()),
