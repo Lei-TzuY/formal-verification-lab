@@ -14,8 +14,12 @@ pub fn render_weak_fair_temporal_report<S: Debug>(
     fairness: &WeakFairness,
 ) -> String {
     let mut output = render_temporal_report(model_name, result);
-    writeln!(&mut output, "weak fairness actions: {}", fairness.actions().len())
-        .expect("writing to String cannot fail");
+    writeln!(
+        &mut output,
+        "weak fairness actions: {}",
+        fairness.actions().len()
+    )
+    .expect("writing to String cannot fail");
     for action in fairness.actions() {
         writeln!(&mut output, "weak-fair action: {}", quote_action(action))
             .expect("writing to String cannot fail");
