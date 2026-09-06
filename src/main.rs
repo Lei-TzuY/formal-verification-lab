@@ -1,11 +1,14 @@
 use formal_verification_lab::bounded::{AnalysisLimits, AnalysisOutcome, BoundedOutcome};
 use formal_verification_lab::buchi::{
-    check_buchi, check_buchi_with_product_limits, BuchiAutomaton, BuchiStatus, FiniteRunPolicy,
+    check_buchi, check_buchi_with_limits, check_buchi_with_product_limits, BuchiAutomaton,
+    BuchiStatus, FiniteRunPolicy,
 };
 use formal_verification_lab::buchi_examples::{
     alternating_pulses, finite_quiet_run, pulse_automaton, unfair_second_pulse,
 };
-use formal_verification_lab::buchi_report::{render_bounded_buchi_report, render_buchi_report};
+use formal_verification_lab::buchi_report::{
+    render_analysis_buchi_report, render_bounded_buchi_report, render_buchi_report,
+};
 use formal_verification_lab::checker::{check_with_limits, ExplorationLimits, VerificationStatus};
 use formal_verification_lab::eventuality::{
     check_eventuality, EventualityProperty, EventualityStatus,
@@ -23,13 +26,14 @@ use formal_verification_lab::examples::{
     traffic_light, CounterState, TrafficLightState,
 };
 use formal_verification_lab::monitor::{
-    check_monitor, check_monitor_with_product_limits, FiniteMonitor, MonitorStatus,
+    check_monitor, check_monitor_with_limits, check_monitor_with_product_limits, FiniteMonitor,
+    MonitorStatus,
 };
 use formal_verification_lab::monitor_examples::{
     invalid_double_open_protocol, session_monitor, session_protocol, stuck_committed_protocol,
 };
 use formal_verification_lab::monitor_report::{
-    render_bounded_monitor_report, render_monitor_report,
+    render_analysis_monitor_report, render_bounded_monitor_report, render_monitor_report,
 };
 use formal_verification_lab::multi_response::{
     check_multi_response, check_multi_response_with_limits,
@@ -80,12 +84,12 @@ use formal_verification_lab::safety::{
 };
 use formal_verification_lab::safety_report::{render_bounded_safety_report, render_safety_report};
 use formal_verification_lab::temporal::{
-    check_action_temporal, check_action_temporal_with_product_limits, ActionAtom,
-    ActionTemporalSpec, TemporalStatus,
+    check_action_temporal, check_action_temporal_with_limits,
+    check_action_temporal_with_product_limits, ActionAtom, ActionTemporalSpec, TemporalStatus,
 };
 use formal_verification_lab::temporal_parse::parse_action_temporal;
 use formal_verification_lab::temporal_report::{
-    render_bounded_temporal_report, render_temporal_report,
+    render_analysis_temporal_report, render_bounded_temporal_report, render_temporal_report,
 };
 use formal_verification_lab::{parse_declarative_document, parse_declarative_model};
 use std::env;
@@ -521,6 +525,18 @@ where
         });
     }
 
+    if contains_model_limit_flag(option_args) {
+        let limits = parse_analysis_limits(option_args)?;
+        let result = check_monitor_with_limits(&model, &monitor, limits)
+            .map_err(|error| error.to_string())?;
+        print!("{}", render_analysis_monitor_report(model.name(), &result));
+        return Ok(match &result.outcome {
+            AnalysisOutcome::Conclusive(MonitorStatus::Satisfied) => ExitCode::SUCCESS,
+            AnalysisOutcome::Conclusive(MonitorStatus::Violated) => ExitCode::from(8),
+            AnalysisOutcome::Inconclusive(_) => ExitCode::from(3),
+        });
+    }
+
     let limits = parse_product_limits(option_args)?;
     let result = check_monitor_with_product_limits(&model, &monitor, limits)
         .map_err(|error| error.to_string())?;
@@ -577,6 +593,18 @@ where
         return Ok(match result.status {
             BuchiStatus::Satisfied => ExitCode::SUCCESS,
             BuchiStatus::Violated => ExitCode::from(9),
+        });
+    }
+
+    if contains_model_limit_flag(option_args) {
+        let limits = parse_analysis_limits(option_args)?;
+        let result = check_buchi_with_limits(&model, &automaton, limits)
+            .map_err(|error| error.to_string())?;
+        print!("{}", render_analysis_buchi_report(model.name(), &result));
+        return Ok(match &result.outcome {
+            AnalysisOutcome::Conclusive(BuchiStatus::Satisfied) => ExitCode::SUCCESS,
+            AnalysisOutcome::Conclusive(BuchiStatus::Violated) => ExitCode::from(9),
+            AnalysisOutcome::Inconclusive(_) => ExitCode::from(3),
         });
     }
 
@@ -707,6 +735,18 @@ where
         return Ok(match result.status {
             TemporalStatus::Satisfied => ExitCode::SUCCESS,
             TemporalStatus::Violated => ExitCode::from(10),
+        });
+    }
+
+    if contains_model_limit_flag(option_args) {
+        let limits = parse_analysis_limits(option_args)?;
+        let result = check_action_temporal_with_limits(&model, &spec, limits)
+            .map_err(|error| error.to_string())?;
+        print!("{}", render_analysis_temporal_report(model.name(), &result));
+        return Ok(match &result.outcome {
+            AnalysisOutcome::Conclusive(TemporalStatus::Satisfied) => ExitCode::SUCCESS,
+            AnalysisOutcome::Conclusive(TemporalStatus::Violated) => ExitCode::from(10),
+            AnalysisOutcome::Inconclusive(_) => ExitCode::from(3),
         });
     }
 
@@ -1040,7 +1080,7 @@ fn status_exit_code(status: VerificationStatus) -> ExitCode {
 }
 
 fn usage() -> String {
-    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | eventually <counter-three|counter-four|traffic-never> | respond <request-grant|request-grant-unfair|dual-grant|dual-grant-unfair-b> [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | monitor <session-ok|session-double-open|session-stuck> [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | buchi <pulses|pulses-unfair|finite-ignore|finite-strict> [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal <request-grant|request-grant-unfair|pulses|pulses-unfair> [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal check <request-grant|request-grant-unfair|pulses|pulses-unfair> <expression> [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal file <path> <expression> [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | state file <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition file <path> <reachable|all-eventually> <proposition> [--max-states N] [--max-transitions N] [--max-depth N] | proposition expr <path> <reachable|all-eventually> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition always <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N]]"
+    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | eventually <counter-three|counter-four|traffic-never> | respond <request-grant|request-grant-unfair|dual-grant|dual-grant-unfair-b> [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | monitor <session-ok|session-double-open|session-stuck> [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | buchi <pulses|pulses-unfair|finite-ignore|finite-strict> [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal <request-grant|request-grant-unfair|pulses|pulses-unfair> [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal check <request-grant|request-grant-unfair|pulses|pulses-unfair> <expression> [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal file <path> <expression> [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | state file <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition file <path> <reachable|all-eventually> <proposition> [--max-states N] [--max-transitions N] [--max-depth N] | proposition expr <path> <reachable|all-eventually> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition always <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N]]"
         .to_owned()
 }
 
