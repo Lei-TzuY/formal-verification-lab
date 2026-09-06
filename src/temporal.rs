@@ -599,9 +599,8 @@ where
     S: Clone + Eq + Hash,
 {
     let automaton = recurring_automaton(spec, actions)?;
-    let result = check_buchi_with_weak_fairness_and_product_limits(
-        model, &automaton, fairness, limits,
-    )?;
+    let result =
+        check_buchi_with_weak_fairness_and_product_limits(model, &automaton, fairness, limits)?;
     bounded_temporal_result_from_buchi(result)
 }
 
