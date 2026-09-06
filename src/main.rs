@@ -87,8 +87,8 @@ use formal_verification_lab::safety::{
 use formal_verification_lab::safety_report::{render_bounded_safety_report, render_safety_report};
 use formal_verification_lab::temporal::{
     check_action_temporal, check_action_temporal_with_limits,
-    check_action_temporal_with_product_limits, check_action_temporal_with_weak_fairness, ActionAtom,
-    ActionTemporalSpec, TemporalStatus,
+    check_action_temporal_with_product_limits, check_action_temporal_with_weak_fairness,
+    ActionAtom, ActionTemporalSpec, TemporalStatus,
 };
 use formal_verification_lab::temporal_parse::parse_action_temporal;
 use formal_verification_lab::temporal_report::{
@@ -735,7 +735,8 @@ where
     if contains_weak_fairness_flag(option_args) {
         if contains_temporal_limit_flag(option_args) {
             return Err(
-                "weak fairness cannot be combined with bounded or staged temporal limits".to_owned(),
+                "weak fairness cannot be combined with bounded or staged temporal limits"
+                    .to_owned(),
             );
         }
         let fairness = parse_weak_fairness(option_args)?;
