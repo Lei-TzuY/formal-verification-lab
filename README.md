@@ -56,7 +56,7 @@ The model is captured once and the monitor runs over the captured labeled graph.
 
 `MultiResponseProperty` composes multiple named `trigger_i -> eventually response_i` clauses in one explicit product `(model_state, pending_bits)`. Each action updates every clause independently.
 
-Infinite failure is checked **per clause** by inducing the subgraph where `pending[i] = true`. This avoids the unsound shortcut of treating any cycle containing any pending bit as a violation. Finite pending terminals take precedence; infinite witnesses identify the violated clause and contain a shortest global stem plus a deterministic closed cycle on which that clause stays pending.
+Infinite failure is checked **per clause** by inducing the subgraph where `pending[i] = true`. This avoids the unsound shortcut of treating any cycle containing any pending bit as a violation if every individual clause is repeatedly discharged. Finite pending terminals take precedence; infinite witnesses identify the violated clause and contain a shortest global stem plus a deterministic closed cycle on which that clause stays pending.
 
 The M10 single-clause API is a compatibility adapter over this canonical engine. M11's independent generated oracle checks 16 graph masks × `7^4` edge-semantics assignments = **38,416** cases.
 
@@ -270,6 +270,14 @@ The built binary exposes `--max-model-states`, `--max-model-transitions`, and `-
 
 Executable evidence includes focused staged monitor, Büchi, and typed-temporal semantic regressions plus six built-binary M29 cases covering monitor/Büchi model-stage cutoffs, response/Büchi frontend routing, declarative file ingestion, product-only compatibility, and real response/Büchi cycle violations that remain conclusive before a later model transition cutoff. The unchanged M12 **4096-case** monitor oracle, M13 **8192-case** Büchi oracle, response oracles, product-only CLI suites, and the full legacy test matrix remain compatibility gates. M29 adds no fairness assumption, wall-clock timeout, total-memory bound, performance claim, new temporal operator, or second traversal engine.
 
+### Milestone 30 — iterative SCC traversal for deep explicit graphs
+
+Milestone 30 removes process-stack recursion from the shared Tarjan SCC traversal. `strongly_connected_components` now uses an explicit DFS frame stack that records each active node and its next successor index, preserving the recursive algorithm's exact successor visitation and child-return lowlink update order.
+
+The public SCC contract is unchanged: members remain ordered by captured graph discovery id, components retain canonical first-member ordering, cyclic classification is unchanged, and recurrence/temporal consumers continue to receive the same deterministic component indices and cycle-witness inputs. M30 changes traversal mechanics only; it does not add a second SCC semantics or claim a speedup.
+
+Executable migration evidence keeps a test-only copy of the previous recursive Tarjan implementation and compares **exact component vectors and ordering across all 512 directed three-node graphs**. Dedicated **50,000-node chain** and **50,000-node cycle** regressions exercise the iterative production traversal at deep graph depth without recursive production DFS. The existing M8 independent SCC oracle and all M9–M29 eventuality/response/monitor/Büchi/bounded/staged temporal suites remain compatibility gates.
+
 ## Architecture
 
 ```text
@@ -284,7 +292,7 @@ src/graph.rs                  neutral captured labeled graphs, bounded/unbounded
                               induced graphs, accounting, deterministic shortest paths
 src/product.rs                bounded/unbounded + staged captured-model-to-product BFS
 src/property.rs               existential reachability + deadlock policies
-src/recurrence.rs             Tarjan SCCs, cyclic classification, cycle witnesses
+src/recurrence.rs             iterative Tarjan SCCs, cyclic classification, cycle witnesses
 src/eventuality.rs            universal eventuality over target-cut residuals
 src/multi_response.rs         product-bounded + staged multi-clause response semantics
 src/response.rs               product-bounded + staged single-clause response adapter
@@ -408,9 +416,9 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo test --all-targets --all-features
 ```
 
-Coverage includes safety, bounded exploration, Peterson, audited reduction, reachability, deadlock policies, SCC structure, universal eventuality, response products, bounded/staged response products, finite-monitor products, bounded/staged finite-monitor products, generalized Büchi acceptance, bounded/staged Büchi products, typed/textual temporal frontends, bounded/staged typed/textual/declarative temporal frontends, declarative finite-model ingestion, exact-state properties, named propositions, Boolean proposition expressions, declarative safety assertions, and bounded state-property verification. Independent generated suites include M8's 512 SCC graphs, M9's 4096 eventuality cases, M10's 4096 single-response cases, M11's 38,416 two-class cases, M12's 4096 finite-monitor cases, M13's 8192 Büchi/finite-policy cases, M22's 9,600 Boolean truth-table cases, M23's 3,584 safety graph/subset cases, and M24's **640 bounded reachability + 640 bounded eventuality** cases.
+Coverage includes safety, bounded exploration, Peterson, audited reduction, reachability, deadlock policies, SCC structure, universal eventuality, response products, bounded/staged response products, finite-monitor products, bounded/staged finite-monitor products, generalized Büchi acceptance, bounded/staged Büchi products, typed/textual temporal frontends, bounded/staged typed/textual/declarative temporal frontends, declarative finite-model ingestion, exact-state properties, named propositions, Boolean proposition expressions, declarative safety assertions, bounded state-property verification, and iterative deep-graph SCC traversal. Independent generated suites include M8's 512 SCC graphs, M9's 4096 eventuality cases, M10's 4096 single-response cases, M11's 38,416 two-class cases, M12's 4096 finite-monitor cases, M13's 8192 Büchi/finite-policy cases, M22's 9,600 Boolean truth-table cases, M23's 3,584 safety graph/subset cases, and M24's **640 bounded reachability + 640 bounded eventuality** cases.
 
-M25–M27 retain their product-only regression suites and unbounded generated oracles. M28 adds staged response semantics and built-binary composed-budget tests. M29 adds `tests/composed_monitor.rs`, `tests/composed_buchi.rs`, `tests/composed_temporal.rs`, and `tests/composed_temporal_cli.rs`; the binary suite verifies model-stage provenance, product-only compatibility, fixed/textual/file routing, and conclusive retained response/Büchi cycles despite later model cutoffs. The complete test command still executes the unchanged older semantic and CLI coverage.
+M25–M27 retain their product-only regression suites and unbounded generated oracles. M28 adds staged response semantics and built-binary composed-budget tests. M29 adds `tests/composed_monitor.rs`, `tests/composed_buchi.rs`, `tests/composed_temporal.rs`, and `tests/composed_temporal_cli.rs`; the binary suite verifies model-stage provenance, product-only compatibility, fixed/textual/file routing, and conclusive retained response/Büchi cycles despite later model cutoffs. M30 adds a 512-graph exact differential against the previous recursive Tarjan semantics plus 50,000-node chain/cycle traversal regressions. The complete test command still executes the unchanged older semantic and CLI coverage.
 
 ## Trust boundaries and limitations
 
@@ -423,14 +431,14 @@ M25–M27 retain their product-only regression suites and unbounded generated or
 - M25–M27 product-only limits run after complete model capture; `--max-product-*` is not a bound on model capture, total memory, wall-clock time, or the entire analysis.
 - M28–M29 compose independent model-space and product-space state/transition/depth budgets across response, finite-monitor, generalized Büchi, and typed/textual/declarative temporal analysis. These are deterministic exploration budgets, not wall-clock deadlines or total-memory limits.
 - Response classes remain Boolean obligations, not per-request identity queues.
-- M9–M29 have **no fairness semantics**. Enabled responses or accepting actions are not assumed to be scheduled.
+- M9–M30 have **no fairness semantics**. Enabled responses or accepting actions are not assumed to be scheduled.
 - The action-temporal frontend supports exact action atoms only. It has no wildcard, Boolean action predicate language, nested temporal operators, temporal negation, or arbitrary formula composition.
 - `all_infinitely_often` is intentionally an infinite-run-only property; finite terminals are ignored. The frontend does not expose M13's strict finite terminal policy for this form.
 - The textual temporal grammar remains deliberately limited to `response(...)` and `infinitely-often(...)`; it is not a general temporal-logic parser.
-- M9–M29 are not a full LTL/CTL implementation and do not claim arbitrary formula parsing/compilation.
+- M9–M30 are not a full LTL/CTL implementation and do not claim arbitrary formula parsing/compilation.
 - The M13 generalized Büchi layer accepts user-defined automata; it does not translate arbitrary LTL into Büchi automata.
-- M14–M16 are internal architecture consolidations and make no performance claim. M17–M29 add frontend/ingestion/resource-bounded capability but no performance claim.
-- Tarjan SCC discovery currently uses recursive DFS; very deep graphs may exhaust the call stack. This is the next architecture frontier rather than an ignored limitation.
+- M14–M16 are internal architecture consolidations and make no performance claim. M17–M30 add frontend/ingestion/resource-bounded/deep-graph capability but no performance claim.
+- M30 removes recursive DFS from SCC discovery, but explicit-state memory still scales with the captured graph and the explicit Tarjan/work stacks.
 - Peterson starvation freedom is still not claimed.
 - The sleep-set engine remains experimental and differentially audited, not a standalone trusted POR proof backend.
 - No SAT/SMT, BDDs, symbolic execution, theorem proving, symmetry reduction, disk-backed state storage, parallel exploration, or distributed checking is implemented.
@@ -438,8 +446,8 @@ M25–M27 retain their product-only regression suites and unbounded generated or
 
 ## Roadmap
 
-Milestones 1–29 form a coherent explicit-state stack: safety -> bounded honesty -> typed models -> independent graph validation -> audited reduction -> existential reachability -> terminal/deadlock analysis -> recurrent SCC structure -> universal eventuality -> response obligations -> multi-class response composition -> deterministic finite monitors -> generalized Büchi acceptance -> shared action-product construction -> neutral captured-graph ownership -> typed/textual temporal specification -> declarative finite-model ingestion -> state/proposition/safety frontends -> bounded state properties -> product-bounded temporal engines -> staged model/product response budgets -> staged whole-analysis monitor/Büchi/typed-textual-declarative temporal budgets.
+Milestones 1–30 form a coherent explicit-state stack: safety -> bounded honesty -> typed models -> independent graph validation -> audited reduction -> existential reachability -> terminal/deadlock analysis -> recurrent SCC structure -> universal eventuality -> response obligations -> multi-class response composition -> deterministic finite monitors -> generalized Büchi acceptance -> shared action-product construction -> neutral captured-graph ownership -> typed/textual temporal specification -> declarative finite-model ingestion -> state/proposition/safety frontends -> bounded state properties -> product-bounded temporal engines -> staged model/product response budgets -> staged whole-analysis monitor/Büchi/typed-textual-declarative temporal budgets -> iterative deep-graph SCC traversal.
 
-The next high-value slice is **Milestone 30: iterative SCC traversal for deep explicit graphs**. `recurrence.rs` still uses recursive Tarjan DFS, and recurrent SCC analysis is shared by recurrence, eventuality, response, monitor, and Büchi paths. M30 should replace recursive SCC discovery with an explicit work stack while preserving the existing deterministic component/state ordering, cyclic classification, shortest-stem/cycle witness behavior, and every public temporal result.
+The next high-value slice is **Milestone 31: explicit weak-fairness liveness**. The current liveness engines intentionally quantify over all maximal executions with no scheduler fairness; this is now the largest semantic gap for realistic response/progress analyses. M31 should introduce a shared exact-action weak-fairness contract for infinite executions, where an action that remains continuously enabled on a recurrent suffix cannot be postponed forever, and integrate that contract through at least generalized Büchi verification plus the typed recurring-action frontend rather than duplicating fairness logic per property.
 
-Acceptance criteria include differential equality against the current SCC semantics on generated small graphs, unchanged M8–M13 and bounded/staged temporal regression suites, deterministic repeated results, and dedicated deep-chain/deep-cycle executable regressions large enough to exercise the iterative traversal without relying on process-stack depth. M30 makes no performance claim merely from changing traversal strategy and must not weaken witness or ordering contracts.
+Acceptance criteria should include deterministic validation of fairness declarations, a shared fair-recurrent witness analysis over labeled SCCs, explicit separation of finite-terminal behavior from infinite fairness, counterexamples that are themselves fair under the configured assumptions, independent generated small-graph oracles covering enabled/taken action combinations, unfair-cycle exclusion regressions, fair-cycle preservation regressions, and unchanged no-fairness results when no fairness assumptions are supplied. M31 must not silently assume strong fairness, mutate existing default semantics, or claim full LTL fairness support.
