@@ -20,11 +20,15 @@ use formal_verification_lab::examples::{
     bounded_counter, buggy_mutex, buggy_peterson_mutex, commuting_counters, peterson_mutex,
     traffic_light, CounterState, TrafficLightState,
 };
-use formal_verification_lab::monitor::{check_monitor, FiniteMonitor, MonitorStatus};
+use formal_verification_lab::monitor::{
+    check_monitor, check_monitor_with_product_limits, FiniteMonitor, MonitorStatus,
+};
 use formal_verification_lab::monitor_examples::{
     invalid_double_open_protocol, session_monitor, session_protocol, stuck_committed_protocol,
 };
-use formal_verification_lab::monitor_report::render_monitor_report;
+use formal_verification_lab::monitor_report::{
+    render_bounded_monitor_report, render_monitor_report,
+};
 use formal_verification_lab::multi_response::{
     check_multi_response, check_multi_response_with_product_limits, MultiResponseProperty,
     MultiResponseStatus, ResponseClause,
@@ -441,39 +445,55 @@ where
 }
 
 fn monitor_command(args: &[String]) -> Result<ExitCode, String> {
-    match args {
-        [query] if query == "session-ok" => run_monitor(
+    let (query, option_args) = args.split_first().ok_or_else(usage)?;
+    match query.as_str() {
+        "session-ok" => run_monitor(
             session_protocol().map_err(|error| error.to_string())?,
             session_monitor().map_err(|error| error.to_string())?,
+            option_args,
         ),
-        [query] if query == "session-double-open" => run_monitor(
+        "session-double-open" => run_monitor(
             invalid_double_open_protocol().map_err(|error| error.to_string())?,
             session_monitor().map_err(|error| error.to_string())?,
+            option_args,
         ),
-        [query] if query == "session-stuck" => run_monitor(
+        "session-stuck" => run_monitor(
             stuck_committed_protocol().map_err(|error| error.to_string())?,
             session_monitor().map_err(|error| error.to_string())?,
+            option_args,
         ),
-        [query] => Err(format!(
+        _ => Err(format!(
             "unknown monitor query '{query}'; expected session-ok, session-double-open, or session-stuck"
         )),
-        _ => Err(usage()),
     }
 }
 
 fn run_monitor<S, M>(
     model: formal_verification_lab::TransitionSystem<S>,
     monitor: FiniteMonitor<M>,
+    option_args: &[String],
 ) -> Result<ExitCode, String>
 where
     S: Clone + Eq + std::hash::Hash + std::fmt::Debug,
     M: Clone + Eq + std::hash::Hash + std::fmt::Debug,
 {
-    let result = check_monitor(&model, &monitor).map_err(|error| error.to_string())?;
-    print!("{}", render_monitor_report(model.name(), &result));
-    Ok(match result.status {
-        MonitorStatus::Satisfied => ExitCode::SUCCESS,
-        MonitorStatus::Violated => ExitCode::from(8),
+    if option_args.is_empty() {
+        let result = check_monitor(&model, &monitor).map_err(|error| error.to_string())?;
+        print!("{}", render_monitor_report(model.name(), &result));
+        return Ok(match result.status {
+            MonitorStatus::Satisfied => ExitCode::SUCCESS,
+            MonitorStatus::Violated => ExitCode::from(8),
+        });
+    }
+
+    let limits = parse_product_limits(option_args)?;
+    let result = check_monitor_with_product_limits(&model, &monitor, limits)
+        .map_err(|error| error.to_string())?;
+    print!("{}", render_bounded_monitor_report(model.name(), &result));
+    Ok(match &result.outcome {
+        BoundedOutcome::Conclusive(MonitorStatus::Satisfied) => ExitCode::SUCCESS,
+        BoundedOutcome::Conclusive(MonitorStatus::Violated) => ExitCode::from(8),
+        BoundedOutcome::Inconclusive(_) => ExitCode::from(3),
     })
 }
 
@@ -898,7 +918,7 @@ fn status_exit_code(status: VerificationStatus) -> ExitCode {
 }
 
 fn usage() -> String {
-    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | eventually <counter-three|counter-four|traffic-never> | respond <request-grant|request-grant-unfair|dual-grant|dual-grant-unfair-b> [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | monitor <session-ok|session-double-open|session-stuck> | buchi <pulses|pulses-unfair|finite-ignore|finite-strict> | temporal <request-grant|request-grant-unfair|pulses|pulses-unfair> | temporal check <request-grant|request-grant-unfair|pulses|pulses-unfair> <expression> | temporal file <path> <expression> | state file <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition file <path> <reachable|all-eventually> <proposition> [--max-states N] [--max-transitions N] [--max-depth N] | proposition expr <path> <reachable|all-eventually> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition always <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N]]"
+    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | eventually <counter-three|counter-four|traffic-never> | respond <request-grant|request-grant-unfair|dual-grant|dual-grant-unfair-b> [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | monitor <session-ok|session-double-open|session-stuck> [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | buchi <pulses|pulses-unfair|finite-ignore|finite-strict> | temporal <request-grant|request-grant-unfair|pulses|pulses-unfair> | temporal check <request-grant|request-grant-unfair|pulses|pulses-unfair> <expression> | temporal file <path> <expression> | state file <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition file <path> <reachable|all-eventually> <proposition> [--max-states N] [--max-transitions N] [--max-depth N] | proposition expr <path> <reachable|all-eventually> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition always <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N]]"
         .to_owned()
 }
 
