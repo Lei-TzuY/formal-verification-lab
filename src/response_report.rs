@@ -30,8 +30,7 @@ pub fn render_bounded_response_report<S: Debug>(
                 .expect("writing to String cannot fail");
         }
         BoundedOutcome::Inconclusive(reason) => {
-            writeln!(&mut output, "response: INCONCLUSIVE")
-                .expect("writing to String cannot fail");
+            writeln!(&mut output, "response: INCONCLUSIVE").expect("writing to String cannot fail");
             writeln!(
                 &mut output,
                 "product inconclusive reason: {}",
@@ -98,8 +97,12 @@ fn render_unbounded_accounting<S: Debug>(output: &mut String, result: &ResponseR
         .expect("writing to String cannot fail");
     writeln!(output, "product states: {}", result.product_states)
         .expect("writing to String cannot fail");
-    writeln!(output, "product transitions: {}", result.product_transitions)
-        .expect("writing to String cannot fail");
+    writeln!(
+        output,
+        "product transitions: {}",
+        result.product_transitions
+    )
+    .expect("writing to String cannot fail");
 }
 
 fn render_counterexample<S: Debug>(
