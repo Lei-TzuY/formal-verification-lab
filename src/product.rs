@@ -243,3 +243,158 @@ fn finish_product<P>(
         known_terminal,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn chain_graph() -> ReachableGraph<usize> {
+        ReachableGraph {
+            states: vec![0, 1],
+            outgoing: vec![
+                vec![SnapshotEdge {
+                    action: "advance".to_owned(),
+                    target: 1,
+                }],
+                Vec::new(),
+            ],
+            initial_ids: vec![0],
+        }
+    }
+
+    fn self_loop_graph() -> ReachableGraph<usize> {
+        ReachableGraph {
+            states: vec![0],
+            outgoing: vec![vec![SnapshotEdge {
+                action: "tick".to_owned(),
+                target: 0,
+            }]],
+            initial_ids: vec![0],
+        }
+    }
+
+    fn build(
+        graph: &ReachableGraph<usize>,
+        limits: ExplorationLimits,
+    ) -> BoundedActionProduct<(usize, bool)> {
+        build_action_product_with_limits(
+            graph,
+            &false,
+            |control, _action| *control,
+            |state, control| (state, control),
+            limits,
+        )
+    }
+
+    #[test]
+    fn zero_state_budget_blocks_the_first_initial_product_state() {
+        let result = build(
+            &chain_graph(),
+            ExplorationLimits {
+                max_states: Some(0),
+                max_transitions: None,
+                max_depth: None,
+            },
+        );
+
+        assert_eq!(
+            result.completion,
+            BoundedOutcome::Inconclusive(InconclusiveReason::StateLimitReached { limit: 0 })
+        );
+        assert!(result.graph.states.is_empty());
+        assert!(result.graph.initial_ids.is_empty());
+        assert_eq!(result.checked_states, 0);
+        assert_eq!(result.explored_transitions, 0);
+        assert_eq!(result.max_depth_reached, None);
+        assert!(result.known_terminal.is_empty());
+    }
+
+    #[test]
+    fn transition_budget_stops_before_the_blocked_edge_is_counted_or_retained() {
+        let result = build(
+            &chain_graph(),
+            ExplorationLimits {
+                max_states: None,
+                max_transitions: Some(0),
+                max_depth: None,
+            },
+        );
+
+        assert_eq!(
+            result.completion,
+            BoundedOutcome::Inconclusive(InconclusiveReason::TransitionLimitReached { limit: 0 })
+        );
+        assert_eq!(result.graph.states, vec![(0, false)]);
+        assert!(result.graph.outgoing[0].is_empty());
+        assert_eq!(result.checked_states, 1);
+        assert_eq!(result.explored_transitions, 0);
+        assert_eq!(result.max_depth_reached, Some(0));
+        assert_eq!(result.known_terminal, vec![false]);
+    }
+
+    #[test]
+    fn depth_budget_counts_the_edge_but_does_not_retain_its_unseen_target() {
+        let result = build(
+            &chain_graph(),
+            ExplorationLimits {
+                max_states: None,
+                max_transitions: None,
+                max_depth: Some(0),
+            },
+        );
+
+        assert_eq!(
+            result.completion,
+            BoundedOutcome::Inconclusive(InconclusiveReason::DepthLimitReached { limit: 0 })
+        );
+        assert_eq!(result.graph.states, vec![(0, false)]);
+        assert!(result.graph.outgoing[0].is_empty());
+        assert_eq!(result.checked_states, 1);
+        assert_eq!(result.explored_transitions, 1);
+        assert_eq!(result.max_depth_reached, Some(0));
+        assert_eq!(result.known_terminal, vec![false]);
+    }
+
+    #[test]
+    fn depth_budget_does_not_block_a_real_edge_to_an_existing_product_state() {
+        let result = build(
+            &self_loop_graph(),
+            ExplorationLimits {
+                max_states: Some(1),
+                max_transitions: Some(1),
+                max_depth: Some(0),
+            },
+        );
+
+        assert_eq!(result.completion, BoundedOutcome::Conclusive(()));
+        assert_eq!(result.graph.states, vec![(0, false)]);
+        assert_eq!(result.graph.outgoing[0].len(), 1);
+        assert_eq!(result.graph.outgoing[0][0].action, "tick");
+        assert_eq!(result.graph.outgoing[0][0].target, 0);
+        assert_eq!(result.checked_states, 1);
+        assert_eq!(result.explored_transitions, 1);
+        assert_eq!(result.max_depth_reached, Some(0));
+        assert_eq!(result.known_terminal, vec![false]);
+    }
+
+    #[test]
+    fn exact_limits_that_do_not_prevent_work_still_complete_the_product() {
+        let result = build(
+            &chain_graph(),
+            ExplorationLimits {
+                max_states: Some(2),
+                max_transitions: Some(1),
+                max_depth: Some(1),
+            },
+        );
+
+        assert_eq!(result.completion, BoundedOutcome::Conclusive(()));
+        assert_eq!(result.graph.states, vec![(0, false), (1, false)]);
+        assert_eq!(result.graph.outgoing[0].len(), 1);
+        assert!(result.graph.outgoing[1].is_empty());
+        assert_eq!(result.checked_states, 2);
+        assert_eq!(result.explored_transitions, 1);
+        assert_eq!(result.max_depth_reached, Some(1));
+        assert_eq!(result.known_terminal, vec![false, true]);
+    }
+}
