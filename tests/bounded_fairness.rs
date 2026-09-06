@@ -80,9 +80,7 @@ fn unrelated_fairness_keeps_a_real_retained_cycle_conclusive() {
         BoundedOutcome::Conclusive(BuchiStatus::Violated)
     );
     let Some(BuchiCounterexample::AcceptanceAvoidingCycle {
-        acceptance,
-        cycle,
-        ..
+        acceptance, cycle, ..
     }) = result.counterexample
     else {
         panic!("expected retained acceptance-avoiding cycle");
