@@ -368,11 +368,7 @@ where
     })
 }
 
-fn next_pending(
-    property: &MultiResponseProperty,
-    pending: &[bool],
-    action: &str,
-) -> Vec<bool> {
+fn next_pending(property: &MultiResponseProperty, pending: &[bool], action: &str) -> Vec<bool> {
     let mut next_pending = pending.to_vec();
     for (index, clause) in property.clauses.iter().enumerate() {
         if (clause.response)(action) {
