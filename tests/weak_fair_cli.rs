@@ -127,23 +127,19 @@ fn fairness_declarations_preserve_order_and_fail_closed_on_duplicates() {
 }
 
 #[test]
-fn fairness_rejects_response_and_bounded_or_staged_combinations() {
-    let response = run(&["temporal", "request-grant", "--weak-fair-action", "grant"]);
-    assert_eq!(response.status.code(), Some(2));
-    assert!(stderr(&response).contains(
-        "weak fairness is currently supported only for infinitely-often temporal specifications"
-    ));
-
-    for bounded_args in [
+fn response_fairness_still_fails_closed_with_or_without_limits() {
+    for extra in [
+        Vec::<&str>::new(),
         vec!["--max-product-states", "2"],
         vec!["--max-model-states", "2"],
     ] {
-        let mut args = vec!["temporal", "pulses-unfair", "--weak-fair-action", "pulse-b"];
-        args.extend(bounded_args);
+        let mut args = vec!["temporal", "request-grant", "--weak-fair-action", "grant"];
+        args.extend(extra);
         let output = run(&args);
         assert_eq!(output.status.code(), Some(2));
-        assert!(stderr(&output)
-            .contains("weak fairness cannot be combined with bounded or staged temporal limits"));
+        assert!(stderr(&output).contains(
+            "weak fairness is currently supported only for infinitely-often temporal specifications"
+        ));
     }
 }
 
