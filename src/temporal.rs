@@ -233,7 +233,9 @@ pub enum TemporalError {
     EmptyPropertyName,
     EmptyActionName,
     NoRecurringActions,
-    DuplicateRecurringAction { action: String },
+    DuplicateRecurringAction {
+        action: String,
+    },
     /// Legacy compatibility marker retained for callers that matched this
     /// variant before weak-fair response semantics were implemented.
     WeakFairnessUnsupportedForResponse,
