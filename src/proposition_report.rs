@@ -1,75 +1,149 @@
+use crate::bounded::BoundedOutcome;
+use crate::bounded_report::format_inconclusive_reason;
 use crate::checker::TraceStep;
 use crate::exact_state::{ExactStateBackend, ExactStateEvidence, ExactStateStatus};
-use crate::proposition::PropositionResult;
+use crate::proposition::{BoundedPropositionResult, PropositionResult};
 use std::fmt::Write;
 
 pub fn render_proposition_report(model_name: &str, result: &PropositionResult) -> String {
     let mut output = String::new();
-    writeln!(&mut output, "model: {model_name}").expect("writing to String cannot fail");
-    writeln!(&mut output, "property: {}", result.property).expect("writing to String cannot fail");
-    writeln!(&mut output, "proposition: {:?}", result.proposition)
-        .expect("writing to String cannot fail");
+    render_header(
+        &mut output,
+        model_name,
+        &result.property,
+        &result.proposition,
+        result.backend,
+    );
     writeln!(
         &mut output,
+        "state property: {}",
+        status_label(result.status)
+    )
+    .expect("writing to String cannot fail");
+    render_accounting(
+        &mut output,
+        result.discovered_states,
+        None,
+        result.explored_transitions,
+        result.max_depth_reached,
+    );
+    render_evidence(&mut output, result.evidence.as_ref());
+    output
+}
+
+pub fn render_bounded_proposition_report(
+    model_name: &str,
+    result: &BoundedPropositionResult,
+) -> String {
+    let mut output = String::new();
+    render_header(
+        &mut output,
+        model_name,
+        &result.property,
+        &result.proposition,
+        result.backend,
+    );
+    match result.outcome {
+        BoundedOutcome::Conclusive(status) => {
+            writeln!(&mut output, "state property: {}", status_label(status))
+                .expect("writing to String cannot fail");
+        }
+        BoundedOutcome::Inconclusive(reason) => {
+            writeln!(&mut output, "state property: INCONCLUSIVE")
+                .expect("writing to String cannot fail");
+            writeln!(
+                &mut output,
+                "inconclusive reason: {}",
+                format_inconclusive_reason(reason)
+            )
+            .expect("writing to String cannot fail");
+        }
+    }
+    render_accounting(
+        &mut output,
+        result.discovered_states,
+        Some(result.checked_states),
+        result.explored_transitions,
+        result.max_depth_reached,
+    );
+    render_evidence(&mut output, result.evidence.as_ref());
+    output
+}
+
+fn render_header(
+    output: &mut String,
+    model_name: &str,
+    property: &str,
+    proposition: &str,
+    backend: ExactStateBackend,
+) {
+    writeln!(output, "model: {model_name}").expect("writing to String cannot fail");
+    writeln!(output, "property: {property}").expect("writing to String cannot fail");
+    writeln!(output, "proposition: {proposition:?}").expect("writing to String cannot fail");
+    writeln!(
+        output,
         "backend: {}",
-        match result.backend {
+        match backend {
             ExactStateBackend::Reachability => "REACHABILITY",
             ExactStateBackend::Eventuality => "EVENTUALITY",
         }
     )
     .expect("writing to String cannot fail");
-    writeln!(
-        &mut output,
-        "state property: {}",
-        match result.status {
-            ExactStateStatus::Satisfied => "SATISFIED",
-            ExactStateStatus::Violated => "VIOLATED",
-        }
-    )
-    .expect("writing to String cannot fail");
-    writeln!(
-        &mut output,
-        "discovered states: {}",
-        result.discovered_states
-    )
-    .expect("writing to String cannot fail");
-    writeln!(
-        &mut output,
-        "explored transitions: {}",
-        result.explored_transitions
-    )
-    .expect("writing to String cannot fail");
-    match result.max_depth_reached {
-        Some(depth) => writeln!(&mut output, "max depth reached: {depth}"),
-        None => writeln!(&mut output, "max depth reached: none"),
+}
+
+fn status_label(status: ExactStateStatus) -> &'static str {
+    match status {
+        ExactStateStatus::Satisfied => "SATISFIED",
+        ExactStateStatus::Violated => "VIOLATED",
+    }
+}
+
+fn render_accounting(
+    output: &mut String,
+    discovered_states: usize,
+    checked_states: Option<usize>,
+    explored_transitions: usize,
+    max_depth_reached: Option<usize>,
+) {
+    writeln!(output, "discovered states: {discovered_states}")
+        .expect("writing to String cannot fail");
+    if let Some(checked_states) = checked_states {
+        writeln!(output, "checked states: {checked_states}")
+            .expect("writing to String cannot fail");
+    }
+    writeln!(output, "explored transitions: {explored_transitions}")
+        .expect("writing to String cannot fail");
+    match max_depth_reached {
+        Some(depth) => writeln!(output, "max depth reached: {depth}"),
+        None => writeln!(output, "max depth reached: none"),
     }
     .expect("writing to String cannot fail");
+}
 
-    match &result.evidence {
-        None => writeln!(&mut output, "evidence: none").expect("writing to String cannot fail"),
+fn render_evidence(output: &mut String, evidence: Option<&ExactStateEvidence>) {
+    match evidence {
+        None => writeln!(output, "evidence: none").expect("writing to String cannot fail"),
         Some(ExactStateEvidence::ReachabilityWitness { trace }) => {
-            writeln!(&mut output, "evidence: REACHABILITY_WITNESS")
+            writeln!(output, "evidence: REACHABILITY_WITNESS")
                 .expect("writing to String cannot fail");
-            writeln!(&mut output, "trace:").expect("writing to String cannot fail");
-            render_trace(&mut output, trace, "initial");
+            writeln!(output, "trace:").expect("writing to String cannot fail");
+            render_trace(output, trace, "initial");
         }
         Some(ExactStateEvidence::EventualityFiniteCounterexample { trace }) => {
-            writeln!(&mut output, "evidence: EVENTUALITY_FINITE_COUNTEREXAMPLE")
+            writeln!(output, "evidence: EVENTUALITY_FINITE_COUNTEREXAMPLE")
                 .expect("writing to String cannot fail");
-            writeln!(&mut output, "trace:").expect("writing to String cannot fail");
-            render_trace(&mut output, trace, "initial");
+            writeln!(output, "trace:").expect("writing to String cannot fail");
+            render_trace(output, trace, "initial");
         }
         Some(ExactStateEvidence::EventualityInfiniteCounterexample { stem, cycle }) => {
-            writeln!(&mut output, "evidence: EVENTUALITY_INFINITE_COUNTEREXAMPLE")
+            writeln!(output, "evidence: EVENTUALITY_INFINITE_COUNTEREXAMPLE")
                 .expect("writing to String cannot fail");
-            writeln!(&mut output, "stem:").expect("writing to String cannot fail");
-            render_trace(&mut output, stem, "initial");
-            writeln!(&mut output, "cycle:").expect("writing to String cannot fail");
-            render_trace(&mut output, cycle, "cycle-entry");
+            writeln!(output, "stem:").expect("writing to String cannot fail");
+            render_trace(output, stem, "initial");
+            writeln!(output, "cycle:").expect("writing to String cannot fail");
+            render_trace(output, cycle, "cycle-entry");
         }
     }
-
-    output
 }
 
 fn render_trace(output: &mut String, trace: &[TraceStep<String>], root: &str) {
