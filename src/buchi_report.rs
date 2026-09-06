@@ -19,11 +19,7 @@ pub fn render_buchi_report<S: Debug, A: Debug>(
         status_label(result.status)
     )
     .expect("writing to String cannot fail");
-    render_policy_and_acceptance(
-        &mut output,
-        result.finite_policy,
-        result.acceptance_sets,
-    );
+    render_policy_and_acceptance(&mut output, result.finite_policy, result.acceptance_sets);
     writeln!(&mut output, "model states: {}", result.model_states)
         .expect("writing to String cannot fail");
     writeln!(
@@ -54,12 +50,8 @@ pub fn render_bounded_buchi_report<S: Debug, A: Debug>(
     render_header(&mut output, model_name, &result.automaton);
     match result.outcome {
         BoundedOutcome::Conclusive(status) => {
-            writeln!(
-                &mut output,
-                "Buchi verification: {}",
-                status_label(status)
-            )
-            .expect("writing to String cannot fail");
+            writeln!(&mut output, "Buchi verification: {}", status_label(status))
+                .expect("writing to String cannot fail");
         }
         BoundedOutcome::Inconclusive(reason) => {
             writeln!(&mut output, "Buchi verification: INCONCLUSIVE")
@@ -72,11 +64,7 @@ pub fn render_bounded_buchi_report<S: Debug, A: Debug>(
             .expect("writing to String cannot fail");
         }
     }
-    render_policy_and_acceptance(
-        &mut output,
-        result.finite_policy,
-        result.acceptance_sets,
-    );
+    render_policy_and_acceptance(&mut output, result.finite_policy, result.acceptance_sets);
     writeln!(&mut output, "model states: {}", result.model_states)
         .expect("writing to String cannot fail");
     writeln!(
@@ -142,8 +130,7 @@ fn render_policy_and_acceptance(
         }
     )
     .expect("writing to String cannot fail");
-    writeln!(output, "acceptance sets: {acceptance_sets}")
-        .expect("writing to String cannot fail");
+    writeln!(output, "acceptance sets: {acceptance_sets}").expect("writing to String cannot fail");
 }
 
 fn render_counterexample<S: Debug, A: Debug>(
