@@ -2,9 +2,10 @@ use crate::bounded::{AnalysisLimits, AnalysisOutcome, BoundedOutcome};
 use crate::checker::{ExplorationLimits, TraceStep};
 use crate::model::TransitionSystem;
 use crate::multi_response::{
-    check_multi_response, check_multi_response_with_limits, check_multi_response_with_product_limits,
-    AnalysisMultiResponseResult, BoundedMultiResponseResult, MultiObligationState,
-    MultiResponseCounterexample, MultiResponseError, MultiResponseProperty, MultiResponseStatus,
+    check_multi_response, check_multi_response_with_limits,
+    check_multi_response_with_product_limits, AnalysisMultiResponseResult,
+    BoundedMultiResponseResult, MultiObligationState, MultiResponseCounterexample,
+    MultiResponseError, MultiResponseProperty, MultiResponseStatus,
 };
 use crate::recurrence::RecurrenceError;
 use std::fmt;
