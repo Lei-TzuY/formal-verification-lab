@@ -184,8 +184,8 @@ pub fn check_eventuality_with_limits<S>(
 where
     S: Clone + Eq + Hash,
 {
-    let captured = capture_reachable_graph_with_limits(model, limits)
-        .map_err(RecurrenceError::from)?;
+    let captured =
+        capture_reachable_graph_with_limits(model, limits).map_err(RecurrenceError::from)?;
     let counterexample = find_counterexample(&captured.graph, &captured.known_terminal, property)?;
     let outcome = if counterexample.is_some() {
         BoundedOutcome::Conclusive(EventualityStatus::Violated)
@@ -253,8 +253,8 @@ where
         .map(|(id, _)| id)
         .collect::<HashSet<_>>();
 
-    if let Some(terminal) = (0..graph.states.len())
-        .find(|id| residual_reachable[*id] && known_terminal[*id])
+    if let Some(terminal) =
+        (0..graph.states.len()).find(|id| residual_reachable[*id] && known_terminal[*id])
     {
         let trace = shortest_path(graph, &graph.initial_ids, terminal, Some(&residual_ids))
             .ok_or(EventualityError::MissingFiniteWitness)?;
