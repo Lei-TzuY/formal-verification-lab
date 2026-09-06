@@ -154,8 +154,10 @@ pub use safety_report::render_safety_report;
 pub use strong_fairness::{check_buchi_with_strong_fairness, StrongFairness, StrongFairnessError};
 pub use temporal::{
     check_action_temporal, check_action_temporal_with_limits,
-    check_action_temporal_with_product_limits, check_action_temporal_with_weak_fairness,
-    check_action_temporal_with_weak_fairness_and_limits,
+    check_action_temporal_with_product_limits, check_action_temporal_with_strong_fairness,
+    check_action_temporal_with_strong_fairness_and_limits,
+    check_action_temporal_with_strong_fairness_and_product_limits,
+    check_action_temporal_with_weak_fairness, check_action_temporal_with_weak_fairness_and_limits,
     check_action_temporal_with_weak_fairness_and_product_limits, ActionAtom, ActionTemporalSpec,
     AnalysisTemporalResult, BoundedTemporalResult, TemporalBackend, TemporalCounterexample,
     TemporalError, TemporalObligation, TemporalResult, TemporalStatus,
