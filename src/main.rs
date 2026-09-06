@@ -815,12 +815,7 @@ fn bounded_state_exit_code(outcome: &BoundedOutcome<ExactStateStatus>) -> ExitCo
 }
 
 fn parse_limits(args: &[String]) -> Result<ExplorationLimits, String> {
-    parse_named_limits(
-        args,
-        "--max-states",
-        "--max-transitions",
-        "--max-depth",
-    )
+    parse_named_limits(args, "--max-states", "--max-transitions", "--max-depth")
 }
 
 fn parse_product_limits(args: &[String]) -> Result<ExplorationLimits, String> {
