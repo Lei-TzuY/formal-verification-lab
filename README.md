@@ -278,6 +278,18 @@ The public SCC contract is unchanged: members remain ordered by captured graph d
 
 Executable migration evidence keeps a test-only copy of the previous recursive Tarjan implementation and compares **exact component vectors and ordering across all 512 directed three-node graphs**. Dedicated **50,000-node chain** and **50,000-node cycle** regressions exercise the iterative production traversal at deep graph depth without recursive production DFS. The existing M8 independent SCC oracle and all M9–M29 eventuality/response/monitor/Büchi/bounded/staged temporal suites remain compatibility gates.
 
+### Milestone 31 — explicit weak-fairness liveness core
+
+Milestone 31 adds a reusable exact-action weak-fairness contract for infinite executions without changing the historical default semantics. `WeakFairness` stores an ordered, validated set of exact action labels. For every configured action `a`, an admitted infinite execution may not postpone `a` forever while `a` remains continuously enabled.
+
+`check_buchi_with_weak_fairness` filters generalized Büchi counterexamples through a shared fair-recurrent witness analysis. Fairness is checked against **full-product action enablement**, not only the property residual: if a fair action is enabled only through an edge leaving an acceptance-avoiding residual, that action is still enabled and an infinite stay inside the residual is rejected as unfair. A recurrent SCC admits a weakly fair execution for action `a` exactly when some recurrent state disables `a` or an internal recurrent edge takes `a`. Returned recurrent counterexamples are deterministic closed walks that themselves visit the required disabled-state or taken-edge witnesses.
+
+Finite terminal policy is unchanged because weak fairness constrains infinite executions only. `check_action_temporal_with_weak_fairness` exposes the same semantics through the typed `all_infinitely_often` frontend. Response specifications fail closed with `WeakFairnessUnsupportedForResponse`; M31 does not infer response fairness or silently broaden the response backend.
+
+The empty fairness set is an exact compatibility path. In addition to focused fairness regressions and a generated two-node action-assigned graph × residual-subset × fairness-set oracle, an independent **8192-case** differential gate — all 16 directed two-node graph masks × `4^4` action assignments × both finite policies — requires `WeakFairness::none()` to return a `BuchiResult` exactly equal to the existing no-fairness backend, including accounting and deterministic witnesses.
+
+M31 intentionally stops at the reusable semantic core and typed API. Fairness assumptions are not yet serialized in the textual temporal grammar or exposed through `fvlab temporal`; product-bounded/staged fairness is not implemented. M31 adds no strong fairness, implicit scheduler fairness, general LTL fairness, or performance claim.
+
 ## Architecture
 
 ```text
@@ -293,12 +305,13 @@ src/graph.rs                  neutral captured labeled graphs, bounded/unbounded
 src/product.rs                bounded/unbounded + staged captured-model-to-product BFS
 src/property.rs               existential reachability + deadlock policies
 src/recurrence.rs             iterative Tarjan SCCs, cyclic classification, cycle witnesses
+src/fairness.rs               exact-action weak fairness + fair recurrent witnesses
 src/eventuality.rs            universal eventuality over target-cut residuals
 src/multi_response.rs         product-bounded + staged multi-clause response semantics
 src/response.rs               product-bounded + staged single-clause response adapter
 src/monitor.rs                unbounded, product-bounded + staged finite-monitor semantics
 src/buchi.rs                  unbounded, product-bounded + staged Büchi semantics
-src/temporal.rs               unbounded, product-bounded + staged exact-action frontend routing
+src/temporal.rs               exact-action frontend routing + typed weak-fair recurring path
 src/temporal_parse.rs         textual parser for the typed temporal subset
 src/temporal_report.rs        normalized unbounded/product-bounded/staged temporal reporting
 src/exact_state.rs            typed/textual exact-state frontend + backend routing
@@ -316,7 +329,7 @@ src/main.rs                   CLI/file/exit-status integration; no model travers
 tests/                        semantic, protocol, graph/product and frontend tests
 ```
 
-The original transition relation remains owned by the canonical `TransitionSystem` plus canonical exploration. Structural and temporal analyses reuse neutral captured finite labeled graphs and one shared deterministic action-product substrate rather than invoking separate traversal engines. Typed/textual properties, proposition metadata, Boolean state predicates, query-time safety assertions, and declarative model files remain ingestion layers that validate and route into the audited core.
+The original transition relation remains owned by the canonical `TransitionSystem` plus canonical exploration. Structural and temporal analyses reuse neutral captured finite labeled graphs and one shared deterministic action-product substrate rather than invoking separate traversal engines. Typed/textual properties, proposition metadata, Boolean state predicates, query-time safety assertions, and declarative model files remain ingestion layers that validate and route into the audited core. Weak fairness is opt-in and lives beside the recurrent graph machinery rather than changing the default traversal substrate.
 
 ## Executable examples
 
@@ -387,7 +400,7 @@ cargo run -- proposition always request-grant.fvl '"pending" or "quiescent"'
 
 ### Typed and textual temporal frontend
 
-`request-grant` and `pulses` satisfy their typed properties. The unfair variants return normalized counterexamples and exit 10. Product-only limits return exit 3 when the selected backend's product construction is incomplete without a conclusive counterexample. Staged invocations add model limits and return stage-qualified exit 3 when unresolved, while preserving real violations already established before a later cutoff. User-supplied expressions and declarative models feed the same typed specs/backends.
+`request-grant` and `pulses` satisfy their typed properties. The unfair variants return normalized counterexamples and exit 10. Product-only limits return exit 3 when the selected backend's product construction is incomplete without a conclusive counterexample. Staged invocations add model limits and return stage-qualified exit 3 when unresolved, while preserving real violations already established before a later cutoff. User-supplied expressions and declarative models feed the same typed specs/backends. M31 additionally exposes weak fairness through the typed API only; the current CLI/textual forms continue to use the historical no-fairness semantics.
 
 ## CLI exit status
 
@@ -416,9 +429,9 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo test --all-targets --all-features
 ```
 
-Coverage includes safety, bounded exploration, Peterson, audited reduction, reachability, deadlock policies, SCC structure, universal eventuality, response products, bounded/staged response products, finite-monitor products, bounded/staged finite-monitor products, generalized Büchi acceptance, bounded/staged Büchi products, typed/textual temporal frontends, bounded/staged typed/textual/declarative temporal frontends, declarative finite-model ingestion, exact-state properties, named propositions, Boolean proposition expressions, declarative safety assertions, bounded state-property verification, and iterative deep-graph SCC traversal. Independent generated suites include M8's 512 SCC graphs, M9's 4096 eventuality cases, M10's 4096 single-response cases, M11's 38,416 two-class cases, M12's 4096 finite-monitor cases, M13's 8192 Büchi/finite-policy cases, M22's 9,600 Boolean truth-table cases, M23's 3,584 safety graph/subset cases, and M24's **640 bounded reachability + 640 bounded eventuality** cases.
+Coverage includes safety, bounded exploration, Peterson, audited reduction, reachability, deadlock policies, SCC structure, universal eventuality, response products, bounded/staged response products, finite-monitor products, bounded/staged finite-monitor products, generalized Büchi acceptance, bounded/staged Büchi products, typed/textual temporal frontends, bounded/staged typed/textual/declarative temporal frontends, declarative finite-model ingestion, exact-state properties, named propositions, Boolean proposition expressions, declarative safety assertions, bounded state-property verification, iterative deep-graph SCC traversal, and opt-in weak-fair Büchi/typed recurring-action verification. Independent generated suites include M8's 512 SCC graphs, M9's 4096 eventuality cases, M10's 4096 single-response cases, M11's 38,416 two-class cases, M12's 4096 finite-monitor cases, M13's 8192 Büchi/finite-policy cases, M22's 9,600 Boolean truth-table cases, M23's 3,584 safety graph/subset cases, and M24's **640 bounded reachability + 640 bounded eventuality** cases.
 
-M25–M27 retain their product-only regression suites and unbounded generated oracles. M28 adds staged response semantics and built-binary composed-budget tests. M29 adds `tests/composed_monitor.rs`, `tests/composed_buchi.rs`, `tests/composed_temporal.rs`, and `tests/composed_temporal_cli.rs`; the binary suite verifies model-stage provenance, product-only compatibility, fixed/textual/file routing, and conclusive retained response/Büchi cycles despite later model cutoffs. M30 adds a 512-graph exact differential against the previous recursive Tarjan semantics plus 50,000-node chain/cycle traversal regressions. The complete test command still executes the unchanged older semantic and CLI coverage.
+M25–M27 retain their product-only regression suites and unbounded generated oracles. M28 adds staged response semantics and built-binary composed-budget tests. M29 adds `tests/composed_monitor.rs`, `tests/composed_buchi.rs`, `tests/composed_temporal.rs`, and `tests/composed_temporal_cli.rs`; the binary suite verifies model-stage provenance, product-only compatibility, fixed/textual/file routing, and conclusive retained response/Büchi cycles despite later model cutoffs. M30 adds a 512-graph exact differential against the previous recursive Tarjan semantics plus 50,000-node chain/cycle traversal regressions. M31 adds generated weak-fair SCC admissibility checks and an **8192-case exact empty-fairness Büchi differential** covering graph/action/policy combinations. The complete test command still executes the unchanged older semantic and CLI coverage.
 
 ## Trust boundaries and limitations
 
@@ -431,13 +444,15 @@ M25–M27 retain their product-only regression suites and unbounded generated or
 - M25–M27 product-only limits run after complete model capture; `--max-product-*` is not a bound on model capture, total memory, wall-clock time, or the entire analysis.
 - M28–M29 compose independent model-space and product-space state/transition/depth budgets across response, finite-monitor, generalized Büchi, and typed/textual/declarative temporal analysis. These are deterministic exploration budgets, not wall-clock deadlines or total-memory limits.
 - Response classes remain Boolean obligations, not per-request identity queues.
-- M9–M30 have **no fairness semantics**. Enabled responses or accepting actions are not assumed to be scheduled.
+- M9–M30 retain historical **no-fairness** semantics. M31 adds only an explicit opt-in exact-action weak-fairness API for unbounded generalized Büchi and typed recurring-action verification; no fairness is assumed by default.
+- M31 does not implement strong fairness. An action that is enabled infinitely often but not continuously enabled is not forced merely by the weak-fairness contract.
+- M31 fairness is not exposed by the current textual temporal grammar or CLI, and is not composed with product-bounded/staged analysis. Response fairness remains unsupported and fails closed through the typed fairness API.
 - The action-temporal frontend supports exact action atoms only. It has no wildcard, Boolean action predicate language, nested temporal operators, temporal negation, or arbitrary formula composition.
 - `all_infinitely_often` is intentionally an infinite-run-only property; finite terminals are ignored. The frontend does not expose M13's strict finite terminal policy for this form.
-- The textual temporal grammar remains deliberately limited to `response(...)` and `infinitely-often(...)`; it is not a general temporal-logic parser.
-- M9–M30 are not a full LTL/CTL implementation and do not claim arbitrary formula parsing/compilation.
+- The textual temporal grammar remains deliberately limited to `response(...)` and `infinitely-often(...)`; it is not a general temporal-logic parser and currently carries no fairness-assumption syntax.
+- M9–M31 are not a full LTL/CTL implementation and do not claim arbitrary formula parsing/compilation.
 - The M13 generalized Büchi layer accepts user-defined automata; it does not translate arbitrary LTL into Büchi automata.
-- M14–M16 are internal architecture consolidations and make no performance claim. M17–M30 add frontend/ingestion/resource-bounded/deep-graph capability but no performance claim.
+- M14–M16 are internal architecture consolidations and make no performance claim. M17–M31 add frontend/ingestion/resource-bounded/deep-graph/fairness capability but no performance claim.
 - M30 removes recursive DFS from SCC discovery, but explicit-state memory still scales with the captured graph and the explicit Tarjan/work stacks.
 - Peterson starvation freedom is still not claimed.
 - The sleep-set engine remains experimental and differentially audited, not a standalone trusted POR proof backend.
@@ -446,8 +461,8 @@ M25–M27 retain their product-only regression suites and unbounded generated or
 
 ## Roadmap
 
-Milestones 1–30 form a coherent explicit-state stack: safety -> bounded honesty -> typed models -> independent graph validation -> audited reduction -> existential reachability -> terminal/deadlock analysis -> recurrent SCC structure -> universal eventuality -> response obligations -> multi-class response composition -> deterministic finite monitors -> generalized Büchi acceptance -> shared action-product construction -> neutral captured-graph ownership -> typed/textual temporal specification -> declarative finite-model ingestion -> state/proposition/safety frontends -> bounded state properties -> product-bounded temporal engines -> staged model/product response budgets -> staged whole-analysis monitor/Büchi/typed-textual-declarative temporal budgets -> iterative deep-graph SCC traversal.
+Milestones 1–31 form a coherent explicit-state stack: safety -> bounded honesty -> typed models -> independent graph validation -> audited reduction -> existential reachability -> terminal/deadlock analysis -> recurrent SCC structure -> universal eventuality -> response obligations -> multi-class response composition -> deterministic finite monitors -> generalized Büchi acceptance -> shared action-product construction -> neutral captured-graph ownership -> typed/textual temporal specification -> declarative finite-model ingestion -> state/proposition/safety frontends -> bounded state properties -> product-bounded temporal engines -> staged model/product response budgets -> staged whole-analysis monitor/Büchi/typed-textual-declarative temporal budgets -> iterative deep-graph SCC traversal -> explicit opt-in weak-fair recurrent liveness semantics.
 
-The next high-value slice is **Milestone 31: explicit weak-fairness liveness**. The current liveness engines intentionally quantify over all maximal executions with no scheduler fairness; this is now the largest semantic gap for realistic response/progress analyses. M31 should introduce a shared exact-action weak-fairness contract for infinite executions, where an action that remains continuously enabled on a recurrent suffix cannot be postponed forever, and integrate that contract through at least generalized Büchi verification plus the typed recurring-action frontend rather than duplicating fairness logic per property.
+The next high-value slice is **Milestone 32: external weak-fairness assumption surface**. M31 deliberately establishes the semantic core before exposing assumptions through user input. M32 should make ordered exact-action weak-fairness assumptions available through a deterministic external surface over the existing typed recurring-action path, with reports that state the active assumptions explicitly and binary integration that proves fair/unfair behavior end to end.
 
-Acceptance criteria should include deterministic validation of fairness declarations, a shared fair-recurrent witness analysis over labeled SCCs, explicit separation of finite-terminal behavior from infinite fairness, counterexamples that are themselves fair under the configured assumptions, independent generated small-graph oracles covering enabled/taken action combinations, unfair-cycle exclusion regressions, fair-cycle preservation regressions, and unchanged no-fairness results when no fairness assumptions are supplied. M31 must not silently assume strong fairness, mutate existing default semantics, or claim full LTL fairness support.
+Acceptance criteria should include deterministic parsing/validation of repeated exact-action fairness declarations, stable assumption rendering, fixed/textual/declarative temporal integration, preservation of exit 0/10/2 behavior, explicit rejection of response fairness, explicit rejection of bounded/staged fairness unless those semantics are implemented in the same milestone, and built-binary regressions showing that an unfair acceptance-avoiding cycle is excluded only when the matching weak-fairness assumption is supplied. M32 must not silently introduce strong fairness, change the no-option default, or conflate fairness assumptions with exploration limits.
