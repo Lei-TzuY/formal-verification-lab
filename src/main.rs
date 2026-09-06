@@ -1,9 +1,11 @@
 use formal_verification_lab::bounded::BoundedOutcome;
-use formal_verification_lab::buchi::{check_buchi, BuchiAutomaton, BuchiStatus, FiniteRunPolicy};
+use formal_verification_lab::buchi::{
+    check_buchi, check_buchi_with_product_limits, BuchiAutomaton, BuchiStatus, FiniteRunPolicy,
+};
 use formal_verification_lab::buchi_examples::{
     alternating_pulses, finite_quiet_run, pulse_automaton, unfair_second_pulse,
 };
-use formal_verification_lab::buchi_report::render_buchi_report;
+use formal_verification_lab::buchi_report::{render_bounded_buchi_report, render_buchi_report};
 use formal_verification_lab::checker::{check_with_limits, ExplorationLimits, VerificationStatus};
 use formal_verification_lab::eventuality::{
     check_eventuality, EventualityProperty, EventualityStatus,
@@ -498,44 +500,61 @@ where
 }
 
 fn buchi_command(args: &[String]) -> Result<ExitCode, String> {
-    match args {
-        [query] if query == "pulses" => run_buchi(
+    let (query, option_args) = args.split_first().ok_or_else(usage)?;
+    match query.as_str() {
+        "pulses" => run_buchi(
             alternating_pulses().map_err(|error| error.to_string())?,
             pulse_automaton(FiniteRunPolicy::IgnoreTerminals).map_err(|error| error.to_string())?,
+            option_args,
         ),
-        [query] if query == "pulses-unfair" => run_buchi(
+        "pulses-unfair" => run_buchi(
             unfair_second_pulse().map_err(|error| error.to_string())?,
             pulse_automaton(FiniteRunPolicy::IgnoreTerminals).map_err(|error| error.to_string())?,
+            option_args,
         ),
-        [query] if query == "finite-ignore" => run_buchi(
+        "finite-ignore" => run_buchi(
             finite_quiet_run().map_err(|error| error.to_string())?,
             pulse_automaton(FiniteRunPolicy::IgnoreTerminals).map_err(|error| error.to_string())?,
+            option_args,
         ),
-        [query] if query == "finite-strict" => run_buchi(
+        "finite-strict" => run_buchi(
             finite_quiet_run().map_err(|error| error.to_string())?,
             pulse_automaton(FiniteRunPolicy::RequireAcceptingTerminal)
                 .map_err(|error| error.to_string())?,
+            option_args,
         ),
-        [query] => Err(format!(
+        _ => Err(format!(
             "unknown Buchi query '{query}'; expected pulses, pulses-unfair, finite-ignore, or finite-strict"
         )),
-        _ => Err(usage()),
     }
 }
 
 fn run_buchi<S, A>(
     model: formal_verification_lab::TransitionSystem<S>,
     automaton: BuchiAutomaton<A>,
+    option_args: &[String],
 ) -> Result<ExitCode, String>
 where
     S: Clone + Eq + std::hash::Hash + std::fmt::Debug,
     A: Clone + Eq + std::hash::Hash + std::fmt::Debug,
 {
-    let result = check_buchi(&model, &automaton).map_err(|error| error.to_string())?;
-    print!("{}", render_buchi_report(model.name(), &result));
-    Ok(match result.status {
-        BuchiStatus::Satisfied => ExitCode::SUCCESS,
-        BuchiStatus::Violated => ExitCode::from(9),
+    if option_args.is_empty() {
+        let result = check_buchi(&model, &automaton).map_err(|error| error.to_string())?;
+        print!("{}", render_buchi_report(model.name(), &result));
+        return Ok(match result.status {
+            BuchiStatus::Satisfied => ExitCode::SUCCESS,
+            BuchiStatus::Violated => ExitCode::from(9),
+        });
+    }
+
+    let limits = parse_product_limits(option_args)?;
+    let result = check_buchi_with_product_limits(&model, &automaton, limits)
+        .map_err(|error| error.to_string())?;
+    print!("{}", render_bounded_buchi_report(model.name(), &result));
+    Ok(match &result.outcome {
+        BoundedOutcome::Conclusive(BuchiStatus::Satisfied) => ExitCode::SUCCESS,
+        BoundedOutcome::Conclusive(BuchiStatus::Violated) => ExitCode::from(9),
+        BoundedOutcome::Inconclusive(_) => ExitCode::from(3),
     })
 }
 
@@ -918,7 +937,7 @@ fn status_exit_code(status: VerificationStatus) -> ExitCode {
 }
 
 fn usage() -> String {
-    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | eventually <counter-three|counter-four|traffic-never> | respond <request-grant|request-grant-unfair|dual-grant|dual-grant-unfair-b> [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | monitor <session-ok|session-double-open|session-stuck> [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | buchi <pulses|pulses-unfair|finite-ignore|finite-strict> | temporal <request-grant|request-grant-unfair|pulses|pulses-unfair> | temporal check <request-grant|request-grant-unfair|pulses|pulses-unfair> <expression> | temporal file <path> <expression> | state file <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition file <path> <reachable|all-eventually> <proposition> [--max-states N] [--max-transitions N] [--max-depth N] | proposition expr <path> <reachable|all-eventually> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition always <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N]]"
+    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | eventually <counter-three|counter-four|traffic-never> | respond <request-grant|request-grant-unfair|dual-grant|dual-grant-unfair-b> [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | monitor <session-ok|session-double-open|session-stuck> [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | buchi <pulses|pulses-unfair|finite-ignore|finite-strict> [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal <request-grant|request-grant-unfair|pulses|pulses-unfair> | temporal check <request-grant|request-grant-unfair|pulses|pulses-unfair> <expression> | temporal file <path> <expression> | state file <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition file <path> <reachable|all-eventually> <proposition> [--max-states N] [--max-transitions N] [--max-depth N] | proposition expr <path> <reachable|all-eventually> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition always <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N]]"
         .to_owned()
 }
 
