@@ -155,7 +155,8 @@ where
     S: Clone + Eq + Hash,
     A: Clone + Eq + Hash,
 {
-    if enablement.states.len() != product.states.len() || known_terminal.len() != product.states.len()
+    if enablement.states.len() != product.states.len()
+        || known_terminal.len() != product.states.len()
     {
         return Err(BuchiError::MissingWitness);
     }
