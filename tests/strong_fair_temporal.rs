@@ -3,11 +3,16 @@ use formal_verification_lab::{
     check_action_temporal_with_product_limits, check_action_temporal_with_strong_fairness,
     check_action_temporal_with_strong_fairness_and_limits,
     check_action_temporal_with_strong_fairness_and_product_limits,
-    check_action_temporal_with_weak_fairness, ActionAtom, ActionTemporalSpec, AnalysisLimits,
-    AnalysisOutcome, AnalysisStage, BoundedOutcome, ExplorationLimits, InconclusiveReason,
-    Invariant, StateVariable, StrongFairness, TemporalBackend, TemporalObligation, TemporalStatus,
-    Transition, TransitionSystem, WeakFairness,
+    check_action_temporal_with_weak_fairness, parse_action_temporal, parse_declarative_model,
+    ActionAtom, ActionTemporalSpec, AnalysisLimits, AnalysisOutcome, AnalysisStage, BoundedOutcome,
+    ExplorationLimits, InconclusiveReason, Invariant, StateVariable, StrongFairness,
+    TemporalBackend, TemporalObligation, TemporalStatus, Transition, TransitionSystem, WeakFairness,
 };
+use std::fs;
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+static NEXT_FILE: AtomicUsize = AtomicUsize::new(0);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum Phase {
@@ -57,6 +62,14 @@ fn transition_limit(limit: usize) -> ExplorationLimits {
         max_transitions: Some(limit),
         max_depth: None,
     }
+}
+
+fn temp_model_path() -> PathBuf {
+    let id = NEXT_FILE.fetch_add(1, Ordering::Relaxed);
+    std::env::temp_dir().join(format!(
+        "fvlab-m40-strong-fair-temporal-{}-{id}.fvl",
+        std::process::id()
+    ))
 }
 
 #[test]
@@ -256,4 +269,47 @@ fn strong_fair_response_violation_remains_normalized_to_response_obligation() {
     };
     assert_eq!(obligation, TemporalObligation::Response);
     assert_eq!(cycle.first().unwrap().state, cycle.last().unwrap().state);
+}
+
+#[test]
+fn textual_declarative_external_file_composes_with_strong_fairness_without_new_grammar() {
+    let path = temp_model_path();
+    fs::write(
+        &path,
+        concat!(
+            "model \"intermittent-grant-file\"\n",
+            "state \"idle\"\n",
+            "state \"offer\"\n",
+            "state \"away\"\n",
+            "initial \"idle\"\n",
+            "edge \"idle\" \"request\" \"offer\"\n",
+            "edge \"offer\" \"grant\" \"idle\"\n",
+            "edge \"offer\" \"defer\" \"away\"\n",
+            "edge \"away\" \"return\" \"offer\"\n",
+        ),
+    )
+    .unwrap();
+
+    let source = fs::read_to_string(&path).unwrap();
+    let model = parse_declarative_model(&source).unwrap();
+    let fairness = StrongFairness::new(["grant"]).unwrap();
+
+    let response = parse_action_temporal(
+        "request-eventually-grant",
+        r#"response("request","grant")"#,
+    )
+    .unwrap();
+    let response_result =
+        check_action_temporal_with_strong_fairness(&model, &response, &fairness).unwrap();
+    assert_eq!(response_result.backend, TemporalBackend::Response);
+    assert_eq!(response_result.status, TemporalStatus::Satisfied);
+
+    let recurring =
+        parse_action_temporal("grant-infinitely-often", r#"infinitely-often("grant")"#).unwrap();
+    let recurring_result =
+        check_action_temporal_with_strong_fairness(&model, &recurring, &fairness).unwrap();
+    assert_eq!(recurring_result.backend, TemporalBackend::Buchi);
+    assert_eq!(recurring_result.status, TemporalStatus::Satisfied);
+
+    fs::remove_file(path).unwrap();
 }
