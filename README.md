@@ -188,7 +188,7 @@ Metadata validation fails closed on empty proposition names, labels that referen
 
 `fvlab proposition file <path> <reachable|all-eventually> <proposition>` exposes this path externally. A well-formed proposition property violation reuses state-property exit 11; file/model/metadata/mode/unknown-proposition errors use exit 2. Existing `state file` remains compatible with documents containing labels.
 
-Executable evidence checks proposition membership ordering, M19 graph compatibility, duplicate/unknown metadata rejection, direct-predicate differential equality for multi-state propositions, deterministic shortest positive witnesses, universal-eventuality lasso preservation, unknown-proposition fail-closed behavior, and real external-file proposition/state integration. M21 adds no Boolean proposition composition, state-variable expression language, fairness semantics, CTL/LTL expansion, second traversal engine, or performance claim.
+Executable evidence checks proposition membership ordering, M19 graph compatibility, duplicate/unknown metadata rejection, direct-predicate differential equality for multi-state propositions, deterministic shortest positive witnesses, universal-eventuality lasso preservation, unknown-proposition fail-closed behavior, and real proposition/state-file binary integration. M21 adds no Boolean proposition composition, state-variable expression language, fairness semantics, CTL/LTL expansion, second traversal engine, or performance claim.
 
 ### Milestone 22 — Boolean proposition expressions
 
@@ -240,6 +240,16 @@ M26's second slice applies the same substrate to generalized Büchi verification
 
 Executable evidence includes six focused bounded-monitor regressions plus three monitor CLI tests, and six focused bounded-Büchi regressions plus three built-binary Büchi CLI tests. The unchanged M12 **4096-case** finite-monitor oracle and M13 **8192-case** Büchi/finite-policy oracle remain unbounded migration-equivalence gates. M26 adds no fairness assumption, wall-clock timeout, whole-analysis resource bound, performance claim, or bounded typed/textual temporal frontend.
 
+### Milestone 27 — bounded typed/textual temporal frontend
+
+Milestone 27 propagates the already audited product-space cutoff semantics through the M17/M18 action-temporal frontend instead of introducing another temporal engine. `check_action_temporal_with_product_limits` routes exact-action response specifications to bounded response verification and recurring-action specifications to bounded generalized Büchi verification.
+
+`BoundedTemporalResult` preserves the frontend's stable backend identity and model-state-only witnesses while exposing exact complete-model counts and checked/explored/retained product accounting. A real response or acceptance-avoiding counterexample established in the retained prefix remains conclusively `VIOLATED`; when no such evidence has been established and product construction is incomplete, the frontend reports `INCONCLUSIVE` rather than fabricating `SATISFIED`. Generous product limits preserve the existing normalized unbounded frontend results.
+
+The fixed teaching-model form, textual `temporal check`, and declarative `temporal file` paths all accept `--max-product-states`, `--max-product-transitions`, and `--max-product-depth`. Exit 3 denotes product-space inconclusiveness, exit 10 remains a genuine frontend temporal violation, and exit 0 means satisfaction was established. Invocations without product-limit options continue through the original unbounded frontend path and retain its output contract.
+
+Executable evidence includes six focused typed-frontend regressions covering response/Büchi cutoff propagation, real lasso evidence before later cutoff, generous-limit differential equivalence, and determinism, plus four built-binary CLI tests covering fixed/check/file routing, exit 3/10/0, normalized obligations, and malformed or wrong-namespace options. M27 adds no new parser operator, fairness assumption, wall-clock timeout, whole-analysis resource bound, performance claim, or second temporal traversal.
+
 ## Architecture
 
 ```text
@@ -260,9 +270,9 @@ src/multi_response.rs         bounded/unbounded multi-clause response semantics
 src/response.rs               bounded/unbounded single-clause adapter over multi-response
 src/monitor.rs                bounded/unbounded finite-monitor semantics over shared product
 src/buchi.rs                  bounded/unbounded Büchi semantics over shared product
-src/temporal.rs               typed exact-action temporal frontend + backend routing
+src/temporal.rs               bounded/unbounded typed exact-action frontend + backend routing
 src/temporal_parse.rs         textual parser for the typed temporal subset
-src/temporal_report.rs        normalized action-temporal frontend reporting
+src/temporal_report.rs        normalized temporal + bounded product reporting
 src/exact_state.rs            typed/textual exact-state frontend + backend routing
 src/exact_state_report.rs     normalized exact-state + bounded reporting
 src/proposition.rs            named-proposition predicate frontend + backend routing
@@ -303,10 +313,12 @@ cargo run -- buchi pulses
 cargo run -- buchi pulses --max-product-states 1
 cargo run -- buchi pulses-unfair --max-product-transitions 2
 cargo run -- temporal request-grant
+cargo run -- temporal request-grant --max-product-states 1
+cargo run -- temporal request-grant-unfair --max-product-transitions 2
 cargo run -- temporal pulses
 cargo run -- temporal check request-grant 'response("request","grant")'
-cargo run -- temporal check pulses 'infinitely-often("pulse-a","pulse-b")'
-cargo run -- temporal file path/to/model.fvl 'response("request","grant")'
+cargo run -- temporal check pulses 'infinitely-often("pulse-a","pulse-b")' --max-product-states 1
+cargo run -- temporal file path/to/model.fvl 'response("request","grant")' --max-product-depth 2
 cargo run -- state file path/to/model.fvl 'reachable("done")'
 cargo run -- state file path/to/model.fvl 'all-eventually("done")' --max-depth 2
 cargo run -- proposition file path/to/model.fvl reachable critical --max-states 20
@@ -334,6 +346,7 @@ Then verify action-temporal, exact-state, proposition, Boolean proposition, or s
 
 ```bash
 cargo run -- temporal file request-grant.fvl 'response("request","grant")'
+cargo run -- temporal file request-grant.fvl 'response("request","grant")' --max-product-states 1
 cargo run -- state file request-grant.fvl 'reachable("waiting")'
 cargo run -- proposition file request-grant.fvl reachable pending
 cargo run -- proposition expr request-grant.fvl reachable '"pending" or "quiescent"'
@@ -347,18 +360,20 @@ cargo run -- temporal request-grant
 cargo run -- temporal request-grant-unfair
 cargo run -- temporal pulses
 cargo run -- temporal pulses-unfair
+cargo run -- temporal request-grant --max-product-states 1
+cargo run -- temporal request-grant-unfair --max-product-transitions 2
 cargo run -- temporal check request-grant 'response("request","grant")'
-cargo run -- temporal check pulses-unfair 'infinitely-often("pulse-a","pulse-b")'
+cargo run -- temporal check pulses-unfair 'infinitely-often("pulse-a","pulse-b")' --max-product-transitions 2
 ```
 
-`request-grant` and `pulses` satisfy their typed properties. The unfair variants return frontend-level normalized counterexamples and exit with status 10. User-supplied expressions and declarative models feed the same typed specs/backends. The existing direct backend commands remain available for comparison.
+`request-grant` and `pulses` satisfy their typed properties. The unfair variants return frontend-level normalized counterexamples and exit with status 10. Product-limit variants return exit 3 when the selected backend's product construction is incomplete without a conclusive counterexample, while preserving real violations already established before a later cutoff. User-supplied expressions and declarative models feed the same typed specs/backends. The existing direct backend commands remain available for comparison.
 
 ## CLI exit status
 
 - `0`: successful analysis whose property holds, or successful structural SCC analysis;
 - `1`: safety invariant violation;
 - `2`: malformed CLI/model/file/analysis/property/metadata error;
-- `3`: configured bounded exploration, bounded state-property verification, bounded response-product verification, bounded finite-monitor product verification, or bounded generalized Büchi product verification is `INCONCLUSIVE`;
+- `3`: configured bounded exploration, bounded state-property verification, bounded response-product verification, bounded finite-monitor product verification, bounded generalized Büchi product verification, or bounded typed/textual temporal verification is `INCONCLUSIVE`;
 - `4`: existential target is `UNREACHABLE`;
 - `5`: unexpected terminal/deadlock found;
 - `6`: universal eventuality is `VIOLATED`;
@@ -380,9 +395,9 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo test --all-targets --all-features
 ```
 
-Coverage includes safety, bounded exploration, Peterson, audited reduction, reachability, deadlock policies, SCC structure, universal eventuality, response products, bounded response products, finite monitor products, bounded finite-monitor products, generalized Büchi-style acceptance, bounded generalized Büchi products, typed/textual action-temporal frontends, declarative finite-model ingestion, exact-state properties, named propositions, Boolean proposition expressions, declarative safety assertions, and bounded state-property verification. Independent generated suites include M8's 512 SCC graphs, M9's 4096 eventuality cases, M10's 4096 single-response cases, M11's 38,416 two-class cases, M12's 4096 finite-monitor cases, M13's 8192 Büchi/finite-policy cases, M22's 9,600 Boolean truth-table cases, M23's 3,584 safety graph/subset cases, and M24's **640 bounded reachability + 640 bounded eventuality** cases.
+Coverage includes safety, bounded exploration, Peterson, audited reduction, reachability, deadlock policies, SCC structure, universal eventuality, response products, bounded response products, finite monitor products, bounded finite-monitor products, generalized Büchi-style acceptance, bounded generalized Büchi products, typed/textual action-temporal frontends, bounded typed/textual temporal frontends, declarative finite-model ingestion, exact-state properties, named propositions, Boolean proposition expressions, declarative safety assertions, and bounded state-property verification. Independent generated suites include M8's 512 SCC graphs, M9's 4096 eventuality cases, M10's 4096 single-response cases, M11's 38,416 two-class cases, M12's 4096 finite-monitor cases, M13's 8192 Büchi/finite-policy cases, M22's 9,600 Boolean truth-table cases, M23's 3,584 safety graph/subset cases, and M24's **640 bounded reachability + 640 bounded eventuality** cases.
 
-M17 adds differential frontend tests without weakening backend oracles. M18 adds parser-to-typed/result differential tests, canonical-expression round trips, position-aware error regressions, and user-expression binary integration. M19 adds parsed-model-to-direct-model differential results, order-preservation and validation regressions, plus real external-file binary integration. M20 adds direct M6/M9 differential comparisons, exact-state parser/round-trip regressions, evidence-preservation checks, and real `state file` binary integration. M21 adds proposition-metadata validation, graph-compatibility checks, multi-state direct-predicate differential comparisons, lasso evidence preservation, and real proposition/state-file binary integration. M22 adds generated Boolean truth-table evaluation, canonical AST/parser round trips, fail-closed proposition resolution, direct M6/M9 differential checks, and real Boolean-expression binary integration. M23 adds complement-reachability differential safety checks, shortest-counterexample validation, a 3,584-case independent graph oracle, and real `proposition always` binary integration. M24 adds generated bounded backend differentials, cutoff-precedence and justified-prefix regressions, frontend propagation checks, built-binary exit-3 validation, and a dedicated bounded state-property CLI workflow. M25 adds five bounded-product substrate tests, six bounded multi-response regressions, three built-binary response-limit contract tests, and retains the unchanged M10/M11 generated oracles as unbounded compatibility gates. M26 adds six focused bounded finite-monitor regressions and three monitor CLI tests while retaining the unchanged M12 4096-case oracle; its Büchi slice adds six focused bounded semantic regressions and three built-binary Büchi product-limit tests while retaining the unchanged M13 8192-case oracle. The complete test command still executes the unchanged older semantic and CLI coverage.
+M17 adds differential frontend tests without weakening backend oracles. M18 adds parser-to-typed/result differential tests, canonical-expression round trips, position-aware error regressions, and user-expression binary integration. M19 adds parsed-model-to-direct-model differential results, order-preservation and validation regressions, plus real external-file binary integration. M20 adds direct M6/M9 differential comparisons, exact-state parser/round-trip regressions, evidence-preservation checks, and real `state file` binary integration. M21 adds proposition-metadata validation, graph-compatibility checks, multi-state direct-predicate differential comparisons, lasso evidence preservation, and real proposition/state-file binary integration. M22 adds generated Boolean truth-table evaluation, canonical AST/parser round trips, fail-closed proposition resolution, direct M6/M9 differential checks, and real Boolean-expression binary integration. M23 adds complement-reachability differential safety checks, shortest-counterexample validation, a 3,584-case independent graph oracle, and real `proposition always` binary integration. M24 adds generated bounded backend differentials, cutoff-precedence and justified-prefix regressions, frontend propagation checks, built-binary exit-3 validation, and a dedicated bounded state-property CLI workflow. M25 adds five bounded-product substrate tests, six bounded multi-response regressions, three built-binary response-limit contract tests, and retains the unchanged M10/M11 generated oracles as unbounded compatibility gates. M26 adds six focused bounded finite-monitor regressions and three monitor CLI tests while retaining the unchanged M12 4096-case oracle; its Büchi slice adds six focused bounded semantic regressions and three built-binary Büchi product-limit tests while retaining the unchanged M13 8192-case oracle. M27 adds six bounded frontend regressions and four built-binary fixed/check/file CLI tests, including generous-limit differential equality with the existing unbounded normalized response/Büchi frontend results. The complete test command still executes the unchanged older semantic and CLI coverage.
 
 ## Trust boundaries and limitations
 
@@ -392,15 +407,15 @@ M17 adds differential frontend tests without weakening backend oracles. M18 adds
 - Boolean state-proposition expressions support only named proposition atoms with `not`, `and`, `or`, and parentheses; they do not provide arithmetic or arbitrary state-field expressions.
 - Explicit-state memory grows with the reachable graph. A `k`-clause response monitor may expand a model state into up to `2^k` pending valuations.
 - M24 propagates explicit resource limits through reachability, universal eventuality, exact-state, proposition, Boolean-proposition, and declarative-safety paths.
-- M25–M26 add product-space limits to response, finite-monitor, and generalized Büchi verification **after complete model capture**. `--max-product-*` is not a bound on model capture, total memory, wall-clock time, or the entire analysis. The typed/textual temporal frontend remains unbounded even though its underlying direct response and Büchi backends now have bounded entry points.
+- M25–M27 add product-space limits to response, finite-monitor, generalized Büchi, and the typed/textual temporal frontend **after complete model capture**. `--max-product-*` is not a bound on model capture, total memory, wall-clock time, or the entire analysis.
 - Response classes remain Boolean obligations, not per-request identity queues.
-- M9–M26 have **no fairness semantics**. Enabled responses or accepting actions are not assumed to be scheduled.
+- M9–M27 have **no fairness semantics**. Enabled responses or accepting actions are not assumed to be scheduled.
 - The action-temporal frontend supports exact action atoms only. It has no wildcard, Boolean action predicate language, nested temporal operators, temporal negation, or arbitrary formula composition.
 - `all_infinitely_often` is intentionally an infinite-run-only property; finite terminals are ignored. The frontend does not expose M13's strict finite terminal policy for this form.
 - The textual temporal grammar remains deliberately limited to `response(...)` and `infinitely-often(...)`; it is not a general temporal-logic parser.
-- M9–M26 are not a full LTL/CTL implementation and do not claim arbitrary formula parsing/compilation.
+- M9–M27 are not a full LTL/CTL implementation and do not claim arbitrary formula parsing/compilation.
 - The M13 generalized Büchi layer accepts user-defined automata; it does not translate arbitrary LTL into Büchi automata.
-- M14–M16 are internal architecture consolidations and make no performance claim. M17–M26 add frontend/ingestion/resource-bounded capability but no performance claim.
+- M14–M16 are internal architecture consolidations and make no performance claim. M17–M27 add frontend/ingestion/resource-bounded capability but no performance claim.
 - Tarjan SCC discovery currently uses recursive DFS; very deep graphs may motivate a future iterative implementation.
 - Peterson starvation freedom is still not claimed.
 - The sleep-set engine remains experimental and differentially audited, not a standalone trusted POR proof backend.
@@ -409,8 +424,8 @@ M17 adds differential frontend tests without weakening backend oracles. M18 adds
 
 ## Roadmap
 
-Milestones 1–26 form a coherent explicit-state stack: safety -> bounded honesty -> typed models -> independent graph validation -> audited reduction -> existential reachability -> terminal/deadlock analysis -> recurrent SCC structure -> universal eventuality -> response obligations -> multi-class response composition -> deterministic finite monitors -> explicit generalized Büchi-style acceptance -> shared action-product construction -> neutral captured-graph ownership -> typed action-temporal specification -> textual temporal parsing -> external declarative finite-model ingestion -> exact-state property specification -> named state propositions -> Boolean proposition expressions -> query-time declarative safety assertions -> bounded state-property verification -> bounded response action products -> bounded finite-monitor products -> bounded generalized Büchi products.
+Milestones 1–27 form a coherent explicit-state stack: safety -> bounded honesty -> typed models -> independent graph validation -> audited reduction -> existential reachability -> terminal/deadlock analysis -> recurrent SCC structure -> universal eventuality -> response obligations -> multi-class response composition -> deterministic finite monitors -> explicit generalized Büchi-style acceptance -> shared action-product construction -> neutral captured-graph ownership -> typed action-temporal specification -> textual temporal parsing -> external declarative finite-model ingestion -> exact-state property specification -> named state propositions -> Boolean proposition expressions -> query-time declarative safety assertions -> bounded state-property verification -> bounded response action products -> bounded finite-monitor products -> bounded generalized Büchi products -> bounded typed/textual temporal frontend.
 
-The next high-value slice is **Milestone 27: bounded typed/textual temporal frontend**. It should propagate the existing product-limit semantics through the M17/M18 frontend into both its response backend and recurring-action Büchi backend while preserving the frontend's normalized witness types, backend identity, parser behavior, and established exit-10 violation contract. Inconclusive product exploration should be explicit and should reuse exit 3; no second temporal semantics engine is needed.
+The next high-value slice is **Milestone 28: explicit model-space + product-space budget composition**. M24 can bound model exploration and M25–M27 can bound product construction, but the temporal product APIs currently require a complete model snapshot first. M28 should define a staged whole-analysis resource envelope that keeps model-capture and product-cutoff reasons distinguishable, never treats an incomplete model prefix as complete temporal evidence, and preserves conclusive counterexamples only when every edge/terminal/cycle fact they depend on is justified.
 
-M27 must keep the same trust boundary as M25–M26: model capture remains complete before product limits are applied. A later milestone may compose model-space and product-space budgets explicitly, but `--max-product-*` must not be documented as a whole-analysis memory or time bound.
+M28 should first establish a shared bounded captured-model-to-product contract rather than duplicating two-stage cutoff logic across response, monitor, Büchi, and the temporal frontend. Acceptance criteria should include deterministic precedence when both stages have configured limits, separate model/product accounting, explicit provenance for `INCONCLUSIVE`, differential equivalence with M24/M25–M27 when either stage is unbounded, and built-binary CLI behavior. It must not describe configured state/transition/depth budgets as a wall-clock, total-memory, or performance guarantee.
