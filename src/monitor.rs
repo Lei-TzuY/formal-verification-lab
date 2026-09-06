@@ -1,9 +1,12 @@
-use crate::bounded::BoundedOutcome;
+use crate::bounded::{
+    AnalysisInconclusiveReason, AnalysisLimits, AnalysisOutcome, AnalysisStage, BoundedOutcome,
+};
 use crate::checker::{ExplorationLimits, TraceStep};
 use crate::graph::{capture_reachable_graph, induced_graph, shortest_path, ReachableGraph};
 use crate::model::TransitionSystem;
 use crate::product::{
-    build_action_product, build_action_product_with_limits, BoundedActionProduct,
+    build_action_product, build_action_product_with_analysis_limits,
+    build_action_product_with_limits, BoundedActionProduct, StagedActionProduct,
 };
 use crate::recurrence::{
     component_is_cyclic, cycle_witness, strongly_connected_components, RecurrenceError,
@@ -60,10 +63,6 @@ impl<M> RejectCondition<M> {
 }
 
 /// A named monitor region that may not contain a maximal suffix forever.
-///
-/// If an execution terminates while this predicate is true, or can remain in a
-/// cycle on which this predicate is continuously true, the progress condition
-/// is violated.
 pub struct ProgressCondition<M> {
     name: String,
     active: MonitorPredicate<M>,
@@ -251,15 +250,32 @@ pub struct MonitorResult<S, M> {
 }
 
 /// Finite-monitor verification under deterministic product-space limits.
-///
-/// The model graph is captured exhaustively before these limits are applied;
-/// the accounting below therefore describes only action-product construction.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BoundedMonitorResult<S, M> {
     pub monitor: String,
     pub outcome: BoundedOutcome<MonitorStatus>,
     pub model_states: usize,
     pub model_transitions: usize,
+    pub product_states: usize,
+    pub checked_product_states: usize,
+    pub explored_product_transitions: usize,
+    pub retained_product_transitions: usize,
+    pub max_product_depth_reached: Option<usize>,
+    pub counterexample: Option<MonitorCounterexample<S, M>>,
+}
+
+/// Finite-monitor verification under independent model and product budgets.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AnalysisMonitorResult<S, M> {
+    pub monitor: String,
+    pub outcome: AnalysisOutcome<MonitorStatus>,
+    pub model_completion: BoundedOutcome<()>,
+    pub product_completion: BoundedOutcome<()>,
+    pub model_states: usize,
+    pub checked_model_states: usize,
+    pub explored_model_transitions: usize,
+    pub retained_model_transitions: usize,
+    pub max_model_depth_reached: Option<usize>,
     pub product_states: usize,
     pub checked_product_states: usize,
     pub explored_product_transitions: usize,
@@ -304,18 +320,6 @@ impl From<RecurrenceError> for MonitorError {
     }
 }
 
-/// Compose a deterministic finite monitor with a captured model graph.
-///
-/// The model transition relation is evaluated exactly once. The monitor update
-/// then consumes only action labels from that snapshot. Rejecting conditions
-/// are immediate safety-style failures. A progress condition is violated when
-/// some maximal execution either terminates while the condition is active or
-/// can remain forever in a cycle where it is continuously active.
-///
-/// Rejecting failures take precedence, followed by progress terminals and then
-/// progress cycles. Within each class, product BFS discovery order and condition
-/// declaration order make witness selection deterministic. No fairness
-/// assumption is applied.
 pub fn check_monitor<S, M>(
     model: &TransitionSystem<S>,
     monitor: &FiniteMonitor<M>,
@@ -354,17 +358,6 @@ where
     })
 }
 
-/// Verify finite-monitor semantics while bounding only deterministic action-
-/// product construction.
-///
-/// A retained rejecting state, true active model terminal, or closed active
-/// cycle is sufficient to prove `Violated`, even if product construction later
-/// reaches a resource limit. If no such witness is established, satisfaction is
-/// returned only when product construction completes; otherwise the exact
-/// product-space cutoff is returned as `Inconclusive`.
-///
-/// Because model capture remains exhaustive in this milestone slice, these
-/// limits must not be described as whole-analysis resource bounds.
 pub fn check_monitor_with_product_limits<S, M>(
     model: &TransitionSystem<S>,
     monitor: &FiniteMonitor<M>,
@@ -412,6 +405,91 @@ where
         max_product_depth_reached: max_depth_reached,
         counterexample,
     })
+}
+
+/// Verify finite-monitor semantics under a staged whole-analysis envelope.
+pub fn check_monitor_with_limits<S, M>(
+    model: &TransitionSystem<S>,
+    monitor: &FiniteMonitor<M>,
+    limits: AnalysisLimits,
+) -> Result<AnalysisMonitorResult<S, M>, MonitorError>
+where
+    S: Clone + Eq + Hash,
+    M: Clone + Eq + Hash,
+{
+    let StagedActionProduct {
+        product:
+            BoundedActionProduct {
+                graph: product,
+                checked_states: checked_product_states,
+                explored_transitions: explored_product_transitions,
+                max_depth_reached: max_product_depth_reached,
+                completion: product_completion,
+                known_terminal,
+            },
+        model_discovered_states,
+        model_checked_states,
+        model_explored_transitions,
+        model_retained_transitions,
+        model_max_depth_reached,
+        model_completion,
+    } = build_action_product_with_analysis_limits(
+        model,
+        &monitor.initial,
+        |state, action| (monitor.step)(state, action),
+        |state, monitor| MonitorProductState { state, monitor },
+        limits,
+    )
+    .map_err(RecurrenceError::from)?;
+
+    let retained_product_transitions = product.outgoing.iter().map(Vec::len).sum();
+    let counterexample = find_counterexample(&product, &known_terminal, monitor)?;
+    let outcome = staged_monitor_outcome(
+        counterexample.is_some(),
+        &model_completion,
+        &product_completion,
+    );
+
+    Ok(AnalysisMonitorResult {
+        monitor: monitor.name.clone(),
+        outcome,
+        model_completion,
+        product_completion,
+        model_states: model_discovered_states,
+        checked_model_states: model_checked_states,
+        explored_model_transitions: model_explored_transitions,
+        retained_model_transitions: model_retained_transitions,
+        max_model_depth_reached: model_max_depth_reached,
+        product_states: product.states.len(),
+        checked_product_states,
+        explored_product_transitions,
+        retained_product_transitions,
+        max_product_depth_reached,
+        counterexample,
+    })
+}
+
+fn staged_monitor_outcome(
+    violated: bool,
+    model_completion: &BoundedOutcome<()>,
+    product_completion: &BoundedOutcome<()>,
+) -> AnalysisOutcome<MonitorStatus> {
+    if violated {
+        return AnalysisOutcome::Conclusive(MonitorStatus::Violated);
+    }
+    if let BoundedOutcome::Inconclusive(reason) = model_completion {
+        return AnalysisOutcome::Inconclusive(AnalysisInconclusiveReason {
+            stage: AnalysisStage::Model,
+            reason: *reason,
+        });
+    }
+    if let BoundedOutcome::Inconclusive(reason) = product_completion {
+        return AnalysisOutcome::Inconclusive(AnalysisInconclusiveReason {
+            stage: AnalysisStage::Product,
+            reason: *reason,
+        });
+    }
+    AnalysisOutcome::Conclusive(MonitorStatus::Satisfied)
 }
 
 fn find_counterexample<S, M>(
