@@ -86,7 +86,15 @@ pub fn render_bounded_monitor_report<S: Debug, M: Debug>(
     );
 
     let incomplete = matches!(result.outcome, BoundedOutcome::Inconclusive(_));
-    render_counterexample(&mut output, result.counterexample.as_ref(), incomplete);
+    if incomplete && result.counterexample.is_none() {
+        writeln!(
+            &mut output,
+            "counterexample: none (product exploration incomplete)"
+        )
+        .expect("writing to String cannot fail");
+    } else {
+        render_counterexample(&mut output, result.counterexample.as_ref(), false);
+    }
     output
 }
 
