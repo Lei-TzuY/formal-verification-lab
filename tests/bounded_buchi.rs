@@ -63,10 +63,7 @@ fn partial_nonterminal_under_strict_policy_is_not_fabricated_as_terminal() {
 #[test]
 fn real_strict_terminal_retained_before_later_cutoff_is_conclusive() {
     let model = model_with_edges("strict-terminal-before-cutoff", |state| match state {
-        0 => vec![
-            Transition::new("quiet", 1),
-            Transition::new("pulse-a", 2),
-        ],
+        0 => vec![Transition::new("quiet", 1), Transition::new("pulse-a", 2)],
         2 => vec![Transition::new("pulse-b", 2)],
         _ => Vec::new(),
     });
@@ -154,12 +151,9 @@ fn assert_generous_limits_match_unbounded(
 ) {
     let automaton = pulse_automaton(policy).unwrap();
     let unbounded = check_buchi(&model, &automaton).unwrap();
-    let bounded = check_buchi_with_product_limits(
-        &model,
-        &automaton,
-        limits(Some(64), Some(128), Some(64)),
-    )
-    .unwrap();
+    let bounded =
+        check_buchi_with_product_limits(&model, &automaton, limits(Some(64), Some(128), Some(64)))
+            .unwrap();
 
     assert_eq!(
         bounded.outcome,
