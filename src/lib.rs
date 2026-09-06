@@ -72,10 +72,11 @@ pub use exact_state::{
 pub use exact_state_report::render_exact_state_report;
 pub use model::{Invariant, ModelError, StateVariable, Transition, TransitionSystem};
 pub use monitor::{
-    check_monitor, FiniteMonitor, MonitorCounterexample, MonitorError, MonitorProductState,
-    MonitorResult, MonitorStatus, ProgressCondition, RejectCondition,
+    check_monitor, check_monitor_with_product_limits, BoundedMonitorResult, FiniteMonitor,
+    MonitorCounterexample, MonitorError, MonitorProductState, MonitorResult, MonitorStatus,
+    ProgressCondition, RejectCondition,
 };
-pub use monitor_report::render_monitor_report;
+pub use monitor_report::{render_bounded_monitor_report, render_monitor_report};
 pub use multi_response::{
     check_multi_response, MultiObligationState, MultiResponseCounterexample, MultiResponseError,
     MultiResponseProperty, MultiResponseResult, MultiResponseStatus, ResponseClause,
