@@ -2,6 +2,10 @@ use crate::bounded::{AnalysisLimits, AnalysisOutcome, BoundedOutcome};
 use crate::bounded_fairness::{
     check_buchi_with_weak_fairness_and_limits, check_buchi_with_weak_fairness_and_product_limits,
 };
+use crate::bounded_strong_fairness::{
+    check_buchi_with_strong_fairness_and_limits,
+    check_buchi_with_strong_fairness_and_product_limits,
+};
 use crate::buchi::{
     check_buchi, check_buchi_with_limits, check_buchi_with_product_limits, AcceptanceSet,
     BuchiAutomaton, BuchiCounterexample, BuchiError, BuchiProductState, BuchiStatus,
@@ -12,10 +16,13 @@ use crate::fairness::{check_buchi_with_weak_fairness, WeakFairness};
 use crate::model::TransitionSystem;
 use crate::response::{
     check_response, check_response_with_limits, check_response_with_product_limits,
-    check_response_with_weak_fairness, check_response_with_weak_fairness_and_limits,
+    check_response_with_strong_fairness, check_response_with_strong_fairness_and_limits,
+    check_response_with_strong_fairness_and_product_limits, check_response_with_weak_fairness,
+    check_response_with_weak_fairness_and_limits,
     check_response_with_weak_fairness_and_product_limits, ObligationState, ResponseCounterexample,
     ResponseError, ResponseProperty, ResponseStatus,
 };
+use crate::strong_fairness::{check_buchi_with_strong_fairness, StrongFairness};
 use std::collections::HashSet;
 use std::fmt;
 use std::hash::Hash;
@@ -330,6 +337,27 @@ where
     }
 }
 
+/// Verify a typed action-temporal specification over executions admitted by
+/// exact-action strong fairness. Response properties reuse the M40 response
+/// adapter; recurring-action properties reuse the M38 generalized Büchi path.
+pub fn check_action_temporal_with_strong_fairness<S>(
+    model: &TransitionSystem<S>,
+    spec: &ActionTemporalSpec,
+    fairness: &StrongFairness,
+) -> Result<TemporalResult<S>, TemporalError>
+where
+    S: Clone + Eq + Hash,
+{
+    match &spec.kind {
+        ActionTemporalKind::Response { trigger, response } => {
+            check_response_spec_with_strong_fairness(model, spec, trigger, response, fairness)
+        }
+        ActionTemporalKind::AllInfinitelyOften { actions } => {
+            check_recurring_spec_with_strong_fairness(model, spec, actions, fairness)
+        }
+    }
+}
+
 /// Verify exact-action weak fairness while bounding only action-product
 /// construction after complete model capture.
 pub fn check_action_temporal_with_weak_fairness_and_product_limits<S>(
@@ -355,6 +383,32 @@ where
     }
 }
 
+/// Verify exact-action strong fairness while bounding only action-product
+/// construction after complete model capture, preserving M39 enablement
+/// authority and product-cutoff incompleteness.
+pub fn check_action_temporal_with_strong_fairness_and_product_limits<S>(
+    model: &TransitionSystem<S>,
+    spec: &ActionTemporalSpec,
+    fairness: &StrongFairness,
+    limits: ExplorationLimits,
+) -> Result<BoundedTemporalResult<S>, TemporalError>
+where
+    S: Clone + Eq + Hash,
+{
+    match &spec.kind {
+        ActionTemporalKind::Response { trigger, response } => {
+            check_response_spec_with_strong_fairness_and_product_limits(
+                model, spec, trigger, response, fairness, limits,
+            )
+        }
+        ActionTemporalKind::AllInfinitelyOften { actions } => {
+            check_recurring_spec_with_strong_fairness_and_product_limits(
+                model, spec, actions, fairness, limits,
+            )
+        }
+    }
+}
+
 /// Verify exact-action weak fairness under independent deterministic model and
 /// product budgets, preserving stage-qualified incompleteness.
 pub fn check_action_temporal_with_weak_fairness_and_limits<S>(
@@ -374,6 +428,32 @@ where
         }
         ActionTemporalKind::AllInfinitelyOften { actions } => {
             check_recurring_spec_with_weak_fairness_and_limits(
+                model, spec, actions, fairness, limits,
+            )
+        }
+    }
+}
+
+/// Verify exact-action strong fairness under independent model/product budgets,
+/// preserving M39 stage-qualified incompleteness and conservative enablement
+/// provenance.
+pub fn check_action_temporal_with_strong_fairness_and_limits<S>(
+    model: &TransitionSystem<S>,
+    spec: &ActionTemporalSpec,
+    fairness: &StrongFairness,
+    limits: AnalysisLimits,
+) -> Result<AnalysisTemporalResult<S>, TemporalError>
+where
+    S: Clone + Eq + Hash,
+{
+    match &spec.kind {
+        ActionTemporalKind::Response { trigger, response } => {
+            check_response_spec_with_strong_fairness_and_limits(
+                model, spec, trigger, response, fairness, limits,
+            )
+        }
+        ActionTemporalKind::AllInfinitelyOften { actions } => {
+            check_recurring_spec_with_strong_fairness_and_limits(
                 model, spec, actions, fairness, limits,
             )
         }
@@ -449,6 +529,21 @@ where
     temporal_result_from_response(result)
 }
 
+fn check_response_spec_with_strong_fairness<S>(
+    model: &TransitionSystem<S>,
+    spec: &ActionTemporalSpec,
+    trigger: &ActionAtom,
+    response: &ActionAtom,
+    fairness: &StrongFairness,
+) -> Result<TemporalResult<S>, TemporalError>
+where
+    S: Clone + Eq + Hash,
+{
+    let property = response_property(spec, trigger, response)?;
+    let result = check_response_with_strong_fairness(model, &property, fairness)?;
+    temporal_result_from_response(result)
+}
+
 fn temporal_result_from_response<S>(
     result: crate::response::ResponseResult<S>,
 ) -> Result<TemporalResult<S>, TemporalError> {
@@ -494,6 +589,23 @@ where
     let property = response_property(spec, trigger, response)?;
     let result =
         check_response_with_weak_fairness_and_product_limits(model, &property, fairness, limits)?;
+    bounded_temporal_result_from_response(result)
+}
+
+fn check_response_spec_with_strong_fairness_and_product_limits<S>(
+    model: &TransitionSystem<S>,
+    spec: &ActionTemporalSpec,
+    trigger: &ActionAtom,
+    response: &ActionAtom,
+    fairness: &StrongFairness,
+    limits: ExplorationLimits,
+) -> Result<BoundedTemporalResult<S>, TemporalError>
+where
+    S: Clone + Eq + Hash,
+{
+    let property = response_property(spec, trigger, response)?;
+    let result =
+        check_response_with_strong_fairness_and_product_limits(model, &property, fairness, limits)?;
     bounded_temporal_result_from_response(result)
 }
 
@@ -544,6 +656,22 @@ where
 {
     let property = response_property(spec, trigger, response)?;
     let result = check_response_with_weak_fairness_and_limits(model, &property, fairness, limits)?;
+    analysis_temporal_result_from_response(result)
+}
+
+fn check_response_spec_with_strong_fairness_and_limits<S>(
+    model: &TransitionSystem<S>,
+    spec: &ActionTemporalSpec,
+    trigger: &ActionAtom,
+    response: &ActionAtom,
+    fairness: &StrongFairness,
+    limits: AnalysisLimits,
+) -> Result<AnalysisTemporalResult<S>, TemporalError>
+where
+    S: Clone + Eq + Hash,
+{
+    let property = response_property(spec, trigger, response)?;
+    let result = check_response_with_strong_fairness_and_limits(model, &property, fairness, limits)?;
     analysis_temporal_result_from_response(result)
 }
 
@@ -660,6 +788,20 @@ where
     temporal_result_from_buchi(result)
 }
 
+fn check_recurring_spec_with_strong_fairness<S>(
+    model: &TransitionSystem<S>,
+    spec: &ActionTemporalSpec,
+    actions: &[ActionAtom],
+    fairness: &StrongFairness,
+) -> Result<TemporalResult<S>, TemporalError>
+where
+    S: Clone + Eq + Hash,
+{
+    let automaton = recurring_automaton(spec, actions)?;
+    let result = check_buchi_with_strong_fairness(model, &automaton, fairness)?;
+    temporal_result_from_buchi(result)
+}
+
 fn check_recurring_spec_with_weak_fairness_and_product_limits<S>(
     model: &TransitionSystem<S>,
     spec: &ActionTemporalSpec,
@@ -676,6 +818,22 @@ where
     bounded_temporal_result_from_buchi(result)
 }
 
+fn check_recurring_spec_with_strong_fairness_and_product_limits<S>(
+    model: &TransitionSystem<S>,
+    spec: &ActionTemporalSpec,
+    actions: &[ActionAtom],
+    fairness: &StrongFairness,
+    limits: ExplorationLimits,
+) -> Result<BoundedTemporalResult<S>, TemporalError>
+where
+    S: Clone + Eq + Hash,
+{
+    let automaton = recurring_automaton(spec, actions)?;
+    let result =
+        check_buchi_with_strong_fairness_and_product_limits(model, &automaton, fairness, limits)?;
+    bounded_temporal_result_from_buchi(result)
+}
+
 fn check_recurring_spec_with_weak_fairness_and_limits<S>(
     model: &TransitionSystem<S>,
     spec: &ActionTemporalSpec,
@@ -688,6 +846,21 @@ where
 {
     let automaton = recurring_automaton(spec, actions)?;
     let result = check_buchi_with_weak_fairness_and_limits(model, &automaton, fairness, limits)?;
+    analysis_temporal_result_from_buchi(result)
+}
+
+fn check_recurring_spec_with_strong_fairness_and_limits<S>(
+    model: &TransitionSystem<S>,
+    spec: &ActionTemporalSpec,
+    actions: &[ActionAtom],
+    fairness: &StrongFairness,
+    limits: AnalysisLimits,
+) -> Result<AnalysisTemporalResult<S>, TemporalError>
+where
+    S: Clone + Eq + Hash,
+{
+    let automaton = recurring_automaton(spec, actions)?;
+    let result = check_buchi_with_strong_fairness_and_limits(model, &automaton, fairness, limits)?;
     analysis_temporal_result_from_buchi(result)
 }
 
