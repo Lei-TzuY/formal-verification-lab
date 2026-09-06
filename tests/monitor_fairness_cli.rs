@@ -125,20 +125,11 @@ fn monitor_fairness_options_fail_closed_on_duplicate_empty_or_missing_actions() 
     assert_eq!(duplicate.status.code(), Some(2));
     assert!(stderr(&duplicate).contains("duplicate weak-fair action 'close'"));
 
-    let empty = run(&[
-        "monitor",
-        "session-unfair-close",
-        "--weak-fair-action",
-        "",
-    ]);
+    let empty = run(&["monitor", "session-unfair-close", "--weak-fair-action", ""]);
     assert_eq!(empty.status.code(), Some(2));
     assert!(stderr(&empty).contains("weak-fair action name must not be empty"));
 
-    let missing = run(&[
-        "monitor",
-        "session-unfair-close",
-        "--weak-fair-action",
-    ]);
+    let missing = run(&["monitor", "session-unfair-close", "--weak-fair-action"]);
     assert_eq!(missing.status.code(), Some(2));
     assert!(stderr(&missing).contains("option '--weak-fair-action' requires an action value"));
 }
