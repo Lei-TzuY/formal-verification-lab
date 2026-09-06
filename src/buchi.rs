@@ -60,6 +60,10 @@ impl<A> AcceptanceSet<A> {
     pub fn name(&self) -> &str {
         &self.name
     }
+
+    pub(crate) fn contains(&self, state: &A) -> bool {
+        (self.predicate)(state)
+    }
 }
 
 /// Policy for finite maximal model executions.
@@ -162,6 +166,10 @@ impl<A> BuchiAutomaton<A> {
 
     pub fn finite_policy(&self) -> FiniteRunPolicy {
         self.finite_policy
+    }
+
+    pub(crate) fn advance(&self, state: &A, action: &str) -> A {
+        (self.step)(state, action)
     }
 }
 
