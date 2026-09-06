@@ -67,8 +67,7 @@ fn empty_weak_fairness_matches_existing_buchi_result_for_all_two_node_products()
                 let model = graph_model(graph_mask, actions);
                 let automaton = pulse_automaton(policy).unwrap();
                 let ordinary = check_buchi(&model, &automaton).unwrap();
-                let fair =
-                    check_buchi_with_weak_fairness(&model, &automaton, &fairness).unwrap();
+                let fair = check_buchi_with_weak_fairness(&model, &automaton, &fairness).unwrap();
                 assert_eq!(
                     fair, ordinary,
                     "graph={graph_mask} assignment={assignment} policy={policy:?}"
