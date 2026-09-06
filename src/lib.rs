@@ -7,6 +7,7 @@
 pub mod bounded;
 pub mod bounded_fairness;
 mod bounded_report;
+pub mod bounded_strong_fairness;
 pub mod buchi;
 pub mod buchi_examples;
 pub mod buchi_report;
@@ -54,6 +55,10 @@ pub use bounded::{
 };
 pub use bounded_fairness::{
     check_buchi_with_weak_fairness_and_limits, check_buchi_with_weak_fairness_and_product_limits,
+};
+pub use bounded_strong_fairness::{
+    check_buchi_with_strong_fairness_and_limits,
+    check_buchi_with_strong_fairness_and_product_limits,
 };
 pub use buchi::{
     check_buchi, check_buchi_with_limits, AcceptanceSet, AnalysisBuchiResult, BuchiAutomaton,

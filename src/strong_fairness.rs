@@ -113,8 +113,13 @@ where
         .iter()
         .map(Vec::is_empty)
         .collect::<Vec<_>>();
-    let counterexample =
-        find_strong_fair_buchi_counterexample(&product, &known_terminal, automaton, fairness)?;
+    let counterexample = find_strong_fair_buchi_counterexample(
+        &product,
+        &product,
+        &known_terminal,
+        automaton,
+        fairness,
+    )?;
 
     Ok(BuchiResult {
         automaton: automaton.name().to_owned(),
@@ -133,7 +138,14 @@ where
     })
 }
 
-fn find_strong_fair_buchi_counterexample<S, A>(
+/// Find one finite or strong-fair infinite Büchi counterexample over `product`.
+///
+/// `enablement` shares product-state ids with `product` but may contain a more
+/// complete or conservative action-enable relation than the retained product
+/// prefix. Infinite fairness checks consult `enablement`; executable witness
+/// edges always come from `product`/its acceptance residuals.
+pub(crate) fn find_strong_fair_buchi_counterexample<S, A>(
+    enablement: &ReachableGraph<BuchiProductState<S, A>>,
     product: &ReachableGraph<BuchiProductState<S, A>>,
     known_terminal: &[bool],
     automaton: &BuchiAutomaton<A>,
@@ -143,6 +155,12 @@ where
     S: Clone + Eq + Hash,
     A: Clone + Eq + Hash,
 {
+    if enablement.states.len() != product.states.len()
+        || known_terminal.len() != product.states.len()
+    {
+        return Err(BuchiError::MissingWitness);
+    }
+
     if automaton.finite_policy() == FiniteRunPolicy::RequireAcceptingTerminal {
         for (product_id, state) in product.states.iter().enumerate() {
             if !known_terminal[product_id] {
@@ -182,7 +200,7 @@ where
 
         let residual = induced_graph(product, &included);
         for component in
-            strongly_fair_components(product, &residual, &residual_to_product, fairness)
+            strongly_fair_components(enablement, &residual, &residual_to_product, fairness)
         {
             let Some((entry, product_entry, stem)) =
                 nearest_component_entry(product, &residual_to_product, &component)
@@ -190,7 +208,7 @@ where
                 return Err(BuchiError::MissingWitness);
             };
             let cycle = strong_fair_cycle(
-                product,
+                enablement,
                 &residual,
                 &residual_to_product,
                 &component,
