@@ -5,6 +5,7 @@
 //! the CLI so it can be reused by tests and future front ends.
 
 pub mod bounded;
+mod bounded_report;
 pub mod buchi;
 pub mod buchi_examples;
 pub mod buchi_report;
