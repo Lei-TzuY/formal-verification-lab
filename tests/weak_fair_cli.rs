@@ -33,24 +33,14 @@ fn fixed_temporal_weak_fairness_excludes_only_the_matching_unfair_lasso() {
     let baseline = run(&["temporal", "pulses-unfair"]);
     assert_eq!(baseline.status.code(), Some(10));
 
-    let fair_b = run(&[
-        "temporal",
-        "pulses-unfair",
-        "--weak-fair-action",
-        "pulse-b",
-    ]);
+    let fair_b = run(&["temporal", "pulses-unfair", "--weak-fair-action", "pulse-b"]);
     assert_eq!(fair_b.status.code(), Some(0));
     let fair_b_stdout = stdout(&fair_b);
     assert!(fair_b_stdout.contains("temporal: SATISFIED"));
     assert!(fair_b_stdout.contains("weak fairness actions: 1"));
     assert!(fair_b_stdout.contains("weak-fair action: \"pulse-b\""));
 
-    let fair_a = run(&[
-        "temporal",
-        "pulses-unfair",
-        "--weak-fair-action",
-        "pulse-a",
-    ]);
+    let fair_a = run(&["temporal", "pulses-unfair", "--weak-fair-action", "pulse-a"]);
     assert_eq!(fair_a.status.code(), Some(10));
     let fair_a_stdout = stdout(&fair_a);
     assert!(fair_a_stdout.contains("temporal: VIOLATED"));
@@ -138,12 +128,7 @@ fn fairness_declarations_preserve_order_and_fail_closed_on_duplicates() {
 
 #[test]
 fn fairness_rejects_response_and_bounded_or_staged_combinations() {
-    let response = run(&[
-        "temporal",
-        "request-grant",
-        "--weak-fair-action",
-        "grant",
-    ]);
+    let response = run(&["temporal", "request-grant", "--weak-fair-action", "grant"]);
     assert_eq!(response.status.code(), Some(2));
     assert!(stderr(&response).contains(
         "weak fairness is currently supported only for infinitely-often temporal specifications"
@@ -153,18 +138,12 @@ fn fairness_rejects_response_and_bounded_or_staged_combinations() {
         vec!["--max-product-states", "2"],
         vec!["--max-model-states", "2"],
     ] {
-        let mut args = vec![
-            "temporal",
-            "pulses-unfair",
-            "--weak-fair-action",
-            "pulse-b",
-        ];
+        let mut args = vec!["temporal", "pulses-unfair", "--weak-fair-action", "pulse-b"];
         args.extend(bounded_args);
         let output = run(&args);
         assert_eq!(output.status.code(), Some(2));
-        assert!(stderr(&output).contains(
-            "weak fairness cannot be combined with bounded or staged temporal limits"
-        ));
+        assert!(stderr(&output)
+            .contains("weak fairness cannot be combined with bounded or staged temporal limits"));
     }
 }
 
