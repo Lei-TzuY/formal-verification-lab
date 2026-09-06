@@ -1,8 +1,8 @@
-use crate::bounded::BoundedOutcome;
+use crate::bounded::{AnalysisOutcome, AnalysisStage, BoundedOutcome};
 use crate::bounded_report::format_inconclusive_reason;
 use crate::buchi::{
-    BoundedBuchiResult, BuchiCounterexample, BuchiProductState, BuchiResult, BuchiStatus,
-    FiniteRunPolicy,
+    AnalysisBuchiResult, BoundedBuchiResult, BuchiCounterexample, BuchiProductState, BuchiResult,
+    BuchiStatus, FiniteRunPolicy,
 };
 use crate::checker::TraceStep;
 use std::fmt::{Debug, Write};
@@ -73,33 +73,96 @@ pub fn render_bounded_buchi_report<S: Debug, A: Debug>(
         result.model_transitions
     )
     .expect("writing to String cannot fail");
-    writeln!(&mut output, "product states: {}", result.product_states)
+    render_product_accounting(
+        &mut output,
+        result.product_states,
+        result.checked_product_states,
+        result.explored_product_transitions,
+        result.retained_product_transitions,
+        result.max_product_depth_reached,
+    );
+
+    let incomplete = matches!(result.outcome, BoundedOutcome::Inconclusive(_));
+    if incomplete && result.counterexample.is_none() {
+        writeln!(
+            &mut output,
+            "counterexample: none (product exploration incomplete)"
+        )
+        .expect("writing to String cannot fail");
+    } else {
+        render_counterexample(&mut output, result.counterexample.as_ref(), false);
+    }
+    output
+}
+
+/// Render generalized Buchi verification under independent model-capture and
+/// action-product resource budgets.
+pub fn render_analysis_buchi_report<S: Debug, A: Debug>(
+    model_name: &str,
+    result: &AnalysisBuchiResult<S, A>,
+) -> String {
+    let mut output = String::new();
+    render_header(&mut output, model_name, &result.automaton);
+    match result.outcome {
+        AnalysisOutcome::Conclusive(status) => {
+            writeln!(&mut output, "Buchi verification: {}", status_label(status))
+                .expect("writing to String cannot fail");
+        }
+        AnalysisOutcome::Inconclusive(reason) => {
+            writeln!(&mut output, "Buchi verification: INCONCLUSIVE")
+                .expect("writing to String cannot fail");
+            writeln!(
+                &mut output,
+                "analysis inconclusive stage: {}",
+                stage_label(reason.stage)
+            )
+            .expect("writing to String cannot fail");
+            writeln!(
+                &mut output,
+                "analysis inconclusive reason: {}",
+                format_inconclusive_reason(reason.reason)
+            )
+            .expect("writing to String cannot fail");
+        }
+    }
+    render_policy_and_acceptance(&mut output, result.finite_policy, result.acceptance_sets);
+    render_stage_completion(&mut output, "model", &result.model_completion);
+    render_stage_completion(&mut output, "product", &result.product_completion);
+    writeln!(&mut output, "model states: {}", result.model_states)
         .expect("writing to String cannot fail");
     writeln!(
         &mut output,
-        "checked product states: {}",
-        result.checked_product_states
+        "checked model states: {}",
+        result.checked_model_states
     )
     .expect("writing to String cannot fail");
     writeln!(
         &mut output,
-        "explored product transitions: {}",
-        result.explored_product_transitions
+        "explored model transitions: {}",
+        result.explored_model_transitions
     )
     .expect("writing to String cannot fail");
     writeln!(
         &mut output,
-        "retained product transitions: {}",
-        result.retained_product_transitions
+        "retained model transitions: {}",
+        result.retained_model_transitions
     )
     .expect("writing to String cannot fail");
-    match result.max_product_depth_reached {
-        Some(depth) => writeln!(&mut output, "max product depth reached: {depth}"),
-        None => writeln!(&mut output, "max product depth reached: none"),
+    match result.max_model_depth_reached {
+        Some(depth) => writeln!(&mut output, "max model depth reached: {depth}"),
+        None => writeln!(&mut output, "max model depth reached: none"),
     }
     .expect("writing to String cannot fail");
+    render_product_accounting(
+        &mut output,
+        result.product_states,
+        result.checked_product_states,
+        result.explored_product_transitions,
+        result.retained_product_transitions,
+        result.max_product_depth_reached,
+    );
 
-    let incomplete = matches!(result.outcome, BoundedOutcome::Inconclusive(_));
+    let incomplete = matches!(result.outcome, AnalysisOutcome::Inconclusive(_));
     render_counterexample(&mut output, result.counterexample.as_ref(), incomplete);
     output
 }
@@ -113,6 +176,13 @@ fn status_label(status: BuchiStatus) -> &'static str {
     match status {
         BuchiStatus::Satisfied => "SATISFIED",
         BuchiStatus::Violated => "VIOLATED",
+    }
+}
+
+fn stage_label(stage: AnalysisStage) -> &'static str {
+    match stage {
+        AnalysisStage::Model => "model",
+        AnalysisStage::Product => "product",
     }
 }
 
@@ -133,17 +203,61 @@ fn render_policy_and_acceptance(
     writeln!(output, "acceptance sets: {acceptance_sets}").expect("writing to String cannot fail");
 }
 
+fn render_stage_completion(output: &mut String, stage: &str, completion: &BoundedOutcome<()>) {
+    match completion {
+        BoundedOutcome::Conclusive(()) => {
+            writeln!(output, "{stage} completion: COMPLETE")
+                .expect("writing to String cannot fail");
+        }
+        BoundedOutcome::Inconclusive(reason) => {
+            writeln!(output, "{stage} completion: INCONCLUSIVE")
+                .expect("writing to String cannot fail");
+            writeln!(
+                output,
+                "{stage} inconclusive reason: {}",
+                format_inconclusive_reason(*reason)
+            )
+            .expect("writing to String cannot fail");
+        }
+    }
+}
+
+fn render_product_accounting(
+    output: &mut String,
+    product_states: usize,
+    checked_product_states: usize,
+    explored_product_transitions: usize,
+    retained_product_transitions: usize,
+    max_product_depth_reached: Option<usize>,
+) {
+    writeln!(output, "product states: {product_states}").expect("writing to String cannot fail");
+    writeln!(output, "checked product states: {checked_product_states}")
+        .expect("writing to String cannot fail");
+    writeln!(
+        output,
+        "explored product transitions: {explored_product_transitions}"
+    )
+    .expect("writing to String cannot fail");
+    writeln!(
+        output,
+        "retained product transitions: {retained_product_transitions}"
+    )
+    .expect("writing to String cannot fail");
+    match max_product_depth_reached {
+        Some(depth) => writeln!(output, "max product depth reached: {depth}"),
+        None => writeln!(output, "max product depth reached: none"),
+    }
+    .expect("writing to String cannot fail");
+}
+
 fn render_counterexample<S: Debug, A: Debug>(
     output: &mut String,
     counterexample: Option<&BuchiCounterexample<S, A>>,
     incomplete: bool,
 ) {
     match counterexample {
-        None if incomplete => writeln!(
-            output,
-            "counterexample: none (product exploration incomplete)"
-        )
-        .expect("writing to String cannot fail"),
+        None if incomplete => writeln!(output, "counterexample: none (analysis incomplete)")
+            .expect("writing to String cannot fail"),
         None => writeln!(
             output,
             "counterexample: none (all configured acceptance obligations hold)"

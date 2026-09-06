@@ -1,9 +1,12 @@
-use crate::bounded::BoundedOutcome;
+use crate::bounded::{
+    AnalysisInconclusiveReason, AnalysisLimits, AnalysisOutcome, AnalysisStage, BoundedOutcome,
+};
 use crate::checker::{ExplorationLimits, TraceStep};
 use crate::graph::{capture_reachable_graph, induced_graph, shortest_path, ReachableGraph};
 use crate::model::TransitionSystem;
 use crate::product::{
-    build_action_product, build_action_product_with_limits, BoundedActionProduct,
+    build_action_product, build_action_product_with_analysis_limits,
+    build_action_product_with_limits, BoundedActionProduct, StagedActionProduct,
 };
 use crate::recurrence::{
     component_is_cyclic, cycle_witness, strongly_connected_components, RecurrenceError,
@@ -223,6 +226,28 @@ pub struct BoundedBuchiResult<S, A> {
     pub counterexample: Option<BuchiCounterexample<S, A>>,
 }
 
+/// Generalized Büchi verification under independent model and product budgets.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AnalysisBuchiResult<S, A> {
+    pub automaton: String,
+    pub outcome: AnalysisOutcome<BuchiStatus>,
+    pub finite_policy: FiniteRunPolicy,
+    pub acceptance_sets: usize,
+    pub model_completion: BoundedOutcome<()>,
+    pub product_completion: BoundedOutcome<()>,
+    pub model_states: usize,
+    pub checked_model_states: usize,
+    pub explored_model_transitions: usize,
+    pub retained_model_transitions: usize,
+    pub max_model_depth_reached: Option<usize>,
+    pub product_states: usize,
+    pub checked_product_states: usize,
+    pub explored_product_transitions: usize,
+    pub retained_product_transitions: usize,
+    pub max_product_depth_reached: Option<usize>,
+    pub counterexample: Option<BuchiCounterexample<S, A>>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BuchiError {
     EmptyAutomatonName,
@@ -260,19 +285,6 @@ impl From<RecurrenceError> for BuchiError {
 
 /// Universally verify generalized Büchi acceptance over all infinite maximal
 /// executions of a finite model, with explicit handling for finite terminals.
-///
-/// The model transition relation is evaluated exactly once. The deterministic
-/// automaton then consumes captured action labels to form a finite product.
-/// Every infinite maximal execution must visit every named acceptance set
-/// infinitely often. For acceptance set `F_i`, an infinite violation therefore
-/// exists exactly when a reachable product cycle can remain entirely in
-/// `not F_i` after some finite stem.
-///
-/// Finite terminal violations, when enabled by the finite-run policy, take
-/// precedence over infinite lassos. Infinite witnesses are selected by shortest
-/// global stem, then acceptance-set declaration order, then product discovery
-/// order. The returned closed cycle is deterministic but is not claimed globally
-/// shortest. No fairness assumption is applied.
 pub fn check_buchi<S, A>(
     model: &TransitionSystem<S>,
     automaton: &BuchiAutomaton<A>,
@@ -315,16 +327,6 @@ where
 
 /// Verify generalized Büchi semantics while bounding only deterministic action-
 /// product construction after complete model capture.
-///
-/// Under `RequireAcceptingTerminal`, only a true underlying model terminal may
-/// witness finite failure. A retained real acceptance-avoiding closed cycle may
-/// likewise prove an infinite violation before a later cutoff. If no such real
-/// counterexample is present, an incomplete product yields the exact
-/// `Inconclusive` reason; satisfaction requires product completion.
-///
-/// When construction is incomplete, the lasso is deterministic evidence from
-/// the justified retained prefix; the unbounded/global shortest witness contract
-/// is retained when the product is complete.
 pub fn check_buchi_with_product_limits<S, A>(
     model: &TransitionSystem<S>,
     automaton: &BuchiAutomaton<A>,
@@ -374,6 +376,93 @@ where
         max_product_depth_reached: max_depth_reached,
         counterexample,
     })
+}
+
+/// Verify generalized Büchi semantics under a staged whole-analysis envelope.
+pub fn check_buchi_with_limits<S, A>(
+    model: &TransitionSystem<S>,
+    automaton: &BuchiAutomaton<A>,
+    limits: AnalysisLimits,
+) -> Result<AnalysisBuchiResult<S, A>, BuchiError>
+where
+    S: Clone + Eq + Hash,
+    A: Clone + Eq + Hash,
+{
+    let StagedActionProduct {
+        product:
+            BoundedActionProduct {
+                graph: product,
+                checked_states: checked_product_states,
+                explored_transitions: explored_product_transitions,
+                max_depth_reached: max_product_depth_reached,
+                completion: product_completion,
+                known_terminal,
+            },
+        model_discovered_states,
+        model_checked_states,
+        model_explored_transitions,
+        model_retained_transitions,
+        model_max_depth_reached,
+        model_completion,
+    } = build_action_product_with_analysis_limits(
+        model,
+        &automaton.initial,
+        |state, action| (automaton.step)(state, action),
+        |state, automaton| BuchiProductState { state, automaton },
+        limits,
+    )
+    .map_err(RecurrenceError::from)?;
+
+    let retained_product_transitions = product.outgoing.iter().map(Vec::len).sum();
+    let counterexample = find_counterexample(&product, &known_terminal, automaton)?;
+    let outcome = staged_buchi_outcome(
+        counterexample.is_some(),
+        &model_completion,
+        &product_completion,
+    );
+
+    Ok(AnalysisBuchiResult {
+        automaton: automaton.name.clone(),
+        outcome,
+        finite_policy: automaton.finite_policy,
+        acceptance_sets: automaton.acceptance.len(),
+        model_completion,
+        product_completion,
+        model_states: model_discovered_states,
+        checked_model_states: model_checked_states,
+        explored_model_transitions: model_explored_transitions,
+        retained_model_transitions: model_retained_transitions,
+        max_model_depth_reached: model_max_depth_reached,
+        product_states: product.states.len(),
+        checked_product_states,
+        explored_product_transitions,
+        retained_product_transitions,
+        max_product_depth_reached,
+        counterexample,
+    })
+}
+
+fn staged_buchi_outcome(
+    violated: bool,
+    model_completion: &BoundedOutcome<()>,
+    product_completion: &BoundedOutcome<()>,
+) -> AnalysisOutcome<BuchiStatus> {
+    if violated {
+        return AnalysisOutcome::Conclusive(BuchiStatus::Violated);
+    }
+    if let BoundedOutcome::Inconclusive(reason) = model_completion {
+        return AnalysisOutcome::Inconclusive(AnalysisInconclusiveReason {
+            stage: AnalysisStage::Model,
+            reason: *reason,
+        });
+    }
+    if let BoundedOutcome::Inconclusive(reason) = product_completion {
+        return AnalysisOutcome::Inconclusive(AnalysisInconclusiveReason {
+            stage: AnalysisStage::Product,
+            reason: *reason,
+        });
+    }
+    AnalysisOutcome::Conclusive(BuchiStatus::Satisfied)
 }
 
 fn find_counterexample<S, A>(
