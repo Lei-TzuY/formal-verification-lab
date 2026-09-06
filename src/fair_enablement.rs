@@ -145,10 +145,9 @@ mod tests {
 
     #[test]
     fn complete_projection_uses_model_enablement_not_retained_product_edges() {
-        let projected = complete_enablement_graph(&model_graph(), &product_graph(), |state| {
-            &state.model
-        })
-        .unwrap();
+        let projected =
+            complete_enablement_graph(&model_graph(), &product_graph(), |state| &state.model)
+                .unwrap();
 
         assert_eq!(projected.outgoing[0].len(), 1);
         assert_eq!(projected.outgoing[0][0].action, "fair");
