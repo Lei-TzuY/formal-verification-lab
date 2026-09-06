@@ -124,11 +124,6 @@ fn generous_product_budget_matches_unbounded_matching_fairness() {
     assert!(bounded_stdout.contains("temporal: SATISFIED"));
     assert!(bounded_stdout.contains("weak-fair action: \"pulse-b\""));
 
-    let unbounded = run(&[
-        "temporal",
-        "pulses-unfair",
-        "--weak-fair-action",
-        "pulse-b",
-    ]);
+    let unbounded = run(&["temporal", "pulses-unfair", "--weak-fair-action", "pulse-b"]);
     assert_eq!(unbounded.status.code(), Some(0));
 }
