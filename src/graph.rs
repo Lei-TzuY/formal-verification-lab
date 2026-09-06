@@ -205,14 +205,7 @@ fn build_bounded_graph<S>(
     discovered_states: usize,
     explored_transitions: usize,
     limits: ExplorationLimits,
-) -> Result<
-    (
-        ReachableGraph<S>,
-        Vec<bool>,
-        Vec<Option<Vec<String>>>,
-    ),
-    GraphCaptureError,
->
+) -> Result<(ReachableGraph<S>, Vec<bool>, Vec<Option<Vec<String>>>), GraphCaptureError>
 where
     S: Clone + Eq + Hash,
 {
