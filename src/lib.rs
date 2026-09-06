@@ -89,8 +89,9 @@ pub use monitor::{
 };
 pub use monitor_report::{render_bounded_monitor_report, render_monitor_report};
 pub use multi_response::{
-    check_multi_response, check_multi_response_with_limits, check_multi_response_with_product_limits,
-    check_multi_response_with_weak_fairness, check_multi_response_with_weak_fairness_and_limits,
+    check_multi_response, check_multi_response_with_limits,
+    check_multi_response_with_product_limits, check_multi_response_with_weak_fairness,
+    check_multi_response_with_weak_fairness_and_limits,
     check_multi_response_with_weak_fairness_and_product_limits, AnalysisMultiResponseResult,
     BoundedMultiResponseResult, MultiObligationState, MultiResponseCounterexample,
     MultiResponseError, MultiResponseProperty, MultiResponseResult, MultiResponseStatus,
