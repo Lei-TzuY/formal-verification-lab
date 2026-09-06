@@ -189,13 +189,8 @@ where
             if !component_is_cyclic(&residual, &component) {
                 continue;
             }
-            let Some(cycle) = weakly_fair_cycle(
-                enablement,
-                &residual,
-                &old_ids,
-                &component,
-                fairness,
-            )?
+            let Some(cycle) =
+                weakly_fair_cycle(enablement, &residual, &old_ids, &component, fairness)?
             else {
                 continue;
             };
