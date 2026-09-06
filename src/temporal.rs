@@ -313,7 +313,9 @@ where
     S: Clone + Eq + Hash,
 {
     match &spec.kind {
-        ActionTemporalKind::Response { .. } => Err(TemporalError::WeakFairnessUnsupportedForResponse),
+        ActionTemporalKind::Response { .. } => {
+            Err(TemporalError::WeakFairnessUnsupportedForResponse)
+        }
         ActionTemporalKind::AllInfinitelyOften { actions } => {
             check_recurring_spec_with_weak_fairness(model, spec, actions, fairness)
         }
