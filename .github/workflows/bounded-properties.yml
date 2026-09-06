@@ -1,0 +1,60 @@
+name: Bounded state-property CLI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  bounded-state-properties:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build CLI
+        run: cargo build --bin fvlab
+      - name: Verify bounded state-property behavior
+        shell: bash
+        run: |
+          model="$(mktemp)"
+          trap 'rm -f "$model"' EXIT
+          cat >"$model" <<'MODEL'
+          model "bounded-ci"
+          state "start"
+          state "done"
+          initial "start"
+          edge "start" "finish" "done"
+          label "start" "ok"
+          label "done" "complete"
+          MODEL
+
+          set +e
+          state_output="$(target/debug/fvlab state file "$model" 'reachable("done")' --max-depth 0)"
+          state_status=$?
+          set -e
+          printf '%s\n' "$state_output"
+          test "$state_status" -eq 3
+          grep -Fq "state property: INCONCLUSIVE" <<<"$state_output"
+          grep -Fq "inconclusive reason: depth limit reached (max 0)" <<<"$state_output"
+          grep -Fq "evidence: none" <<<"$state_output"
+
+          conclusive_output="$(target/debug/fvlab state file "$model" 'reachable("start")' --max-depth 0)"
+          printf '%s\n' "$conclusive_output"
+          grep -Fq "state property: SATISFIED" <<<"$conclusive_output"
+          grep -Fq "evidence: REACHABILITY_WITNESS" <<<"$conclusive_output"
+          grep -Fq '"start" [initial]' <<<"$conclusive_output"
+
+          set +e
+          safety_output="$(target/debug/fvlab proposition always "$model" '"ok" or "complete"' --max-depth 0)"
+          safety_status=$?
+          set -e
+          printf '%s\n' "$safety_output"
+          test "$safety_status" -eq 3
+          grep -Fq "safety: INCONCLUSIVE" <<<"$safety_output"
+          grep -Fq "inconclusive reason: depth limit reached (max 0)" <<<"$safety_output"
+          if grep -Fq "safety: SAFE" <<<"$safety_output"; then
+            exit 1
+          fi
