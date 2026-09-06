@@ -3,14 +3,10 @@ use crate::buchi::{
     FiniteRunPolicy,
 };
 use crate::checker::TraceStep;
-use crate::graph::{
-    capture_reachable_graph, induced_graph, shortest_path, ReachableGraph,
-};
+use crate::graph::{capture_reachable_graph, induced_graph, shortest_path, ReachableGraph};
 use crate::model::TransitionSystem;
 use crate::product::build_action_product;
-use crate::recurrence::{
-    component_is_cyclic, strongly_connected_components, RecurrenceError,
-};
+use crate::recurrence::{component_is_cyclic, strongly_connected_components, RecurrenceError};
 use std::collections::HashSet;
 use std::fmt;
 use std::hash::Hash;
@@ -110,12 +106,8 @@ where
         .iter()
         .map(Vec::is_empty)
         .collect::<Vec<_>>();
-    let counterexample = find_fair_buchi_counterexample(
-        &product,
-        &known_terminal,
-        automaton,
-        fairness,
-    )?;
+    let counterexample =
+        find_fair_buchi_counterexample(&product, &known_terminal, automaton, fairness)?;
 
     Ok(BuchiResult {
         automaton: automaton.name().to_owned(),
@@ -186,13 +178,9 @@ where
             if !component_is_cyclic(&residual, &component) {
                 continue;
             }
-            let Some(cycle) = weakly_fair_cycle(
-                product,
-                &residual,
-                &old_ids,
-                &component,
-                fairness,
-            )? else {
+            let Some(cycle) =
+                weakly_fair_cycle(product, &residual, &old_ids, &component, fairness)?
+            else {
                 continue;
             };
             let entry = *component.first().ok_or(BuchiError::MissingWitness)?;
@@ -214,13 +202,15 @@ where
         }
     }
 
-    Ok(best.map(|candidate| BuchiCounterexample::AcceptanceAvoidingCycle {
-        acceptance: automaton.acceptance_sets()[candidate.acceptance_index]
-            .name()
-            .to_owned(),
-        stem: candidate.stem,
-        cycle: candidate.cycle,
-    }))
+    Ok(
+        best.map(|candidate| BuchiCounterexample::AcceptanceAvoidingCycle {
+            acceptance: automaton.acceptance_sets()[candidate.acceptance_index]
+                .name()
+                .to_owned(),
+            stem: candidate.stem,
+            cycle: candidate.cycle,
+        }),
+    )
 }
 
 struct FairBuchiCandidate<S, A> {
@@ -552,14 +542,9 @@ mod tests {
                     }
                     for fair_actions in fair_configs {
                         let fairness = WeakFairness::new(fair_actions.iter().copied()).unwrap();
-                        let witness = weakly_fair_cycle(
-                            &full,
-                            &residual,
-                            &old_ids,
-                            &component,
-                            &fairness,
-                        )
-                        .unwrap();
+                        let witness =
+                            weakly_fair_cycle(&full, &residual, &old_ids, &component, &fairness)
+                                .unwrap();
                         let expected = oracle_component_is_fair(
                             &full,
                             &residual,
@@ -618,7 +603,8 @@ mod tests {
         let fairness = WeakFairness::new(["pulse-a"]).unwrap();
         let result = check_buchi_with_weak_fairness(&model, &automaton, &fairness).unwrap();
         assert_eq!(result.status, BuchiStatus::Violated);
-        let Some(BuchiCounterexample::AcceptanceAvoidingCycle { cycle, .. }) = result.counterexample
+        let Some(BuchiCounterexample::AcceptanceAvoidingCycle { cycle, .. }) =
+            result.counterexample
         else {
             panic!("expected fair acceptance-avoiding cycle");
         };
