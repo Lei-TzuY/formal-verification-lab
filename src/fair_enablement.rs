@@ -7,8 +7,8 @@ use std::hash::Hash;
 /// product state id space.
 ///
 /// Targets are self references because consumers need only action-label
-/// presence for weak-fairness enablement checks. Executable recurrent edges
-/// always come from the retained product residual itself.
+/// presence for fairness enablement checks. Executable recurrent edges always
+/// come from the retained product residual itself.
 pub(crate) fn complete_enablement_graph<S, P, Project>(
     model_graph: &ReachableGraph<S>,
     product: &ReachableGraph<P>,
@@ -58,12 +58,12 @@ where
 /// `complete_enabled_actions[id] = Some(actions)` is exact knowledge from one
 /// evaluated successor vector. `None` means enablement is unknown, so every
 /// configured fair action is conservatively represented as enabled. This is the
-/// M33 provenance rule shared by every staged weak-fair temporal consumer.
-pub(crate) fn bounded_enablement_graph<S, P, Project>(
+/// provenance rule shared by staged weak- and strong-fair temporal consumers.
+pub(crate) fn bounded_enablement_graph_for_actions<S, P, Project>(
     model_graph: &ReachableGraph<S>,
     complete_enabled_actions: &[Option<Vec<String>>],
     product: &ReachableGraph<P>,
-    fairness: &WeakFairness,
+    fair_actions: &[String],
     project_model_state: Project,
 ) -> Option<ReachableGraph<P>>
 where
@@ -92,7 +92,7 @@ where
             let actions = complete_enabled_actions[model_id]
                 .as_ref()
                 .cloned()
-                .unwrap_or_else(|| fairness.actions().to_vec());
+                .unwrap_or_else(|| fair_actions.to_vec());
             Some(
                 actions
                     .into_iter()
@@ -110,6 +110,27 @@ where
         outgoing,
         initial_ids: product.initial_ids.clone(),
     })
+}
+
+pub(crate) fn bounded_enablement_graph<S, P, Project>(
+    model_graph: &ReachableGraph<S>,
+    complete_enabled_actions: &[Option<Vec<String>>],
+    product: &ReachableGraph<P>,
+    fairness: &WeakFairness,
+    project_model_state: Project,
+) -> Option<ReachableGraph<P>>
+where
+    S: Clone + Eq + Hash,
+    P: Clone,
+    Project: Fn(&P) -> &S,
+{
+    bounded_enablement_graph_for_actions(
+        model_graph,
+        complete_enabled_actions,
+        product,
+        fairness.actions(),
+        project_model_state,
+    )
 }
 
 #[cfg(test)]
@@ -162,6 +183,28 @@ mod tests {
             &[None, Some(Vec::new())],
             &product_graph(),
             &fairness,
+            |state| &state.model,
+        )
+        .unwrap();
+
+        assert_eq!(
+            projected.outgoing[0]
+                .iter()
+                .map(|edge| edge.action.as_str())
+                .collect::<Vec<_>>(),
+            vec!["fair", "other"]
+        );
+        assert!(projected.outgoing[1].is_empty());
+    }
+
+    #[test]
+    fn generic_projection_uses_the_same_conservative_unknown_rule() {
+        let actions = vec!["fair".to_owned(), "other".to_owned()];
+        let projected = bounded_enablement_graph_for_actions(
+            &model_graph(),
+            &[None, Some(Vec::new())],
+            &product_graph(),
+            &actions,
             |state| &state.model,
         )
         .unwrap();
