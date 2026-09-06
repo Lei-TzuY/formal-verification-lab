@@ -19,17 +19,14 @@ fn stderr(output: &std::process::Output) -> String {
 
 #[test]
 fn fixed_temporal_examples_expose_product_limits_and_preserve_violation_exit() {
-    let inconclusive = run(&[
-        "temporal",
-        "request-grant",
-        "--max-product-states",
-        "1",
-    ]);
+    let inconclusive = run(&["temporal", "request-grant", "--max-product-states", "1"]);
     assert_eq!(inconclusive.status.code(), Some(3));
     let inconclusive_stdout = stdout(&inconclusive);
     assert!(inconclusive_stdout.contains("backend: RESPONSE"));
     assert!(inconclusive_stdout.contains("temporal: INCONCLUSIVE"));
-    assert!(inconclusive_stdout.contains("product inconclusive reason: state limit reached (max 1)"));
+    assert!(
+        inconclusive_stdout.contains("product inconclusive reason: state limit reached (max 1)")
+    );
     assert!(inconclusive_stdout.contains("counterexample: none (product exploration incomplete)"));
 
     let violated = run(&[
@@ -126,7 +123,5 @@ fn temporal_cli_rejects_model_limit_flags_in_the_product_limit_surface() {
 
     let malformed = run(&["temporal", "pulses", "--max-product-depth"]);
     assert_eq!(malformed.status.code(), Some(2));
-    assert!(
-        stderr(&malformed).contains("option '--max-product-depth' requires an integer value")
-    );
+    assert!(stderr(&malformed).contains("option '--max-product-depth' requires an integer value"));
 }
