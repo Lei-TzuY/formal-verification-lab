@@ -1,6 +1,8 @@
 use crate::fairness::WeakFairness;
-use crate::temporal::TemporalResult;
-use crate::temporal_report::render_temporal_report;
+use crate::temporal::{AnalysisTemporalResult, BoundedTemporalResult, TemporalResult};
+use crate::temporal_report::{
+    render_analysis_temporal_report, render_bounded_temporal_report, render_temporal_report,
+};
 use std::fmt::{Debug, Write};
 
 /// Render one unbounded temporal result together with the exact-action weak
@@ -14,17 +16,46 @@ pub fn render_weak_fair_temporal_report<S: Debug>(
     fairness: &WeakFairness,
 ) -> String {
     let mut output = render_temporal_report(model_name, result);
+    append_weak_fairness(&mut output, fairness);
+    output
+}
+
+/// Render a product-bounded temporal result together with the exact-action
+/// weak-fairness assumptions used for recurrent counterexample filtering.
+pub fn render_bounded_weak_fair_temporal_report<S: Debug>(
+    model_name: &str,
+    result: &BoundedTemporalResult<S>,
+    fairness: &WeakFairness,
+) -> String {
+    let mut output = render_bounded_temporal_report(model_name, result);
+    append_weak_fairness(&mut output, fairness);
+    output
+}
+
+/// Render a staged model/product temporal result together with its exact-action
+/// weak-fairness assumptions. Stage-qualified cutoff reporting remains owned by
+/// the canonical temporal renderer.
+pub fn render_analysis_weak_fair_temporal_report<S: Debug>(
+    model_name: &str,
+    result: &AnalysisTemporalResult<S>,
+    fairness: &WeakFairness,
+) -> String {
+    let mut output = render_analysis_temporal_report(model_name, result);
+    append_weak_fairness(&mut output, fairness);
+    output
+}
+
+fn append_weak_fairness(output: &mut String, fairness: &WeakFairness) {
     writeln!(
-        &mut output,
+        output,
         "weak fairness actions: {}",
         fairness.actions().len()
     )
     .expect("writing to String cannot fail");
     for action in fairness.actions() {
-        writeln!(&mut output, "weak-fair action: {}", quote_action(action))
+        writeln!(output, "weak-fair action: {}", quote_action(action))
             .expect("writing to String cannot fail");
     }
-    output
 }
 
 fn quote_action(action: &str) -> String {

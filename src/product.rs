@@ -157,7 +157,7 @@ where
 
 /// Build a product over a justified model prefix whose terminal knowledge is
 /// supplied separately from the prefix's outgoing adjacency.
-fn build_action_product_from_prefix_with_limits<S, C, P, Step, Lift>(
+pub(crate) fn build_action_product_from_prefix_with_limits<S, C, P, Step, Lift>(
     graph: &ReachableGraph<S>,
     model_known_terminal: &[bool],
     initial_control: &C,

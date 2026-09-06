@@ -5,6 +5,7 @@
 //! the CLI so it can be reused by tests and future front ends.
 
 pub mod bounded;
+pub mod bounded_fairness;
 mod bounded_report;
 pub mod buchi;
 pub mod buchi_examples;
@@ -47,6 +48,9 @@ pub mod temporal_report;
 
 pub use bounded::{
     AnalysisInconclusiveReason, AnalysisLimits, AnalysisOutcome, AnalysisStage, BoundedOutcome,
+};
+pub use bounded_fairness::{
+    check_buchi_with_weak_fairness_and_limits, check_buchi_with_weak_fairness_and_product_limits,
 };
 pub use buchi::{
     check_buchi, check_buchi_with_limits, AcceptanceSet, AnalysisBuchiResult, BuchiAutomaton,
@@ -129,8 +133,10 @@ pub use safety_report::render_safety_report;
 pub use temporal::{
     check_action_temporal, check_action_temporal_with_limits,
     check_action_temporal_with_product_limits, check_action_temporal_with_weak_fairness,
-    ActionAtom, ActionTemporalSpec, AnalysisTemporalResult, BoundedTemporalResult, TemporalBackend,
-    TemporalCounterexample, TemporalError, TemporalObligation, TemporalResult, TemporalStatus,
+    check_action_temporal_with_weak_fairness_and_limits,
+    check_action_temporal_with_weak_fairness_and_product_limits, ActionAtom, ActionTemporalSpec,
+    AnalysisTemporalResult, BoundedTemporalResult, TemporalBackend, TemporalCounterexample,
+    TemporalError, TemporalObligation, TemporalResult, TemporalStatus,
 };
 pub use temporal_parse::{parse_action_temporal, TemporalParseError, TemporalParseErrorKind};
 pub use temporal_report::{render_bounded_temporal_report, render_temporal_report};

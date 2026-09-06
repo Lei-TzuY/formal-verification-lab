@@ -26,7 +26,10 @@ use formal_verification_lab::examples::{
     traffic_light, CounterState, TrafficLightState,
 };
 use formal_verification_lab::fairness::WeakFairness;
-use formal_verification_lab::fairness_report::render_weak_fair_temporal_report;
+use formal_verification_lab::fairness_report::{
+    render_analysis_weak_fair_temporal_report, render_bounded_weak_fair_temporal_report,
+    render_weak_fair_temporal_report,
+};
 use formal_verification_lab::monitor::{
     check_monitor, check_monitor_with_limits, check_monitor_with_product_limits, FiniteMonitor,
     MonitorStatus,
@@ -88,7 +91,9 @@ use formal_verification_lab::safety_report::{render_bounded_safety_report, rende
 use formal_verification_lab::temporal::{
     check_action_temporal, check_action_temporal_with_limits,
     check_action_temporal_with_product_limits, check_action_temporal_with_weak_fairness,
-    ActionAtom, ActionTemporalSpec, TemporalStatus,
+    check_action_temporal_with_weak_fairness_and_limits,
+    check_action_temporal_with_weak_fairness_and_product_limits, ActionAtom, ActionTemporalSpec,
+    TemporalStatus,
 };
 use formal_verification_lab::temporal_parse::parse_action_temporal;
 use formal_verification_lab::temporal_report::{
@@ -732,19 +737,53 @@ fn run_temporal<S>(
 where
     S: Clone + Eq + std::hash::Hash + std::fmt::Debug,
 {
-    if contains_weak_fairness_flag(option_args) {
-        if contains_temporal_limit_flag(option_args) {
-            return Err(
-                "weak fairness cannot be combined with bounded or staged temporal limits"
-                    .to_owned(),
+    let options = parse_temporal_options(option_args)?;
+
+    if !options.fairness.is_empty() {
+        if options.has_model_limits {
+            let limits = AnalysisLimits::new(options.model_limits, options.product_limits);
+            let result = check_action_temporal_with_weak_fairness_and_limits(
+                &model,
+                &spec,
+                &options.fairness,
+                limits,
+            )
+            .map_err(|error| error.to_string())?;
+            print!(
+                "{}",
+                render_analysis_weak_fair_temporal_report(model.name(), &result, &options.fairness)
             );
+            return Ok(match &result.outcome {
+                AnalysisOutcome::Conclusive(TemporalStatus::Satisfied) => ExitCode::SUCCESS,
+                AnalysisOutcome::Conclusive(TemporalStatus::Violated) => ExitCode::from(10),
+                AnalysisOutcome::Inconclusive(_) => ExitCode::from(3),
+            });
         }
-        let fairness = parse_weak_fairness(option_args)?;
-        let result = check_action_temporal_with_weak_fairness(&model, &spec, &fairness)
+
+        if options.has_product_limits {
+            let result = check_action_temporal_with_weak_fairness_and_product_limits(
+                &model,
+                &spec,
+                &options.fairness,
+                options.product_limits,
+            )
+            .map_err(|error| error.to_string())?;
+            print!(
+                "{}",
+                render_bounded_weak_fair_temporal_report(model.name(), &result, &options.fairness)
+            );
+            return Ok(match &result.outcome {
+                BoundedOutcome::Conclusive(TemporalStatus::Satisfied) => ExitCode::SUCCESS,
+                BoundedOutcome::Conclusive(TemporalStatus::Violated) => ExitCode::from(10),
+                BoundedOutcome::Inconclusive(_) => ExitCode::from(3),
+            });
+        }
+
+        let result = check_action_temporal_with_weak_fairness(&model, &spec, &options.fairness)
             .map_err(|error| error.to_string())?;
         print!(
             "{}",
-            render_weak_fair_temporal_report(model.name(), &result, &fairness)
+            render_weak_fair_temporal_report(model.name(), &result, &options.fairness)
         );
         return Ok(match result.status {
             TemporalStatus::Satisfied => ExitCode::SUCCESS,
@@ -752,17 +791,8 @@ where
         });
     }
 
-    if option_args.is_empty() {
-        let result = check_action_temporal(&model, &spec).map_err(|error| error.to_string())?;
-        print!("{}", render_temporal_report(model.name(), &result));
-        return Ok(match result.status {
-            TemporalStatus::Satisfied => ExitCode::SUCCESS,
-            TemporalStatus::Violated => ExitCode::from(10),
-        });
-    }
-
-    if contains_model_limit_flag(option_args) {
-        let limits = parse_analysis_limits(option_args)?;
+    if options.has_model_limits {
+        let limits = AnalysisLimits::new(options.model_limits, options.product_limits);
         let result = check_action_temporal_with_limits(&model, &spec, limits)
             .map_err(|error| error.to_string())?;
         print!("{}", render_analysis_temporal_report(model.name(), &result));
@@ -773,14 +803,23 @@ where
         });
     }
 
-    let limits = parse_product_limits(option_args)?;
-    let result = check_action_temporal_with_product_limits(&model, &spec, limits)
-        .map_err(|error| error.to_string())?;
-    print!("{}", render_bounded_temporal_report(model.name(), &result));
-    Ok(match &result.outcome {
-        BoundedOutcome::Conclusive(TemporalStatus::Satisfied) => ExitCode::SUCCESS,
-        BoundedOutcome::Conclusive(TemporalStatus::Violated) => ExitCode::from(10),
-        BoundedOutcome::Inconclusive(_) => ExitCode::from(3),
+    if options.has_product_limits {
+        let result =
+            check_action_temporal_with_product_limits(&model, &spec, options.product_limits)
+                .map_err(|error| error.to_string())?;
+        print!("{}", render_bounded_temporal_report(model.name(), &result));
+        return Ok(match &result.outcome {
+            BoundedOutcome::Conclusive(TemporalStatus::Satisfied) => ExitCode::SUCCESS,
+            BoundedOutcome::Conclusive(TemporalStatus::Violated) => ExitCode::from(10),
+            BoundedOutcome::Inconclusive(_) => ExitCode::from(3),
+        });
+    }
+
+    let result = check_action_temporal(&model, &spec).map_err(|error| error.to_string())?;
+    print!("{}", render_temporal_report(model.name(), &result));
+    Ok(match result.status {
+        TemporalStatus::Satisfied => ExitCode::SUCCESS,
+        TemporalStatus::Violated => ExitCode::from(10),
     })
 }
 
@@ -1002,39 +1041,83 @@ fn contains_model_limit_flag(args: &[String]) -> bool {
     })
 }
 
-fn contains_weak_fairness_flag(args: &[String]) -> bool {
-    args.iter().any(|arg| arg == "--weak-fair-action")
+struct TemporalCliOptions {
+    fairness: WeakFairness,
+    model_limits: ExplorationLimits,
+    product_limits: ExplorationLimits,
+    has_model_limits: bool,
+    has_product_limits: bool,
 }
 
-fn contains_temporal_limit_flag(args: &[String]) -> bool {
-    args.iter().any(|arg| {
-        matches!(
-            arg.as_str(),
-            "--max-model-states"
-                | "--max-model-transitions"
-                | "--max-model-depth"
-                | "--max-product-states"
-                | "--max-product-transitions"
-                | "--max-product-depth"
-        )
-    })
-}
-
-fn parse_weak_fairness(args: &[String]) -> Result<WeakFairness, String> {
-    let mut actions = Vec::new();
+fn parse_temporal_options(args: &[String]) -> Result<TemporalCliOptions, String> {
+    let mut fairness_actions = Vec::new();
+    let mut model_limits = ExplorationLimits::unbounded();
+    let mut product_limits = ExplorationLimits::unbounded();
+    let mut has_model_limits = false;
+    let mut has_product_limits = false;
     let mut index = 0;
+
     while index < args.len() {
         let flag = args[index].as_str();
-        if flag != "--weak-fair-action" {
-            return Err(format!("unknown option '{flag}'\n{}", usage()));
+        match flag {
+            "--weak-fair-action" => {
+                let action = args.get(index + 1).ok_or_else(|| {
+                    "option '--weak-fair-action' requires an action value".to_owned()
+                })?;
+                fairness_actions.push(action.clone());
+            }
+            "--max-model-states"
+            | "--max-model-transitions"
+            | "--max-model-depth"
+            | "--max-product-states"
+            | "--max-product-transitions"
+            | "--max-product-depth" => {
+                let value = args
+                    .get(index + 1)
+                    .ok_or_else(|| format!("option '{flag}' requires an integer value"))?;
+                let parsed = value
+                    .parse::<usize>()
+                    .map_err(|_| format!("option '{flag}' requires a non-negative integer"))?;
+                match flag {
+                    "--max-model-states" => {
+                        set_limit(&mut model_limits.max_states, parsed, flag)?;
+                        has_model_limits = true;
+                    }
+                    "--max-model-transitions" => {
+                        set_limit(&mut model_limits.max_transitions, parsed, flag)?;
+                        has_model_limits = true;
+                    }
+                    "--max-model-depth" => {
+                        set_limit(&mut model_limits.max_depth, parsed, flag)?;
+                        has_model_limits = true;
+                    }
+                    "--max-product-states" => {
+                        set_limit(&mut product_limits.max_states, parsed, flag)?;
+                        has_product_limits = true;
+                    }
+                    "--max-product-transitions" => {
+                        set_limit(&mut product_limits.max_transitions, parsed, flag)?;
+                        has_product_limits = true;
+                    }
+                    "--max-product-depth" => {
+                        set_limit(&mut product_limits.max_depth, parsed, flag)?;
+                        has_product_limits = true;
+                    }
+                    _ => unreachable!("temporal limit flag matched above"),
+                }
+            }
+            _ => return Err(format!("unknown option '{flag}'\n{}", usage())),
         }
-        let action = args
-            .get(index + 1)
-            .ok_or_else(|| "option '--weak-fair-action' requires an action value".to_owned())?;
-        actions.push(action.clone());
         index += 2;
     }
-    WeakFairness::new(actions).map_err(|error| error.to_string())
+
+    Ok(TemporalCliOptions {
+        fairness: WeakFairness::new(fairness_actions).map_err(|error| error.to_string())?,
+        model_limits,
+        product_limits,
+        has_model_limits,
+        has_product_limits,
+    })
 }
 
 fn parse_analysis_limits(args: &[String]) -> Result<AnalysisLimits, String> {
