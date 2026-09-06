@@ -1,6 +1,5 @@
 use formal_verification_lab::multi_response::{
-    check_multi_response_with_weak_fairness,
-    check_multi_response_with_weak_fairness_and_limits,
+    check_multi_response_with_weak_fairness, check_multi_response_with_weak_fairness_and_limits,
     check_multi_response_with_weak_fairness_and_product_limits,
 };
 use formal_verification_lab::multi_response_examples::unfair_dual_response_protocol;
@@ -146,7 +145,9 @@ fn taken_fair_action_does_not_hide_a_real_pending_clause_cycle() {
     };
     assert_eq!(clause, "class-b");
     assert!(cycle.iter().all(|step| step.state.pending[1]));
-    assert!(cycle.iter().any(|step| step.action.as_deref() == Some("tick")));
+    assert!(cycle
+        .iter()
+        .any(|step| step.action.as_deref() == Some("tick")));
 }
 
 #[test]
@@ -198,10 +199,7 @@ fn generous_product_limits_preserve_unbounded_fair_result_and_accounting() {
     };
 
     let bounded = check_multi_response_with_weak_fairness_and_product_limits(
-        &model,
-        &property,
-        &fairness,
-        generous,
+        &model, &property, &fairness, generous,
     )
     .unwrap();
 
