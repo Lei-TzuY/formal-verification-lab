@@ -7,10 +7,11 @@ use crate::buchi::{
     BuchiStatus, FiniteRunPolicy,
 };
 use crate::checker::{ExplorationLimits, TraceStep};
+use crate::fair_enablement::{bounded_enablement_graph, complete_enablement_graph};
 use crate::fairness::{weakly_fair_cycle, WeakFairness};
 use crate::graph::{
     capture_reachable_graph, capture_reachable_graph_with_limits, induced_graph, shortest_path,
-    GraphCaptureCompletion, ReachableGraph, SnapshotEdge,
+    GraphCaptureCompletion, ReachableGraph,
 };
 use crate::model::TransitionSystem;
 use crate::product::{
@@ -18,7 +19,6 @@ use crate::product::{
     BoundedActionProduct,
 };
 use crate::recurrence::{component_is_cyclic, strongly_connected_components, RecurrenceError};
-use std::collections::HashMap;
 use std::hash::Hash;
 
 /// Verify generalized Buchi acceptance under exact-action weak fairness while
@@ -64,7 +64,8 @@ where
         limits,
     );
     let retained_product_transitions = product.outgoing.iter().map(Vec::len).sum();
-    let enablement = complete_model_enablement_graph(&captured.graph, &product)?;
+    let enablement = complete_enablement_graph(&captured.graph, &product, |state| &state.state)
+        .ok_or(BuchiError::MissingWitness)?;
     let counterexample = find_bounded_fair_counterexample(
         &enablement,
         &product,
@@ -149,12 +150,14 @@ where
         limits.product,
     );
     let retained_product_transitions = product.outgoing.iter().map(Vec::len).sum();
-    let enablement = bounded_model_enablement_graph(
+    let enablement = bounded_enablement_graph(
         &captured.graph,
         &captured.complete_enabled_actions,
         &product,
         fairness,
-    )?;
+        |state| &state.state,
+    )
+    .ok_or(BuchiError::MissingWitness)?;
     let counterexample = find_bounded_fair_counterexample(
         &enablement,
         &product,
@@ -210,109 +213,6 @@ fn staged_fair_outcome(
         });
     }
     AnalysisOutcome::Conclusive(BuchiStatus::Satisfied)
-}
-
-/// Build an action-enable snapshot with exactly the product state's id space.
-/// Targets are intentionally self references: only action-label presence is
-/// consumed by `weakly_fair_cycle`; recurrent taken edges still come from the
-/// retained product residual itself.
-fn complete_model_enablement_graph<S, A>(
-    model_graph: &ReachableGraph<S>,
-    product: &ReachableGraph<BuchiProductState<S, A>>,
-) -> Result<ReachableGraph<BuchiProductState<S, A>>, BuchiError>
-where
-    S: Clone + Eq + Hash,
-    A: Clone,
-{
-    let model_ids = model_graph
-        .states
-        .iter()
-        .cloned()
-        .enumerate()
-        .map(|(id, state)| (state, id))
-        .collect::<HashMap<_, _>>();
-
-    let outgoing = product
-        .states
-        .iter()
-        .enumerate()
-        .map(|(product_id, state)| {
-            let model_id = model_ids
-                .get(&state.state)
-                .copied()
-                .ok_or(BuchiError::MissingWitness)?;
-            Ok(model_graph.outgoing[model_id]
-                .iter()
-                .map(|edge| SnapshotEdge {
-                    action: edge.action.clone(),
-                    target: product_id,
-                })
-                .collect::<Vec<_>>())
-        })
-        .collect::<Result<Vec<_>, BuchiError>>()?;
-
-    Ok(ReachableGraph {
-        states: product.states.clone(),
-        outgoing,
-        initial_ids: product.initial_ids.clone(),
-    })
-}
-
-/// Build conservative action-enable knowledge for a staged product. A complete
-/// successor vector supplies its exact action labels even when some of those
-/// model edges were not retained. Unknown successor vectors synthesize every
-/// configured fair action as enabled, which blocks false disabled-state proofs
-/// without inventing executable product edges.
-fn bounded_model_enablement_graph<S, A>(
-    model_graph: &ReachableGraph<S>,
-    complete_enabled_actions: &[Option<Vec<String>>],
-    product: &ReachableGraph<BuchiProductState<S, A>>,
-    fairness: &WeakFairness,
-) -> Result<ReachableGraph<BuchiProductState<S, A>>, BuchiError>
-where
-    S: Clone + Eq + Hash,
-    A: Clone,
-{
-    if complete_enabled_actions.len() != model_graph.states.len() {
-        return Err(BuchiError::MissingWitness);
-    }
-
-    let model_ids = model_graph
-        .states
-        .iter()
-        .cloned()
-        .enumerate()
-        .map(|(id, state)| (state, id))
-        .collect::<HashMap<_, _>>();
-
-    let outgoing = product
-        .states
-        .iter()
-        .enumerate()
-        .map(|(product_id, state)| {
-            let model_id = model_ids
-                .get(&state.state)
-                .copied()
-                .ok_or(BuchiError::MissingWitness)?;
-            let actions = complete_enabled_actions[model_id]
-                .as_ref()
-                .cloned()
-                .unwrap_or_else(|| fairness.actions().to_vec());
-            Ok(actions
-                .into_iter()
-                .map(|action| SnapshotEdge {
-                    action,
-                    target: product_id,
-                })
-                .collect::<Vec<_>>())
-        })
-        .collect::<Result<Vec<_>, BuchiError>>()?;
-
-    Ok(ReachableGraph {
-        states: product.states.clone(),
-        outgoing,
-        initial_ids: product.initial_ids.clone(),
-    })
 }
 
 fn find_bounded_fair_counterexample<S, A>(

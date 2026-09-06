@@ -60,6 +60,10 @@ impl<M> RejectCondition<M> {
     pub fn name(&self) -> &str {
         &self.name
     }
+
+    pub(crate) fn matches(&self, state: &M) -> bool {
+        (self.predicate)(state)
+    }
 }
 
 /// A named monitor region that may not contain a maximal suffix forever.
@@ -102,6 +106,10 @@ impl<M> ProgressCondition<M> {
 
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    pub(crate) fn is_active(&self, state: &M) -> bool {
+        (self.active)(state)
     }
 }
 
@@ -206,6 +214,10 @@ impl<M> FiniteMonitor<M> {
 
     pub fn progress(&self) -> &[ProgressCondition<M>] {
         &self.progress
+    }
+
+    pub(crate) fn advance(&self, state: &M, action: &str) -> M {
+        (self.step)(state, action)
     }
 }
 
