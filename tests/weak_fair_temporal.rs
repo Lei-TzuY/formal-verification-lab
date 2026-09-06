@@ -2,8 +2,8 @@ use formal_verification_lab::buchi_examples::unfair_second_pulse;
 use formal_verification_lab::response_examples::unfair_request_grant_protocol;
 use formal_verification_lab::{
     check_action_temporal, check_action_temporal_with_weak_fairness, ActionAtom,
-    ActionTemporalSpec, TemporalBackend, TemporalCounterexample, TemporalObligation, TemporalStatus,
-    WeakFairness,
+    ActionTemporalSpec, TemporalBackend, TemporalCounterexample, TemporalObligation,
+    TemporalStatus, WeakFairness,
 };
 
 fn pulse_spec() -> ActionTemporalSpec {
@@ -96,9 +96,7 @@ fn weak_fair_response_routes_through_the_response_backend() {
     .unwrap();
     assert_eq!(fair_wait.status, TemporalStatus::Violated);
     let Some(TemporalCounterexample::Infinite {
-        obligation,
-        cycle,
-        ..
+        obligation, cycle, ..
     }) = fair_wait.counterexample
     else {
         panic!("expected weakly fair response lasso");
