@@ -114,7 +114,9 @@ fn product_and_model_cutoffs_remain_inconclusive_with_provenance() {
     let product_report = stdout(&product);
     assert!(product_report.contains("temporal: INCONCLUSIVE"));
     assert!(product_report.contains("strong-fair action: \"grant\""));
-    assert!(product_report.contains("transition limit reached: 2"));
+    assert!(
+        product_report.contains("product inconclusive reason: transition limit reached (max 2)")
+    );
 
     let model = fvlab(&[
         "temporal",
@@ -127,8 +129,10 @@ fn product_and_model_cutoffs_remain_inconclusive_with_provenance() {
     assert_eq!(model.status.code(), Some(3));
     let model_report = stdout(&model);
     assert!(model_report.contains("temporal: INCONCLUSIVE"));
-    assert!(model_report.contains("inconclusive stage: model"));
-    assert!(model_report.contains("transition limit reached: 1"));
+    assert!(model_report.contains("analysis inconclusive stage: model"));
+    assert!(
+        model_report.contains("analysis inconclusive reason: transition limit reached (max 1)")
+    );
     assert!(model_report.contains("strong-fair action: \"grant\""));
 }
 
