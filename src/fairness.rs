@@ -343,6 +343,7 @@ mod tests {
     use super::{check_buchi_with_weak_fairness, weakly_fair_cycle, FairnessError, WeakFairness};
     use crate::buchi::{check_buchi, BuchiCounterexample, BuchiStatus, FiniteRunPolicy};
     use crate::buchi_examples::{finite_quiet_run, pulse_automaton, unfair_second_pulse};
+    use crate::checker::TraceStep;
     use crate::graph::{induced_graph, ReachableGraph, SnapshotEdge};
     use crate::recurrence::{component_is_cyclic, strongly_connected_components};
     use std::collections::HashSet;
