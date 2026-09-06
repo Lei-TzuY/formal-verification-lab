@@ -1,7 +1,15 @@
 use crate::bounded::{
     AnalysisInconclusiveReason, AnalysisLimits, AnalysisOutcome, AnalysisStage, BoundedOutcome,
 };
+use crate::bounded_fairness::{
+    check_buchi_with_weak_fairness_and_limits, check_buchi_with_weak_fairness_and_product_limits,
+};
+use crate::buchi::{
+    AcceptanceSet, AnalysisBuchiResult, BoundedBuchiResult, BuchiAutomaton, BuchiCounterexample,
+    BuchiError, BuchiProductState, BuchiResult, BuchiStatus, FiniteRunPolicy,
+};
 use crate::checker::{ExplorationLimits, TraceStep};
+use crate::fairness::{check_buchi_with_weak_fairness, WeakFairness};
 use crate::graph::{capture_reachable_graph, induced_graph, shortest_path, ReachableGraph};
 use crate::model::TransitionSystem;
 use crate::product::{
@@ -240,8 +248,10 @@ pub enum MultiResponseError {
     EmptyClauseName,
     DuplicateClauseName { name: String },
     Graph(RecurrenceError),
+    Buchi(BuchiError),
     MissingFiniteWitness,
     MissingCycleWitness,
+    FairnessAdapterInvariant,
 }
 
 impl fmt::Display for MultiResponseError {
@@ -254,6 +264,7 @@ impl fmt::Display for MultiResponseError {
                 write!(f, "duplicate response clause name '{name}'")
             }
             Self::Graph(error) => write!(f, "multi-response graph analysis failed: {error}"),
+            Self::Buchi(error) => write!(f, "weak-fair multi-response analysis failed: {error}"),
             Self::MissingFiniteWitness => write!(
                 f,
                 "pending terminal product state did not yield a counterexample trace"
@@ -261,6 +272,10 @@ impl fmt::Display for MultiResponseError {
             Self::MissingCycleWitness => write!(
                 f,
                 "pending cyclic product component did not yield a stem-plus-cycle counterexample"
+            ),
+            Self::FairnessAdapterInvariant => write!(
+                f,
+                "weak-fair multi-response adapter observed inconsistent clause state"
             ),
         }
     }
@@ -271,6 +286,12 @@ impl std::error::Error for MultiResponseError {}
 impl From<RecurrenceError> for MultiResponseError {
     fn from(value: RecurrenceError) -> Self {
         Self::Graph(value)
+    }
+}
+
+impl From<BuchiError> for MultiResponseError {
+    fn from(value: BuchiError) -> Self {
+        Self::Buchi(value)
     }
 }
 
@@ -463,6 +484,233 @@ where
         clause_count: property.clauses.len(),
         counterexample,
     })
+}
+
+/// Verify the conjunction of response clauses over executions admitted by an
+/// explicit exact-action weak-fairness contract.
+///
+/// Non-empty fairness is compiled to one generalized Buchi acceptance set per
+/// clause: clause `i` accepts exactly when its pending bit is false. This keeps
+/// infinite failure per clause rather than collapsing all pending bits into one
+/// condition. Finite terminals use the strict accepting-terminal policy, so a
+/// finite unanswered obligation remains a violation. Empty fairness delegates
+/// exactly to the historical M11 engine.
+pub fn check_multi_response_with_weak_fairness<S>(
+    model: &TransitionSystem<S>,
+    property: &MultiResponseProperty,
+    fairness: &WeakFairness,
+) -> Result<MultiResponseResult<S>, MultiResponseError>
+where
+    S: Clone + Eq + Hash,
+{
+    if fairness.is_empty() {
+        return check_multi_response(model, property);
+    }
+
+    let automaton = fair_multi_response_automaton(property)?;
+    let result = check_buchi_with_weak_fairness(model, &automaton, fairness)?;
+    normalize_fair_buchi_result(property, result)
+}
+
+/// Product-bounded weak-fair multi-response verification after complete model
+/// capture. Unknown product work remains `INCONCLUSIVE` unless a real weakly
+/// fair violating terminal/cycle is already justified by the retained prefix.
+pub fn check_multi_response_with_weak_fairness_and_product_limits<S>(
+    model: &TransitionSystem<S>,
+    property: &MultiResponseProperty,
+    fairness: &WeakFairness,
+    limits: ExplorationLimits,
+) -> Result<BoundedMultiResponseResult<S>, MultiResponseError>
+where
+    S: Clone + Eq + Hash,
+{
+    if fairness.is_empty() {
+        return check_multi_response_with_product_limits(model, property, limits);
+    }
+
+    let automaton = fair_multi_response_automaton(property)?;
+    let result =
+        check_buchi_with_weak_fairness_and_product_limits(model, &automaton, fairness, limits)?;
+    normalize_fair_bounded_buchi_result(property, result)
+}
+
+/// Staged model/product-bounded weak-fair multi-response verification. Fairness
+/// enablement provenance is inherited from the M33 bounded fair Buchi engine;
+/// unknown enablement can never be treated as proof that a fair action is
+/// disabled.
+pub fn check_multi_response_with_weak_fairness_and_limits<S>(
+    model: &TransitionSystem<S>,
+    property: &MultiResponseProperty,
+    fairness: &WeakFairness,
+    limits: AnalysisLimits,
+) -> Result<AnalysisMultiResponseResult<S>, MultiResponseError>
+where
+    S: Clone + Eq + Hash,
+{
+    if fairness.is_empty() {
+        return check_multi_response_with_limits(model, property, limits);
+    }
+
+    let automaton = fair_multi_response_automaton(property)?;
+    let result = check_buchi_with_weak_fairness_and_limits(model, &automaton, fairness, limits)?;
+    normalize_fair_analysis_buchi_result(property, result)
+}
+
+fn fair_multi_response_automaton(
+    property: &MultiResponseProperty,
+) -> Result<BuchiAutomaton<Vec<bool>>, MultiResponseError> {
+    let mut acceptance = Vec::with_capacity(property.clauses.len());
+    for (index, clause) in property.clauses.iter().enumerate() {
+        acceptance.push(AcceptanceSet::new(
+            clause.name.clone(),
+            move |pending: &Vec<bool>| !pending[index],
+        )?);
+    }
+
+    let name = format!("{}-weak-fair-response", property.name);
+    let initial = vec![false; property.clauses.len()];
+    let step_property = property.clone();
+    Ok(BuchiAutomaton::new(
+        name,
+        initial,
+        move |pending, action| next_pending(&step_property, pending, action),
+        acceptance,
+        FiniteRunPolicy::RequireAcceptingTerminal,
+    )?)
+}
+
+fn normalize_fair_buchi_result<S>(
+    property: &MultiResponseProperty,
+    result: BuchiResult<S, Vec<bool>>,
+) -> Result<MultiResponseResult<S>, MultiResponseError> {
+    Ok(MultiResponseResult {
+        property: property.name.clone(),
+        status: map_buchi_status(result.status),
+        model_states: result.model_states,
+        model_transitions: result.model_transitions,
+        product_states: result.product_states,
+        product_transitions: result.product_transitions,
+        clause_count: property.clauses.len(),
+        counterexample: collapse_fair_buchi_counterexample(property, result.counterexample)?,
+    })
+}
+
+fn normalize_fair_bounded_buchi_result<S>(
+    property: &MultiResponseProperty,
+    result: BoundedBuchiResult<S, Vec<bool>>,
+) -> Result<BoundedMultiResponseResult<S>, MultiResponseError> {
+    Ok(BoundedMultiResponseResult {
+        property: property.name.clone(),
+        outcome: match result.outcome {
+            BoundedOutcome::Conclusive(status) => {
+                BoundedOutcome::Conclusive(map_buchi_status(status))
+            }
+            BoundedOutcome::Inconclusive(reason) => BoundedOutcome::Inconclusive(reason),
+        },
+        model_states: result.model_states,
+        model_transitions: result.model_transitions,
+        product_states: result.product_states,
+        checked_product_states: result.checked_product_states,
+        explored_product_transitions: result.explored_product_transitions,
+        retained_product_transitions: result.retained_product_transitions,
+        max_product_depth_reached: result.max_product_depth_reached,
+        clause_count: property.clauses.len(),
+        counterexample: collapse_fair_buchi_counterexample(property, result.counterexample)?,
+    })
+}
+
+fn normalize_fair_analysis_buchi_result<S>(
+    property: &MultiResponseProperty,
+    result: AnalysisBuchiResult<S, Vec<bool>>,
+) -> Result<AnalysisMultiResponseResult<S>, MultiResponseError> {
+    Ok(AnalysisMultiResponseResult {
+        property: property.name.clone(),
+        outcome: match result.outcome {
+            AnalysisOutcome::Conclusive(status) => {
+                AnalysisOutcome::Conclusive(map_buchi_status(status))
+            }
+            AnalysisOutcome::Inconclusive(reason) => AnalysisOutcome::Inconclusive(reason),
+        },
+        model_completion: result.model_completion,
+        product_completion: result.product_completion,
+        model_states: result.model_states,
+        checked_model_states: result.checked_model_states,
+        explored_model_transitions: result.explored_model_transitions,
+        retained_model_transitions: result.retained_model_transitions,
+        max_model_depth_reached: result.max_model_depth_reached,
+        product_states: result.product_states,
+        checked_product_states: result.checked_product_states,
+        explored_product_transitions: result.explored_product_transitions,
+        retained_product_transitions: result.retained_product_transitions,
+        max_product_depth_reached: result.max_product_depth_reached,
+        clause_count: property.clauses.len(),
+        counterexample: collapse_fair_buchi_counterexample(property, result.counterexample)?,
+    })
+}
+
+fn map_buchi_status(status: BuchiStatus) -> MultiResponseStatus {
+    match status {
+        BuchiStatus::Satisfied => MultiResponseStatus::Satisfied,
+        BuchiStatus::Violated => MultiResponseStatus::Violated,
+    }
+}
+
+fn collapse_fair_buchi_counterexample<S>(
+    property: &MultiResponseProperty,
+    counterexample: Option<BuchiCounterexample<S, Vec<bool>>>,
+) -> Result<Option<MultiResponseCounterexample<S>>, MultiResponseError> {
+    match counterexample {
+        None => Ok(None),
+        Some(BuchiCounterexample::FiniteTerminal {
+            missing_acceptance,
+            trace,
+        }) => Ok(Some(MultiResponseCounterexample::Finite {
+            clause: fair_clause_name(property, &missing_acceptance)?,
+            trace: collapse_fair_buchi_trace(trace, property.clauses.len())?,
+        })),
+        Some(BuchiCounterexample::AcceptanceAvoidingCycle {
+            acceptance,
+            stem,
+            cycle,
+        }) => Ok(Some(MultiResponseCounterexample::Infinite {
+            clause: fair_clause_name(property, &acceptance)?,
+            stem: collapse_fair_buchi_trace(stem, property.clauses.len())?,
+            cycle: collapse_fair_buchi_trace(cycle, property.clauses.len())?,
+        })),
+    }
+}
+
+fn fair_clause_name(
+    property: &MultiResponseProperty,
+    acceptance: &str,
+) -> Result<String, MultiResponseError> {
+    property
+        .clauses
+        .iter()
+        .find(|clause| clause.name == acceptance)
+        .map(|clause| clause.name.clone())
+        .ok_or(MultiResponseError::FairnessAdapterInvariant)
+}
+
+fn collapse_fair_buchi_trace<S>(
+    trace: Vec<TraceStep<BuchiProductState<S, Vec<bool>>>>,
+    clause_count: usize,
+) -> Result<Vec<TraceStep<MultiObligationState<S>>>, MultiResponseError> {
+    trace
+        .into_iter()
+        .map(|step| {
+            if step.state.automaton.len() != clause_count {
+                return Err(MultiResponseError::FairnessAdapterInvariant);
+            }
+            Ok(TraceStep {
+                action: step.action,
+                state: MultiObligationState {
+                    state: step.state.state,
+                    pending: step.state.automaton,
+                },
+            })
+        })
+        .collect()
 }
 
 fn analysis_outcome(
