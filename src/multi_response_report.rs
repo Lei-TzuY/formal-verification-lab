@@ -13,7 +13,12 @@ pub fn render_multi_response_report<S: Debug>(
     result: &MultiResponseResult<S>,
 ) -> String {
     let mut output = String::new();
-    render_header(&mut output, model_name, &result.property, result.clause_count);
+    render_header(
+        &mut output,
+        model_name,
+        &result.property,
+        result.clause_count,
+    );
     writeln!(
         &mut output,
         "multi-response: {}",
@@ -47,7 +52,12 @@ pub fn render_bounded_multi_response_report<S: Debug>(
     result: &BoundedMultiResponseResult<S>,
 ) -> String {
     let mut output = String::new();
-    render_header(&mut output, model_name, &result.property, result.clause_count);
+    render_header(
+        &mut output,
+        model_name,
+        &result.property,
+        result.clause_count,
+    );
     match result.outcome {
         BoundedOutcome::Conclusive(status) => {
             writeln!(&mut output, "multi-response: {}", status_label(status))
