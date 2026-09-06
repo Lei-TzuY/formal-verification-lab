@@ -1,7 +1,10 @@
-use crate::checker::TraceStep;
+use crate::bounded::BoundedOutcome;
+use crate::checker::{ExplorationLimits, TraceStep};
 use crate::graph::{capture_reachable_graph, induced_graph, shortest_path, ReachableGraph};
 use crate::model::TransitionSystem;
-use crate::product::build_action_product;
+use crate::product::{
+    build_action_product, build_action_product_with_limits, BoundedActionProduct,
+};
 use crate::recurrence::{
     component_is_cyclic, cycle_witness, strongly_connected_components, RecurrenceError,
 };
@@ -199,6 +202,27 @@ pub struct BuchiResult<S, A> {
     pub counterexample: Option<BuchiCounterexample<S, A>>,
 }
 
+/// Generalized Büchi verification under deterministic product-space limits.
+///
+/// Model capture remains exhaustive; these counters describe only the bounded
+/// action-product phase. A retained real terminal/lasso may prove violation
+/// before a later cutoff, while satisfaction still requires product completion.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BoundedBuchiResult<S, A> {
+    pub automaton: String,
+    pub outcome: BoundedOutcome<BuchiStatus>,
+    pub finite_policy: FiniteRunPolicy,
+    pub acceptance_sets: usize,
+    pub model_states: usize,
+    pub model_transitions: usize,
+    pub product_states: usize,
+    pub checked_product_states: usize,
+    pub explored_product_transitions: usize,
+    pub retained_product_transitions: usize,
+    pub max_product_depth_reached: Option<usize>,
+    pub counterexample: Option<BuchiCounterexample<S, A>>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BuchiError {
     EmptyAutomatonName,
@@ -265,10 +289,105 @@ where
         |state, automaton| BuchiProductState { state, automaton },
     );
     let product_transitions = product.outgoing.iter().map(Vec::len).sum();
+    let known_terminal = product
+        .outgoing
+        .iter()
+        .map(Vec::is_empty)
+        .collect::<Vec<_>>();
+    let counterexample = find_counterexample(&product, &known_terminal, automaton)?;
 
+    Ok(BuchiResult {
+        automaton: automaton.name.clone(),
+        status: if counterexample.is_some() {
+            BuchiStatus::Violated
+        } else {
+            BuchiStatus::Satisfied
+        },
+        finite_policy: automaton.finite_policy,
+        acceptance_sets: automaton.acceptance.len(),
+        model_states: captured.discovered_states,
+        model_transitions: captured.explored_transitions,
+        product_states: product.states.len(),
+        product_transitions,
+        counterexample,
+    })
+}
+
+/// Verify generalized Büchi semantics while bounding only deterministic action-
+/// product construction after complete model capture.
+///
+/// Under `RequireAcceptingTerminal`, only a true underlying model terminal may
+/// witness finite failure. A retained real acceptance-avoiding closed cycle may
+/// likewise prove an infinite violation before a later cutoff. If no such real
+/// counterexample is present, an incomplete product yields the exact
+/// `Inconclusive` reason; satisfaction requires product completion.
+///
+/// When construction is incomplete, the lasso is deterministic evidence from
+/// the justified retained prefix; the unbounded/global shortest witness contract
+/// is retained when the product is complete.
+pub fn check_buchi_with_product_limits<S, A>(
+    model: &TransitionSystem<S>,
+    automaton: &BuchiAutomaton<A>,
+    limits: ExplorationLimits,
+) -> Result<BoundedBuchiResult<S, A>, BuchiError>
+where
+    S: Clone + Eq + Hash,
+    A: Clone + Eq + Hash,
+{
+    let captured = capture_reachable_graph(model).map_err(RecurrenceError::from)?;
+    let BoundedActionProduct {
+        graph: product,
+        checked_states,
+        explored_transitions,
+        max_depth_reached,
+        completion,
+        known_terminal,
+    } = build_action_product_with_limits(
+        &captured.graph,
+        &automaton.initial,
+        |state, action| (automaton.step)(state, action),
+        |state, automaton| BuchiProductState { state, automaton },
+        limits,
+    );
+    let retained_product_transitions = product.outgoing.iter().map(Vec::len).sum();
+    let counterexample = find_counterexample(&product, &known_terminal, automaton)?;
+    let outcome = if counterexample.is_some() {
+        BoundedOutcome::Conclusive(BuchiStatus::Violated)
+    } else {
+        match completion {
+            BoundedOutcome::Conclusive(()) => BoundedOutcome::Conclusive(BuchiStatus::Satisfied),
+            BoundedOutcome::Inconclusive(reason) => BoundedOutcome::Inconclusive(reason),
+        }
+    };
+
+    Ok(BoundedBuchiResult {
+        automaton: automaton.name.clone(),
+        outcome,
+        finite_policy: automaton.finite_policy,
+        acceptance_sets: automaton.acceptance.len(),
+        model_states: captured.discovered_states,
+        model_transitions: captured.explored_transitions,
+        product_states: product.states.len(),
+        checked_product_states: checked_states,
+        explored_product_transitions: explored_transitions,
+        retained_product_transitions,
+        max_product_depth_reached: max_depth_reached,
+        counterexample,
+    })
+}
+
+fn find_counterexample<S, A>(
+    product: &ReachableGraph<BuchiProductState<S, A>>,
+    known_terminal: &[bool],
+    automaton: &BuchiAutomaton<A>,
+) -> Result<Option<BuchiCounterexample<S, A>>, BuchiError>
+where
+    S: Clone + Eq + Hash,
+    A: Clone + Eq + Hash,
+{
     if automaton.finite_policy == FiniteRunPolicy::RequireAcceptingTerminal {
         for (product_id, state) in product.states.iter().enumerate() {
-            if !product.outgoing[product_id].is_empty() {
+            if !known_terminal[product_id] {
                 continue;
             }
             let Some(set) = automaton
@@ -278,19 +397,12 @@ where
             else {
                 continue;
             };
-            let trace = shortest_path(&product, &product.initial_ids, product_id, None)
+            let trace = shortest_path(product, &product.initial_ids, product_id, None)
                 .ok_or(BuchiError::MissingWitness)?;
-            return Ok(violation_result(
-                automaton,
-                captured.discovered_states,
-                captured.explored_transitions,
-                &product,
-                product_transitions,
-                BuchiCounterexample::FiniteTerminal {
-                    missing_acceptance: set.name.clone(),
-                    trace,
-                },
-            ));
+            return Ok(Some(BuchiCounterexample::FiniteTerminal {
+                missing_acceptance: set.name.clone(),
+                trace,
+            }));
         }
     }
 
@@ -311,7 +423,7 @@ where
             continue;
         }
 
-        let residual = induced_graph(&product, &included);
+        let residual = induced_graph(product, &included);
         let components = strongly_connected_components(&residual);
         for (component_index, component) in components.iter().enumerate() {
             if !component_is_cyclic(&residual, component) {
@@ -319,7 +431,7 @@ where
             }
             let entry = *component.first().ok_or(BuchiError::MissingWitness)?;
             let product_entry = old_ids[entry];
-            let stem = shortest_path(&product, &product.initial_ids, product_entry, None)
+            let stem = shortest_path(product, &product.initial_ids, product_entry, None)
                 .ok_or(BuchiError::MissingWitness)?;
             let candidate = CycleCandidate {
                 acceptance_index,
@@ -350,54 +462,16 @@ where
             &candidate.component,
         )?
         .ok_or(BuchiError::MissingWitness)?;
-        return Ok(violation_result(
-            automaton,
-            captured.discovered_states,
-            captured.explored_transitions,
-            &product,
-            product_transitions,
-            BuchiCounterexample::AcceptanceAvoidingCycle {
-                acceptance: automaton.acceptance[candidate.acceptance_index]
-                    .name
-                    .clone(),
-                stem: candidate.stem,
-                cycle: witness.cycle,
-            },
-        ));
+        return Ok(Some(BuchiCounterexample::AcceptanceAvoidingCycle {
+            acceptance: automaton.acceptance[candidate.acceptance_index]
+                .name
+                .clone(),
+            stem: candidate.stem,
+            cycle: witness.cycle,
+        }));
     }
 
-    Ok(BuchiResult {
-        automaton: automaton.name.clone(),
-        status: BuchiStatus::Satisfied,
-        finite_policy: automaton.finite_policy,
-        acceptance_sets: automaton.acceptance.len(),
-        model_states: captured.discovered_states,
-        model_transitions: captured.explored_transitions,
-        product_states: product.states.len(),
-        product_transitions,
-        counterexample: None,
-    })
-}
-
-fn violation_result<S, A>(
-    automaton: &BuchiAutomaton<A>,
-    model_states: usize,
-    model_transitions: usize,
-    product: &ReachableGraph<BuchiProductState<S, A>>,
-    product_transitions: usize,
-    counterexample: BuchiCounterexample<S, A>,
-) -> BuchiResult<S, A> {
-    BuchiResult {
-        automaton: automaton.name.clone(),
-        status: BuchiStatus::Violated,
-        finite_policy: automaton.finite_policy,
-        acceptance_sets: automaton.acceptance.len(),
-        model_states,
-        model_transitions,
-        product_states: product.states.len(),
-        product_transitions,
-        counterexample: Some(counterexample),
-    }
+    Ok(None)
 }
 
 struct CycleCandidate<S, A> {
