@@ -1,13 +1,14 @@
-use crate::bounded::BoundedOutcome;
+use crate::bounded::{AnalysisLimits, AnalysisOutcome, BoundedOutcome};
 use crate::buchi::{
-    check_buchi, check_buchi_with_product_limits, AcceptanceSet, BuchiAutomaton,
-    BuchiCounterexample, BuchiError, BuchiProductState, BuchiStatus, FiniteRunPolicy,
+    check_buchi, check_buchi_with_limits, check_buchi_with_product_limits, AcceptanceSet,
+    BuchiAutomaton, BuchiCounterexample, BuchiError, BuchiProductState, BuchiStatus,
+    FiniteRunPolicy,
 };
 use crate::checker::{ExplorationLimits, TraceStep};
 use crate::model::TransitionSystem;
 use crate::response::{
-    check_response, check_response_with_product_limits, ObligationState, ResponseCounterexample,
-    ResponseError, ResponseProperty, ResponseStatus,
+    check_response, check_response_with_limits, check_response_with_product_limits,
+    ObligationState, ResponseCounterexample, ResponseError, ResponseProperty, ResponseStatus,
 };
 use std::collections::HashSet;
 use std::fmt;
@@ -200,6 +201,27 @@ pub struct BoundedTemporalResult<S> {
     pub counterexample: Option<TemporalCounterexample<S>>,
 }
 
+/// Typed temporal result under independent model-capture and product budgets.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AnalysisTemporalResult<S> {
+    pub property: String,
+    pub backend: TemporalBackend,
+    pub outcome: AnalysisOutcome<TemporalStatus>,
+    pub model_completion: BoundedOutcome<()>,
+    pub product_completion: BoundedOutcome<()>,
+    pub model_states: usize,
+    pub checked_model_states: usize,
+    pub explored_model_transitions: usize,
+    pub retained_model_transitions: usize,
+    pub max_model_depth_reached: Option<usize>,
+    pub product_states: usize,
+    pub checked_product_states: usize,
+    pub explored_product_transitions: usize,
+    pub retained_product_transitions: usize,
+    pub max_product_depth_reached: Option<usize>,
+    pub counterexample: Option<TemporalCounterexample<S>>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TemporalError {
     EmptyPropertyName,
@@ -271,11 +293,6 @@ where
 
 /// Compile and verify one typed action-temporal specification while bounding
 /// only the shared action-product phase of the selected backend.
-///
-/// Model capture remains exhaustive. A real response or Büchi counterexample in
-/// the retained product prefix remains conclusive; otherwise an incomplete
-/// product is reported explicitly as `Inconclusive` and is never promoted to
-/// frontend satisfaction.
 pub fn check_action_temporal_with_product_limits<S>(
     model: &TransitionSystem<S>,
     spec: &ActionTemporalSpec,
@@ -290,6 +307,26 @@ where
         }
         ActionTemporalKind::AllInfinitelyOften { actions } => {
             check_recurring_spec_with_product_limits(model, spec, actions, limits)
+        }
+    }
+}
+
+/// Compile and verify one typed action-temporal specification under independent
+/// model-capture and product-construction budgets.
+pub fn check_action_temporal_with_limits<S>(
+    model: &TransitionSystem<S>,
+    spec: &ActionTemporalSpec,
+    limits: AnalysisLimits,
+) -> Result<AnalysisTemporalResult<S>, TemporalError>
+where
+    S: Clone + Eq + Hash,
+{
+    match &spec.kind {
+        ActionTemporalKind::Response { trigger, response } => {
+            check_response_spec_with_limits(model, spec, trigger, response, limits)
+        }
+        ActionTemporalKind::AllInfinitelyOften { actions } => {
+            check_recurring_spec_with_limits(model, spec, actions, limits)
         }
     }
 }
@@ -339,6 +376,40 @@ where
         outcome: map_bounded_response_outcome(result.outcome),
         model_states: result.model_states,
         model_transitions: result.model_transitions,
+        product_states: result.product_states,
+        checked_product_states: result.checked_product_states,
+        explored_product_transitions: result.explored_product_transitions,
+        retained_product_transitions: result.retained_product_transitions,
+        max_product_depth_reached: result.max_product_depth_reached,
+        counterexample,
+    })
+}
+
+fn check_response_spec_with_limits<S>(
+    model: &TransitionSystem<S>,
+    spec: &ActionTemporalSpec,
+    trigger: &ActionAtom,
+    response: &ActionAtom,
+    limits: AnalysisLimits,
+) -> Result<AnalysisTemporalResult<S>, TemporalError>
+where
+    S: Clone + Eq + Hash,
+{
+    let property = response_property(spec, trigger, response)?;
+    let result = check_response_with_limits(model, &property, limits)?;
+    let counterexample = normalize_response_counterexample(result.counterexample);
+
+    Ok(AnalysisTemporalResult {
+        property: result.property,
+        backend: TemporalBackend::Response,
+        outcome: map_analysis_response_outcome(result.outcome),
+        model_completion: result.model_completion,
+        product_completion: result.product_completion,
+        model_states: result.model_states,
+        checked_model_states: result.checked_model_states,
+        explored_model_transitions: result.explored_model_transitions,
+        retained_model_transitions: result.retained_model_transitions,
+        max_model_depth_reached: result.max_model_depth_reached,
         product_states: result.product_states,
         checked_product_states: result.checked_product_states,
         explored_product_transitions: result.explored_product_transitions,
@@ -399,6 +470,17 @@ fn map_bounded_response_outcome(
     }
 }
 
+fn map_analysis_response_outcome(
+    outcome: AnalysisOutcome<ResponseStatus>,
+) -> AnalysisOutcome<TemporalStatus> {
+    match outcome {
+        AnalysisOutcome::Conclusive(status) => {
+            AnalysisOutcome::Conclusive(map_response_status(status))
+        }
+        AnalysisOutcome::Inconclusive(reason) => AnalysisOutcome::Inconclusive(reason),
+    }
+}
+
 fn check_recurring_spec<S>(
     model: &TransitionSystem<S>,
     spec: &ActionTemporalSpec,
@@ -442,6 +524,39 @@ where
         outcome: map_bounded_buchi_outcome(result.outcome),
         model_states: result.model_states,
         model_transitions: result.model_transitions,
+        product_states: result.product_states,
+        checked_product_states: result.checked_product_states,
+        explored_product_transitions: result.explored_product_transitions,
+        retained_product_transitions: result.retained_product_transitions,
+        max_product_depth_reached: result.max_product_depth_reached,
+        counterexample,
+    })
+}
+
+fn check_recurring_spec_with_limits<S>(
+    model: &TransitionSystem<S>,
+    spec: &ActionTemporalSpec,
+    actions: &[ActionAtom],
+    limits: AnalysisLimits,
+) -> Result<AnalysisTemporalResult<S>, TemporalError>
+where
+    S: Clone + Eq + Hash,
+{
+    let automaton = recurring_automaton(spec, actions)?;
+    let result = check_buchi_with_limits(model, &automaton, limits)?;
+    let counterexample = normalize_buchi_counterexample(result.counterexample)?;
+
+    Ok(AnalysisTemporalResult {
+        property: result.automaton,
+        backend: TemporalBackend::Buchi,
+        outcome: map_analysis_buchi_outcome(result.outcome),
+        model_completion: result.model_completion,
+        product_completion: result.product_completion,
+        model_states: result.model_states,
+        checked_model_states: result.checked_model_states,
+        explored_model_transitions: result.explored_model_transitions,
+        retained_model_transitions: result.retained_model_transitions,
+        max_model_depth_reached: result.max_model_depth_reached,
         product_states: result.product_states,
         checked_product_states: result.checked_product_states,
         explored_product_transitions: result.explored_product_transitions,
@@ -513,6 +628,17 @@ fn map_bounded_buchi_outcome(
     match outcome {
         BoundedOutcome::Conclusive(status) => BoundedOutcome::Conclusive(map_buchi_status(status)),
         BoundedOutcome::Inconclusive(reason) => BoundedOutcome::Inconclusive(reason),
+    }
+}
+
+fn map_analysis_buchi_outcome(
+    outcome: AnalysisOutcome<BuchiStatus>,
+) -> AnalysisOutcome<TemporalStatus> {
+    match outcome {
+        AnalysisOutcome::Conclusive(status) => {
+            AnalysisOutcome::Conclusive(map_buchi_status(status))
+        }
+        AnalysisOutcome::Inconclusive(reason) => AnalysisOutcome::Inconclusive(reason),
     }
 }
 
