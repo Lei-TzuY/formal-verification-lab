@@ -1,8 +1,19 @@
+use crate::buchi::{
+    BuchiAutomaton, BuchiCounterexample, BuchiError, BuchiProductState, BuchiResult, BuchiStatus,
+    FiniteRunPolicy,
+};
 use crate::checker::TraceStep;
-use crate::graph::{shortest_path, ReachableGraph};
-use crate::recurrence::RecurrenceError;
+use crate::graph::{
+    capture_reachable_graph, induced_graph, shortest_path, ReachableGraph,
+};
+use crate::model::TransitionSystem;
+use crate::product::build_action_product;
+use crate::recurrence::{
+    component_is_cyclic, strongly_connected_components, RecurrenceError,
+};
 use std::collections::HashSet;
 use std::fmt;
+use std::hash::Hash;
 
 /// Exact-action weak-fairness assumptions for infinite executions.
 ///
@@ -69,6 +80,163 @@ impl fmt::Display for FairnessError {
 }
 
 impl std::error::Error for FairnessError {}
+
+/// Universally verify one generalized Büchi automaton while quantifying only
+/// over infinite executions that satisfy the configured exact-action weak
+/// fairness assumptions. Finite terminal policy remains unchanged by fairness.
+///
+/// The empty fairness set is an exact semantic compatibility path for
+/// `check_buchi`: it explores the same product and selects the same deterministic
+/// acceptance-avoiding lasso when one exists.
+pub fn check_buchi_with_weak_fairness<S, A>(
+    model: &TransitionSystem<S>,
+    automaton: &BuchiAutomaton<A>,
+    fairness: &WeakFairness,
+) -> Result<BuchiResult<S, A>, BuchiError>
+where
+    S: Clone + Eq + Hash,
+    A: Clone + Eq + Hash,
+{
+    let captured = capture_reachable_graph(model).map_err(RecurrenceError::from)?;
+    let product = build_action_product(
+        &captured.graph,
+        automaton.initial(),
+        |state, action| automaton.advance(state, action),
+        |state, automaton| BuchiProductState { state, automaton },
+    );
+    let product_transitions = product.outgoing.iter().map(Vec::len).sum();
+    let known_terminal = product
+        .outgoing
+        .iter()
+        .map(Vec::is_empty)
+        .collect::<Vec<_>>();
+    let counterexample = find_fair_buchi_counterexample(
+        &product,
+        &known_terminal,
+        automaton,
+        fairness,
+    )?;
+
+    Ok(BuchiResult {
+        automaton: automaton.name().to_owned(),
+        status: if counterexample.is_some() {
+            BuchiStatus::Violated
+        } else {
+            BuchiStatus::Satisfied
+        },
+        finite_policy: automaton.finite_policy(),
+        acceptance_sets: automaton.acceptance_sets().len(),
+        model_states: captured.discovered_states,
+        model_transitions: captured.explored_transitions,
+        product_states: product.states.len(),
+        product_transitions,
+        counterexample,
+    })
+}
+
+fn find_fair_buchi_counterexample<S, A>(
+    product: &ReachableGraph<BuchiProductState<S, A>>,
+    known_terminal: &[bool],
+    automaton: &BuchiAutomaton<A>,
+    fairness: &WeakFairness,
+) -> Result<Option<BuchiCounterexample<S, A>>, BuchiError>
+where
+    S: Clone + Eq + Hash,
+    A: Clone + Eq + Hash,
+{
+    if automaton.finite_policy() == FiniteRunPolicy::RequireAcceptingTerminal {
+        for (product_id, state) in product.states.iter().enumerate() {
+            if !known_terminal[product_id] {
+                continue;
+            }
+            let Some(set) = automaton
+                .acceptance_sets()
+                .iter()
+                .find(|set| !set.contains(&state.automaton))
+            else {
+                continue;
+            };
+            let trace = shortest_path(product, &product.initial_ids, product_id, None)
+                .ok_or(BuchiError::MissingWitness)?;
+            return Ok(Some(BuchiCounterexample::FiniteTerminal {
+                missing_acceptance: set.name().to_owned(),
+                trace,
+            }));
+        }
+    }
+
+    let mut best: Option<FairBuchiCandidate<S, A>> = None;
+    for (acceptance_index, set) in automaton.acceptance_sets().iter().enumerate() {
+        let included = product
+            .states
+            .iter()
+            .map(|state| !set.contains(&state.automaton))
+            .collect::<Vec<_>>();
+        let old_ids = included
+            .iter()
+            .enumerate()
+            .filter_map(|(id, included)| included.then_some(id))
+            .collect::<Vec<_>>();
+        if old_ids.is_empty() {
+            continue;
+        }
+
+        let residual = induced_graph(product, &included);
+        for component in strongly_connected_components(&residual) {
+            if !component_is_cyclic(&residual, &component) {
+                continue;
+            }
+            let Some(cycle) = weakly_fair_cycle(
+                product,
+                &residual,
+                &old_ids,
+                &component,
+                fairness,
+            )? else {
+                continue;
+            };
+            let entry = *component.first().ok_or(BuchiError::MissingWitness)?;
+            let product_entry = old_ids[entry];
+            let stem = shortest_path(product, &product.initial_ids, product_entry, None)
+                .ok_or(BuchiError::MissingWitness)?;
+            let candidate = FairBuchiCandidate {
+                acceptance_index,
+                product_entry,
+                stem,
+                cycle,
+            };
+            if best
+                .as_ref()
+                .is_none_or(|current| fair_candidate_key(&candidate) < fair_candidate_key(current))
+            {
+                best = Some(candidate);
+            }
+        }
+    }
+
+    Ok(best.map(|candidate| BuchiCounterexample::AcceptanceAvoidingCycle {
+        acceptance: automaton.acceptance_sets()[candidate.acceptance_index]
+            .name()
+            .to_owned(),
+        stem: candidate.stem,
+        cycle: candidate.cycle,
+    }))
+}
+
+struct FairBuchiCandidate<S, A> {
+    acceptance_index: usize,
+    product_entry: usize,
+    stem: Vec<TraceStep<BuchiProductState<S, A>>>,
+    cycle: Vec<TraceStep<BuchiProductState<S, A>>>,
+}
+
+fn fair_candidate_key<S, A>(candidate: &FairBuchiCandidate<S, A>) -> (usize, usize, usize) {
+    (
+        candidate.stem.len().saturating_sub(1),
+        candidate.acceptance_index,
+        candidate.product_entry,
+    )
+}
 
 /// Build a deterministic closed recurrent walk through one cyclic residual SCC
 /// that is weakly fair under every configured exact action.
@@ -182,7 +350,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{weakly_fair_cycle, FairnessError, WeakFairness};
+    use super::{check_buchi_with_weak_fairness, weakly_fair_cycle, FairnessError, WeakFairness};
+    use crate::buchi::{check_buchi, BuchiCounterexample, BuchiStatus, FiniteRunPolicy};
+    use crate::buchi_examples::{finite_quiet_run, pulse_automaton, unfair_second_pulse};
     use crate::graph::{induced_graph, ReachableGraph, SnapshotEdge};
     use crate::recurrence::{component_is_cyclic, strongly_connected_components};
     use std::collections::HashSet;
@@ -254,7 +424,7 @@ mod tests {
 
     fn assert_real_closed_fair_cycle(
         full: &ReachableGraph<usize>,
-        cycle: &[crate::checker::TraceStep<usize>],
+        cycle: &[TraceStep<usize>],
         fair_actions: &[&str],
     ) {
         assert!(cycle.len() >= 2);
@@ -409,5 +579,66 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn empty_fairness_exactly_preserves_existing_buchi_results() {
+        let fairness = WeakFairness::none();
+        for model in [unfair_second_pulse().unwrap(), finite_quiet_run().unwrap()] {
+            for policy in [
+                FiniteRunPolicy::IgnoreTerminals,
+                FiniteRunPolicy::RequireAcceptingTerminal,
+            ] {
+                let automaton = pulse_automaton(policy).unwrap();
+                assert_eq!(
+                    check_buchi_with_weak_fairness(&model, &automaton, &fairness).unwrap(),
+                    check_buchi(&model, &automaton).unwrap()
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn weak_fair_pulse_b_excludes_the_unfair_acceptance_avoiding_loop() {
+        let model = unfair_second_pulse().unwrap();
+        let automaton = pulse_automaton(FiniteRunPolicy::IgnoreTerminals).unwrap();
+        let ordinary = check_buchi(&model, &automaton).unwrap();
+        assert_eq!(ordinary.status, BuchiStatus::Violated);
+
+        let fairness = WeakFairness::new(["pulse-b"]).unwrap();
+        let fair = check_buchi_with_weak_fairness(&model, &automaton, &fairness).unwrap();
+        assert_eq!(fair.status, BuchiStatus::Satisfied);
+        assert!(fair.counterexample.is_none());
+    }
+
+    #[test]
+    fn fair_counterexample_itself_carries_the_required_taken_action() {
+        let model = unfair_second_pulse().unwrap();
+        let automaton = pulse_automaton(FiniteRunPolicy::IgnoreTerminals).unwrap();
+        let fairness = WeakFairness::new(["pulse-a"]).unwrap();
+        let result = check_buchi_with_weak_fairness(&model, &automaton, &fairness).unwrap();
+        assert_eq!(result.status, BuchiStatus::Violated);
+        let Some(BuchiCounterexample::AcceptanceAvoidingCycle { cycle, .. }) = result.counterexample
+        else {
+            panic!("expected fair acceptance-avoiding cycle");
+        };
+        assert!(cycle
+            .iter()
+            .skip(1)
+            .any(|step| step.action.as_deref() == Some("pulse-a")));
+        assert_eq!(cycle.first().unwrap().state, cycle.last().unwrap().state);
+    }
+
+    #[test]
+    fn weak_fairness_does_not_change_strict_finite_terminal_policy() {
+        let model = finite_quiet_run().unwrap();
+        let automaton = pulse_automaton(FiniteRunPolicy::RequireAcceptingTerminal).unwrap();
+        let fairness = WeakFairness::new(["pulse-a", "pulse-b"]).unwrap();
+        let result = check_buchi_with_weak_fairness(&model, &automaton, &fairness).unwrap();
+        assert_eq!(result.status, BuchiStatus::Violated);
+        assert!(matches!(
+            result.counterexample,
+            Some(BuchiCounterexample::FiniteTerminal { .. })
+        ));
     }
 }
