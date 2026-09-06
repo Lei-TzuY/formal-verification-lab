@@ -138,7 +138,9 @@ pub use reduction::{
 };
 pub use response::{
     check_response, check_response_with_limits, check_response_with_product_limits,
-    check_response_with_weak_fairness, check_response_with_weak_fairness_and_limits,
+    check_response_with_strong_fairness, check_response_with_strong_fairness_and_limits,
+    check_response_with_strong_fairness_and_product_limits, check_response_with_weak_fairness,
+    check_response_with_weak_fairness_and_limits,
     check_response_with_weak_fairness_and_product_limits, AnalysisResponseResult,
     BoundedResponseResult, ObligationState, ResponseCounterexample, ResponseError,
     ResponseProperty, ResponseResult, ResponseStatus,
