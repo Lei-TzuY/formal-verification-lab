@@ -865,12 +865,9 @@ where
             });
         }
 
-        let result = check_action_temporal_with_strong_fairness(
-            &model,
-            &spec,
-            &options.strong_fairness,
-        )
-        .map_err(|error| error.to_string())?;
+        let result =
+            check_action_temporal_with_strong_fairness(&model, &spec, &options.strong_fairness)
+                .map_err(|error| error.to_string())?;
         print!(
             "{}",
             render_strong_fair_temporal_report(model.name(), &result, &options.strong_fairness)
@@ -1108,13 +1105,14 @@ fn run_proposition_expression_file(
         });
     }
 
-    let limits = check_proposition_expression_property_with_limits(&document, &spec, parse_limits(option_args)?)
+    let limits = parse_limits(option_args)?;
+    let result = check_proposition_expression_property_with_limits(&document, &spec, limits)
         .map_err(|error| error.to_string())?;
     print!(
         "{}",
-        render_bounded_proposition_expression_report(document.model().name(), &limits)
+        render_bounded_proposition_expression_report(document.model().name(), &result)
     );
-    Ok(bounded_state_exit_code(&limits.outcome))
+    Ok(bounded_state_exit_code(&result.outcome))
 }
 
 fn run_safety_file(
