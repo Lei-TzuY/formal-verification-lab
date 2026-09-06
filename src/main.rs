@@ -683,10 +683,7 @@ where
     let limits = parse_product_limits(option_args)?;
     let result = check_action_temporal_with_product_limits(&model, &spec, limits)
         .map_err(|error| error.to_string())?;
-    print!(
-        "{}",
-        render_bounded_temporal_report(model.name(), &result)
-    );
+    print!("{}", render_bounded_temporal_report(model.name(), &result));
     Ok(match &result.outcome {
         BoundedOutcome::Conclusive(TemporalStatus::Satisfied) => ExitCode::SUCCESS,
         BoundedOutcome::Conclusive(TemporalStatus::Violated) => ExitCode::from(10),
