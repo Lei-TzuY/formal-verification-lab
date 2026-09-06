@@ -80,7 +80,10 @@ fn proven_strict_terminal_survives_later_model_cutoff() {
     )
     .unwrap();
 
-    assert_eq!(result.outcome, AnalysisOutcome::Conclusive(BuchiStatus::Violated));
+    assert_eq!(
+        result.outcome,
+        AnalysisOutcome::Conclusive(BuchiStatus::Violated)
+    );
     assert_eq!(
         result.model_completion,
         BoundedOutcome::Inconclusive(InconclusiveReason::DepthLimitReached { limit: 1 })
@@ -113,15 +116,16 @@ fn retained_acceptance_avoiding_cycle_survives_later_model_cutoff() {
     )
     .unwrap();
 
-    assert_eq!(result.outcome, AnalysisOutcome::Conclusive(BuchiStatus::Violated));
+    assert_eq!(
+        result.outcome,
+        AnalysisOutcome::Conclusive(BuchiStatus::Violated)
+    );
     assert_eq!(
         result.model_completion,
         BoundedOutcome::Inconclusive(InconclusiveReason::DepthLimitReached { limit: 1 })
     );
     let Some(BuchiCounterexample::AcceptanceAvoidingCycle {
-        acceptance,
-        cycle,
-        ..
+        acceptance, cycle, ..
     }) = result.counterexample
     else {
         panic!("expected acceptance-avoiding lasso");
