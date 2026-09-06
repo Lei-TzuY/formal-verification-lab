@@ -126,8 +126,8 @@ pub use safety::{
 pub use safety_report::render_safety_report;
 pub use temporal::{
     check_action_temporal, check_action_temporal_with_limits,
-    check_action_temporal_with_product_limits, check_action_temporal_with_weak_fairness, ActionAtom,
-    ActionTemporalSpec, AnalysisTemporalResult, BoundedTemporalResult, TemporalBackend,
+    check_action_temporal_with_product_limits, check_action_temporal_with_weak_fairness,
+    ActionAtom, ActionTemporalSpec, AnalysisTemporalResult, BoundedTemporalResult, TemporalBackend,
     TemporalCounterexample, TemporalError, TemporalObligation, TemporalResult, TemporalStatus,
 };
 pub use temporal_parse::{parse_action_temporal, TemporalParseError, TemporalParseErrorKind};
