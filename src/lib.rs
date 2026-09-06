@@ -17,6 +17,7 @@ pub mod eventuality_report;
 pub mod exact_state;
 pub mod exact_state_report;
 pub mod examples;
+pub mod fairness;
 mod graph;
 pub mod model;
 pub mod monitor;
@@ -72,6 +73,7 @@ pub use exact_state::{
     ExactStateStatus,
 };
 pub use exact_state_report::render_exact_state_report;
+pub use fairness::{FairnessError, WeakFairness};
 pub use model::{Invariant, ModelError, StateVariable, Transition, TransitionSystem};
 pub use monitor::{
     check_monitor, check_monitor_with_limits, check_monitor_with_product_limits,
