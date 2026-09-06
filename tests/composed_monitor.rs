@@ -26,10 +26,7 @@ fn monitor() -> FiniteMonitor<Control> {
             (Control::Rejected, _) => Control::Rejected,
             (state, _) => state,
         },
-        vec![RejectCondition::new("not-rejected", |state| {
-            *state == Control::Rejected
-        })
-        .unwrap()],
+        vec![RejectCondition::new("not-rejected", |state| *state == Control::Rejected).unwrap()],
         vec![ProgressCondition::new("active-eventually-clears", |state| {
             *state == Control::Active
         })
@@ -154,7 +151,9 @@ fn retained_progress_cycle_is_conclusive_before_later_model_cutoff() {
         panic!("expected progress-cycle witness");
     };
     assert_eq!(cycle.first().unwrap().state, cycle.last().unwrap().state);
-    assert!(cycle.iter().all(|step| step.state.monitor == Control::Active));
+    assert!(cycle
+        .iter()
+        .all(|step| step.state.monitor == Control::Active));
 }
 
 #[test]
