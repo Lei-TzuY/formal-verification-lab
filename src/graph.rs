@@ -53,6 +53,12 @@ pub(crate) struct BoundedCapturedReachableGraph<S> {
     pub(crate) complete_enabled_actions: Vec<Option<Vec<String>>>,
 }
 
+struct BoundedGraphMaterialization<S> {
+    graph: ReachableGraph<S>,
+    known_terminal: Vec<bool>,
+    complete_enabled_actions: Vec<Option<Vec<String>>>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum GraphCaptureError {
     Model(ModelError),
@@ -124,7 +130,11 @@ where
         GraphSearchOutcome::Inconclusive(reason) => GraphCaptureCompletion::Inconclusive(reason),
         GraphSearchOutcome::Match { .. } => return Err(GraphCaptureError::UnexpectedInconclusive),
     };
-    let (graph, known_terminal, complete_enabled_actions) = build_bounded_graph(
+    let BoundedGraphMaterialization {
+        graph,
+        known_terminal,
+        complete_enabled_actions,
+    } = build_bounded_graph(
         model,
         captured,
         search.discovered_states,
@@ -205,7 +215,7 @@ fn build_bounded_graph<S>(
     discovered_states: usize,
     explored_transitions: usize,
     limits: ExplorationLimits,
-) -> Result<(ReachableGraph<S>, Vec<bool>, Vec<Option<Vec<String>>>), GraphCaptureError>
+) -> Result<BoundedGraphMaterialization<S>, GraphCaptureError>
 where
     S: Clone + Eq + Hash,
 {
@@ -289,15 +299,15 @@ where
         return Err(GraphCaptureError::SnapshotTargetMissing);
     }
 
-    Ok((
-        ReachableGraph {
+    Ok(BoundedGraphMaterialization {
+        graph: ReachableGraph {
             states,
             outgoing,
             initial_ids,
         },
         known_terminal,
         complete_enabled_actions,
-    ))
+    })
 }
 
 /// Build a dense graph induced by `included`, preserving original discovery
