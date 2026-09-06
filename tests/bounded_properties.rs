@@ -225,10 +225,7 @@ fn oracle_eventuality(
     }
     while let Some(from) = queue.pop_front() {
         for to in 0..2 {
-            if captured.observed[from][to]
-                && target_mask & (1 << to) == 0
-                && !residual[to]
-            {
+            if captured.observed[from][to] && target_mask & (1 << to) == 0 && !residual[to] {
                 residual[to] = true;
                 queue.push_back(to);
             }
@@ -304,7 +301,8 @@ fn limit_profiles() -> Vec<ExplorationLimits> {
 }
 
 fn generated_model(mask: u8) -> formal_verification_lab::TransitionSystem<String> {
-    let mut input = String::from("model \"bounded-oracle\"\nstate \"s0\"\nstate \"s1\"\ninitial \"s0\"\n");
+    let mut input =
+        String::from("model \"bounded-oracle\"\nstate \"s0\"\nstate \"s1\"\ninitial \"s0\"\n");
     for from in 0..2 {
         for to in 0..2 {
             if mask & (1 << (from * 2 + to)) != 0 {
@@ -332,7 +330,10 @@ fn generated_bounded_backend_oracle_matches_reachability_and_eventuality() {
                 })
                 .unwrap();
                 let actual = check_reachability_with_limits(&model, &property, profile).unwrap();
-                assert_eq!(actual.outcome, expected.outcome, "reach mask={mask} target={target_mask} limits={profile:?}");
+                assert_eq!(
+                    actual.outcome, expected.outcome,
+                    "reach mask={mask} target={target_mask} limits={profile:?}"
+                );
                 assert_eq!(actual.discovered_states, expected.discovered_states);
                 assert_eq!(actual.checked_states, expected.checked_states);
                 assert_eq!(actual.explored_transitions, expected.explored_transitions);
@@ -345,14 +346,18 @@ fn generated_bounded_backend_oracle_matches_reachability_and_eventuality() {
                 reachability_cases += 1;
 
                 let model = generated_model(mask);
-                let property = EventualityProperty::new("bounded-eventually", move |state: &String| {
-                    let index = state.strip_prefix('s').unwrap().parse::<u8>().unwrap();
-                    target_mask & (1 << index) != 0
-                })
-                .unwrap();
+                let property =
+                    EventualityProperty::new("bounded-eventually", move |state: &String| {
+                        let index = state.strip_prefix('s').unwrap().parse::<u8>().unwrap();
+                        target_mask & (1 << index) != 0
+                    })
+                    .unwrap();
                 let actual = check_eventuality_with_limits(&model, &property, profile).unwrap();
                 let expected = oracle_eventuality(mask, target_mask, profile);
-                assert_eq!(actual.outcome, expected, "eventuality mask={mask} target={target_mask} limits={profile:?}");
+                assert_eq!(
+                    actual.outcome, expected,
+                    "eventuality mask={mask} target={target_mask} limits={profile:?}"
+                );
                 if let BoundedOutcome::Conclusive(EventualityStatus::Violated) = actual.outcome {
                     assert!(actual.counterexample.is_some());
                 }
@@ -450,7 +455,10 @@ fn bounded_frontends_propagate_inconclusive_without_fabricating_evidence() {
 
     let exact = ExactStatePropertySpec::reachable("reach-done", "done").unwrap();
     let result = check_exact_state_property_with_limits(document.model(), &exact, limits).unwrap();
-    assert!(matches!(result.outcome, BoundedOutcome::Inconclusive(InconclusiveReason::DepthLimitReached { limit: 0 })));
+    assert!(matches!(
+        result.outcome,
+        BoundedOutcome::Inconclusive(InconclusiveReason::DepthLimitReached { limit: 0 })
+    ));
     assert!(result.evidence.is_none());
 
     let proposition = PropositionPropertySpec::reachable("reach-complete", "complete").unwrap();
