@@ -392,7 +392,7 @@ impl fmt::Display for ExactStateParseError {
             ExactStateParseErrorKind::UnknownOperator { operator } => {
                 write!(f, "unsupported exact-state operator '{operator}'")
             }
-            ExactStateParseErrorKind::ExpectedOpenParen => write!(f, "expected '('") ,
+            ExactStateParseErrorKind::ExpectedOpenParen => write!(f, "expected '('"),
             ExactStateParseErrorKind::ExpectedString => {
                 write!(f, "expected a double-quoted exact state id")
             }
@@ -402,7 +402,7 @@ impl fmt::Display for ExactStateParseError {
             ExactStateParseErrorKind::InvalidEscape { escape } => {
                 write!(f, "unsupported string escape '\\{escape}'")
             }
-            ExactStateParseErrorKind::ExpectedCommaOrClose => write!(f, "expected ',' or ')'") ,
+            ExactStateParseErrorKind::ExpectedCommaOrClose => write!(f, "expected ',' or ')'"),
             ExactStateParseErrorKind::WrongArity {
                 operator,
                 expected,
