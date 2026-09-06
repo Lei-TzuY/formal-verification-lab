@@ -99,12 +99,9 @@ fn matching_fair_exit_eliminates_the_unfair_progress_lasso() {
         Some(MonitorCounterexample::ProgressCycle { .. })
     ));
 
-    let fair = check_monitor_with_weak_fairness(
-        &model,
-        &monitor,
-        &WeakFairness::new(["finish"]).unwrap(),
-    )
-    .unwrap();
+    let fair =
+        check_monitor_with_weak_fairness(&model, &monitor, &WeakFairness::new(["finish"]).unwrap())
+            .unwrap();
     assert_eq!(fair.status, MonitorStatus::Satisfied);
     assert!(fair.counterexample.is_none());
 }
@@ -150,12 +147,9 @@ fn rejecting_state_precedence_is_unchanged_by_fairness() {
     let model = invalid_double_open_protocol().unwrap();
     let monitor = session_monitor().unwrap();
     let historical = check_monitor(&model, &monitor).unwrap();
-    let fair = check_monitor_with_weak_fairness(
-        &model,
-        &monitor,
-        &WeakFairness::new(["close"]).unwrap(),
-    )
-    .unwrap();
+    let fair =
+        check_monitor_with_weak_fairness(&model, &monitor, &WeakFairness::new(["close"]).unwrap())
+            .unwrap();
 
     assert_eq!(fair, historical);
     assert!(matches!(
@@ -169,12 +163,9 @@ fn finite_active_terminal_is_unchanged_by_fairness() {
     let model = active_terminal_model();
     let monitor = progress_monitor();
     let historical = check_monitor(&model, &monitor).unwrap();
-    let fair = check_monitor_with_weak_fairness(
-        &model,
-        &monitor,
-        &WeakFairness::new(["finish"]).unwrap(),
-    )
-    .unwrap();
+    let fair =
+        check_monitor_with_weak_fairness(&model, &monitor, &WeakFairness::new(["finish"]).unwrap())
+            .unwrap();
 
     assert_eq!(fair, historical);
     assert!(matches!(
@@ -210,13 +201,8 @@ fn empty_fairness_is_exact_compatibility_for_all_limit_surfaces() {
         check_monitor_with_product_limits(&model, &monitor, product_limits).unwrap()
     );
     assert_eq!(
-        check_monitor_with_weak_fairness_and_limits(
-            &model,
-            &monitor,
-            &fairness,
-            analysis_limits,
-        )
-        .unwrap(),
+        check_monitor_with_weak_fairness_and_limits(&model, &monitor, &fairness, analysis_limits,)
+            .unwrap(),
         check_monitor_with_limits(&model, &monitor, analysis_limits).unwrap()
     );
 }
@@ -289,7 +275,10 @@ fn unbounded_staged_fair_analysis_matches_unbounded_fair_result_and_evidence() {
         AnalysisOutcome::Conclusive(unbounded.status)
     );
     assert_eq!(staged.model_states, unbounded.model_states);
-    assert_eq!(staged.explored_model_transitions, unbounded.model_transitions);
+    assert_eq!(
+        staged.explored_model_transitions,
+        unbounded.model_transitions
+    );
     assert_eq!(staged.product_states, unbounded.product_states);
     assert_eq!(
         staged.retained_product_transitions,
