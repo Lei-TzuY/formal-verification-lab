@@ -1,10 +1,11 @@
-use crate::bounded::BoundedOutcome;
+use crate::bounded::{AnalysisLimits, AnalysisOutcome, BoundedOutcome};
 use crate::checker::{ExplorationLimits, TraceStep};
 use crate::model::TransitionSystem;
 use crate::multi_response::{
-    check_multi_response, check_multi_response_with_product_limits, BoundedMultiResponseResult,
-    MultiObligationState, MultiResponseCounterexample, MultiResponseError, MultiResponseProperty,
-    MultiResponseStatus,
+    check_multi_response, check_multi_response_with_limits,
+    check_multi_response_with_product_limits, AnalysisMultiResponseResult,
+    BoundedMultiResponseResult, MultiObligationState, MultiResponseCounterexample,
+    MultiResponseError, MultiResponseProperty, MultiResponseStatus,
 };
 use crate::recurrence::RecurrenceError;
 use std::fmt;
@@ -112,6 +113,27 @@ pub struct BoundedResponseResult<S> {
     pub counterexample: Option<ResponseCounterexample<S>>,
 }
 
+/// Single-clause response result under independently configured model and
+/// product exploration budgets.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AnalysisResponseResult<S> {
+    pub property: String,
+    pub outcome: AnalysisOutcome<ResponseStatus>,
+    pub model_completion: BoundedOutcome<()>,
+    pub product_completion: BoundedOutcome<()>,
+    pub model_states: usize,
+    pub checked_model_states: usize,
+    pub explored_model_transitions: usize,
+    pub retained_model_transitions: usize,
+    pub max_model_depth_reached: Option<usize>,
+    pub product_states: usize,
+    pub checked_product_states: usize,
+    pub explored_product_transitions: usize,
+    pub retained_product_transitions: usize,
+    pub max_product_depth_reached: Option<usize>,
+    pub counterexample: Option<ResponseCounterexample<S>>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ResponseError {
     EmptyPropertyName,
@@ -195,6 +217,23 @@ where
     normalize_bounded_result(result)
 }
 
+/// Verify a single response obligation under independent model-capture and
+/// product-construction limits. A justified finite/cyclic violation remains
+/// conclusive from a prefix; satisfaction requires both stages to complete.
+pub fn check_response_with_limits<S>(
+    model: &TransitionSystem<S>,
+    property: &ResponseProperty,
+    limits: AnalysisLimits,
+) -> Result<AnalysisResponseResult<S>, ResponseError>
+where
+    S: Clone + Eq + Hash,
+{
+    let multi_property = single_multi_property(property);
+    let result = check_multi_response_with_limits(model, &multi_property, limits)
+        .map_err(map_multi_error)?;
+    normalize_analysis_result(result)
+}
+
 fn single_multi_property(property: &ResponseProperty) -> MultiResponseProperty {
     MultiResponseProperty::from_single_shared(
         property.name.clone(),
@@ -217,6 +256,34 @@ fn normalize_bounded_result<S>(
         outcome,
         model_states: result.model_states,
         model_transitions: result.model_transitions,
+        product_states: result.product_states,
+        checked_product_states: result.checked_product_states,
+        explored_product_transitions: result.explored_product_transitions,
+        retained_product_transitions: result.retained_product_transitions,
+        max_product_depth_reached: result.max_product_depth_reached,
+        counterexample,
+    })
+}
+
+fn normalize_analysis_result<S>(
+    result: AnalysisMultiResponseResult<S>,
+) -> Result<AnalysisResponseResult<S>, ResponseError> {
+    let counterexample = collapse_counterexample(result.counterexample)?;
+    let outcome = match result.outcome {
+        AnalysisOutcome::Conclusive(status) => AnalysisOutcome::Conclusive(map_status(status)),
+        AnalysisOutcome::Inconclusive(reason) => AnalysisOutcome::Inconclusive(reason),
+    };
+
+    Ok(AnalysisResponseResult {
+        property: result.property,
+        outcome,
+        model_completion: result.model_completion,
+        product_completion: result.product_completion,
+        model_states: result.model_states,
+        checked_model_states: result.checked_model_states,
+        explored_model_transitions: result.explored_model_transitions,
+        retained_model_transitions: result.retained_model_transitions,
+        max_model_depth_reached: result.max_model_depth_reached,
         product_states: result.product_states,
         checked_product_states: result.checked_product_states,
         explored_product_transitions: result.explored_product_transitions,

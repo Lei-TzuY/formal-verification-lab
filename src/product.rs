@@ -1,6 +1,10 @@
-use crate::bounded::BoundedOutcome;
+use crate::bounded::{AnalysisLimits, BoundedOutcome};
 use crate::checker::{ExplorationLimits, InconclusiveReason};
-use crate::graph::{ReachableGraph, SnapshotEdge};
+use crate::graph::{
+    capture_reachable_graph_with_limits, GraphCaptureCompletion, GraphCaptureError, ReachableGraph,
+    SnapshotEdge,
+};
+use crate::model::TransitionSystem;
 use std::collections::{HashMap, VecDeque};
 use std::hash::Hash;
 
@@ -12,8 +16,21 @@ pub(crate) struct BoundedActionProduct<P> {
     pub(crate) max_depth_reached: Option<usize>,
     pub(crate) completion: BoundedOutcome<()>,
     /// True only for retained product states whose underlying model state is a
-    /// real terminal in the complete captured model graph.
+    /// terminal justified by the model snapshot used to construct the product.
     pub(crate) known_terminal: Vec<bool>,
+}
+
+/// Shared result of staged bounded model capture followed by bounded product
+/// construction. This is the M28 trust boundary reused by temporal consumers.
+#[derive(Debug, Clone)]
+pub(crate) struct StagedActionProduct<P> {
+    pub(crate) product: BoundedActionProduct<P>,
+    pub(crate) model_discovered_states: usize,
+    pub(crate) model_checked_states: usize,
+    pub(crate) model_explored_transitions: usize,
+    pub(crate) model_retained_transitions: usize,
+    pub(crate) model_max_depth_reached: Option<usize>,
+    pub(crate) model_completion: BoundedOutcome<()>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -67,12 +84,8 @@ where
 /// Materialize a deterministic prefix of an action product under product-space
 /// state, transition, and depth limits.
 ///
-/// The supplied model graph is already complete. Limits therefore apply only
-/// to product construction, not to model capture. A counted transition whose
-/// previously unseen target is blocked by a state/depth limit is not inserted
-/// into the retained graph. `known_terminal` is derived from the complete model
-/// graph, so a cutoff can never turn a partially expanded product state into a
-/// fabricated finite terminal.
+/// The supplied model graph is complete. Limits therefore apply only to product
+/// construction. Terminal knowledge is derived from that complete graph.
 pub(crate) fn build_action_product_with_limits<S, C, P, Step, Lift>(
     graph: &ReachableGraph<S>,
     initial_control: &C,
@@ -86,6 +99,80 @@ where
     Step: Fn(&C, &str) -> C,
     Lift: Fn(S, C) -> P,
 {
+    let known_terminal = graph.outgoing.iter().map(Vec::is_empty).collect::<Vec<_>>();
+    build_action_product_from_prefix_with_limits(
+        graph,
+        &known_terminal,
+        initial_control,
+        step,
+        lift,
+        limits,
+    )
+}
+
+/// Compose canonical bounded model capture with bounded action-product
+/// construction without pretending that the captured model prefix is complete.
+///
+/// Real retained model edges may still support conclusive counterexamples.
+/// Terminal facts are propagated explicitly from bounded model capture so a
+/// missing edge caused by a model cutoff can never fabricate a product terminal.
+pub(crate) fn build_action_product_with_analysis_limits<S, C, P, Step, Lift>(
+    model: &TransitionSystem<S>,
+    initial_control: &C,
+    step: Step,
+    lift: Lift,
+    limits: AnalysisLimits,
+) -> Result<StagedActionProduct<P>, GraphCaptureError>
+where
+    S: Clone + Eq + Hash,
+    C: Clone + Eq + Hash,
+    Step: Fn(&C, &str) -> C,
+    Lift: Fn(S, C) -> P,
+{
+    let captured = capture_reachable_graph_with_limits(model, limits.model)?;
+    let model_retained_transitions = captured.graph.outgoing.iter().map(Vec::len).sum();
+    let model_completion = match captured.completion {
+        GraphCaptureCompletion::Complete => BoundedOutcome::Conclusive(()),
+        GraphCaptureCompletion::Inconclusive(reason) => BoundedOutcome::Inconclusive(reason),
+    };
+    let product = build_action_product_from_prefix_with_limits(
+        &captured.graph,
+        &captured.known_terminal,
+        initial_control,
+        step,
+        lift,
+        limits.product,
+    );
+
+    Ok(StagedActionProduct {
+        product,
+        model_discovered_states: captured.discovered_states,
+        model_checked_states: captured.checked_states,
+        model_explored_transitions: captured.explored_transitions,
+        model_retained_transitions,
+        model_max_depth_reached: captured.max_depth_reached,
+        model_completion,
+    })
+}
+
+/// Build a product over a justified model prefix whose terminal knowledge is
+/// supplied separately from the prefix's outgoing adjacency.
+fn build_action_product_from_prefix_with_limits<S, C, P, Step, Lift>(
+    graph: &ReachableGraph<S>,
+    model_known_terminal: &[bool],
+    initial_control: &C,
+    step: Step,
+    lift: Lift,
+    limits: ExplorationLimits,
+) -> BoundedActionProduct<P>
+where
+    S: Clone,
+    C: Clone + Eq + Hash,
+    Step: Fn(&C, &str) -> C,
+    Lift: Fn(S, C) -> P,
+{
+    assert_eq!(model_known_terminal.len(), graph.states.len());
+
     let mut states = Vec::new();
     let mut outgoing: Vec<Vec<SnapshotEdge>> = Vec::new();
     let mut initial_ids = Vec::new();
@@ -122,7 +209,7 @@ where
             ids.insert(key, id);
             states.push(lift(graph.states[model_id].clone(), control.clone()));
             outgoing.push(Vec::new());
-            known_terminal.push(graph.outgoing[model_id].is_empty());
+            known_terminal.push(model_known_terminal[model_id]);
             model_ids.push(model_id);
             controls.push(control);
             depths.push(0_usize);
@@ -204,7 +291,7 @@ where
                     next_control.clone(),
                 ));
                 outgoing.push(Vec::new());
-                known_terminal.push(graph.outgoing[edge.target].is_empty());
+                known_terminal.push(model_known_terminal[edge.target]);
                 model_ids.push(edge.target);
                 controls.push(next_control);
                 depths.push(depth + 1);

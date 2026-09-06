@@ -43,7 +43,9 @@ pub mod temporal;
 pub mod temporal_parse;
 pub mod temporal_report;
 
-pub use bounded::BoundedOutcome;
+pub use bounded::{
+    AnalysisInconclusiveReason, AnalysisLimits, AnalysisOutcome, AnalysisStage, BoundedOutcome,
+};
 pub use buchi::{
     check_buchi, AcceptanceSet, BuchiAutomaton, BuchiCounterexample, BuchiError, BuchiProductState,
     BuchiResult, BuchiStatus, FiniteRunPolicy,
@@ -78,8 +80,9 @@ pub use monitor::{
 };
 pub use monitor_report::{render_bounded_monitor_report, render_monitor_report};
 pub use multi_response::{
-    check_multi_response, MultiObligationState, MultiResponseCounterexample, MultiResponseError,
-    MultiResponseProperty, MultiResponseResult, MultiResponseStatus, ResponseClause,
+    check_multi_response, check_multi_response_with_limits, AnalysisMultiResponseResult,
+    MultiObligationState, MultiResponseCounterexample, MultiResponseError, MultiResponseProperty,
+    MultiResponseResult, MultiResponseStatus, ResponseClause,
 };
 pub use multi_response_report::render_multi_response_report;
 pub use property::{
@@ -109,8 +112,8 @@ pub use reduction::{
     ReductionAudit, ReductionAuditError,
 };
 pub use response::{
-    check_response, ObligationState, ResponseCounterexample, ResponseError, ResponseProperty,
-    ResponseResult, ResponseStatus,
+    check_response, check_response_with_limits, AnalysisResponseResult, ObligationState,
+    ResponseCounterexample, ResponseError, ResponseProperty, ResponseResult, ResponseStatus,
 };
 pub use response_report::render_response_report;
 pub use safety::{
