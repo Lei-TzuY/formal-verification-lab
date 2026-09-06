@@ -51,12 +51,9 @@ fn generous_limits() -> ExplorationLimits {
 #[test]
 fn bounded_response_frontend_reports_product_inconclusive_without_false_proof() {
     let model = request_grant_protocol().unwrap();
-    let result = check_action_temporal_with_product_limits(
-        &model,
-        &response_spec(),
-        max_product_states(1),
-    )
-    .unwrap();
+    let result =
+        check_action_temporal_with_product_limits(&model, &response_spec(), max_product_states(1))
+            .unwrap();
 
     assert_eq!(result.backend, TemporalBackend::Response);
     assert_eq!(
@@ -99,18 +96,17 @@ fn bounded_response_frontend_preserves_real_cycle_before_later_cutoff() {
     assert_eq!(obligation, TemporalObligation::Response);
     assert_eq!(stem.last().unwrap().state, cycle.first().unwrap().state);
     assert_eq!(cycle.first().unwrap().state, cycle.last().unwrap().state);
-    assert!(cycle.iter().any(|step| step.action.as_deref() == Some("wait")));
+    assert!(cycle
+        .iter()
+        .any(|step| step.action.as_deref() == Some("wait")));
 }
 
 #[test]
 fn bounded_recurring_frontend_reports_product_inconclusive_without_false_satisfaction() {
     let model = alternating_pulses().unwrap();
-    let result = check_action_temporal_with_product_limits(
-        &model,
-        &pulse_spec(),
-        max_product_states(1),
-    )
-    .unwrap();
+    let result =
+        check_action_temporal_with_product_limits(&model, &pulse_spec(), max_product_states(1))
+            .unwrap();
 
     assert_eq!(result.backend, TemporalBackend::Buchi);
     assert_eq!(
@@ -174,17 +170,26 @@ fn generous_product_limits_match_existing_unbounded_frontend_results() {
     );
     assert_eq!(response_bounded.backend, response_unbounded.backend);
     assert_eq!(response_bounded.property, response_unbounded.property);
-    assert_eq!(response_bounded.model_states, response_unbounded.model_states);
+    assert_eq!(
+        response_bounded.model_states,
+        response_unbounded.model_states
+    );
     assert_eq!(
         response_bounded.model_transitions,
         response_unbounded.model_transitions
     );
-    assert_eq!(response_bounded.product_states, response_unbounded.product_states);
+    assert_eq!(
+        response_bounded.product_states,
+        response_unbounded.product_states
+    );
     assert_eq!(
         response_bounded.retained_product_transitions,
         response_unbounded.product_transitions
     );
-    assert_eq!(response_bounded.counterexample, response_unbounded.counterexample);
+    assert_eq!(
+        response_bounded.counterexample,
+        response_unbounded.counterexample
+    );
 
     let pulse_model = unfair_second_pulse().unwrap();
     let pulse_spec = pulse_spec();
@@ -199,7 +204,10 @@ fn generous_product_limits_match_existing_unbounded_frontend_results() {
     assert_eq!(pulse_bounded.backend, pulse_unbounded.backend);
     assert_eq!(pulse_bounded.property, pulse_unbounded.property);
     assert_eq!(pulse_bounded.model_states, pulse_unbounded.model_states);
-    assert_eq!(pulse_bounded.model_transitions, pulse_unbounded.model_transitions);
+    assert_eq!(
+        pulse_bounded.model_transitions,
+        pulse_unbounded.model_transitions
+    );
     assert_eq!(pulse_bounded.product_states, pulse_unbounded.product_states);
     assert_eq!(
         pulse_bounded.retained_product_transitions,
