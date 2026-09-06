@@ -560,9 +560,11 @@ fn collapse_trace<S>(
 fn map_multi_error(error: MultiResponseError) -> ResponseError {
     match error {
         MultiResponseError::Graph(error) => ResponseError::Graph(error),
+        MultiResponseError::Buchi(error) => ResponseError::Buchi(error),
         MultiResponseError::MissingFiniteWitness => ResponseError::MissingFiniteWitness,
         MultiResponseError::MissingCycleWitness => ResponseError::MissingCycleWitness,
-        MultiResponseError::EmptyPropertyName
+        MultiResponseError::FairnessAdapterInvariant
+        | MultiResponseError::EmptyPropertyName
         | MultiResponseError::NoClauses
         | MultiResponseError::EmptyClauseName
         | MultiResponseError::DuplicateClauseName { .. } => ResponseError::AdapterInvariant,
