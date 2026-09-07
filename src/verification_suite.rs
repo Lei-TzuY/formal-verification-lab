@@ -3,12 +3,43 @@ use std::fmt;
 
 const SUITE: &str = "suite";
 const JOB: &str = "job";
+const EXPECT: &str = "expect";
 pub const MAX_VERIFICATION_SUITE_JOBS: usize = 128;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VerificationExpectedOutcome {
+    Satisfied,
+    Violated,
+    Inconclusive,
+    Error,
+}
+
+impl VerificationExpectedOutcome {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Satisfied => "satisfied",
+            Self::Violated => "violated",
+            Self::Inconclusive => "inconclusive",
+            Self::Error => "error",
+        }
+    }
+
+    fn parse(value: &str) -> Option<Self> {
+        match value {
+            "satisfied" => Some(Self::Satisfied),
+            "violated" => Some(Self::Violated),
+            "inconclusive" => Some(Self::Inconclusive),
+            "error" => Some(Self::Error),
+            _ => None,
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VerificationSuite {
     name: String,
     job_paths: Vec<String>,
+    expected_outcomes: Vec<Option<VerificationExpectedOutcome>>,
 }
 
 impl VerificationSuite {
@@ -20,12 +51,21 @@ impl VerificationSuite {
         &self.job_paths
     }
 
+    pub fn expected_outcomes(&self) -> &[Option<VerificationExpectedOutcome>] {
+        &self.expected_outcomes
+    }
+
     pub fn canonical_document(&self) -> String {
         let mut lines = vec![format!("suite {}", quote(&self.name))];
         lines.extend(
-            self.job_paths
-                .iter()
-                .map(|path| format!("job {}", quote(path))),
+            self.job_paths.iter().zip(&self.expected_outcomes).map(
+                |(path, expected)| match expected {
+                    Some(expected) => {
+                        format!("job {} expect {}", quote(path), quote(expected.as_str()))
+                    }
+                    None => format!("job {}", quote(path)),
+                },
+            ),
         );
         lines.join("\n")
     }
@@ -40,6 +80,7 @@ pub enum VerificationSuiteParseErrorKind {
     InvalidEscape { escape: String },
     EmptyName,
     EmptyPath,
+    InvalidExpectedOutcome { outcome: String },
     TrailingInput,
     DuplicateSuiteDirective,
     DuplicateJob { path: String },
@@ -100,6 +141,12 @@ impl fmt::Display for VerificationSuiteParseError {
             VerificationSuiteParseErrorKind::EmptyPath => {
                 write!(f, "job path must not be empty")
             }
+            VerificationSuiteParseErrorKind::InvalidExpectedOutcome { outcome } => {
+                write!(
+                    f,
+                    "unsupported expected outcome '{outcome}'; expected satisfied, violated, inconclusive, or error"
+                )
+            }
             VerificationSuiteParseErrorKind::TrailingInput => {
                 write!(f, "unexpected trailing input after directive value")
             }
@@ -129,6 +176,7 @@ pub fn parse_verification_suite(
 ) -> Result<VerificationSuite, VerificationSuiteParseError> {
     let mut name = None;
     let mut job_paths = Vec::new();
+    let mut expected_outcomes = Vec::new();
     let mut seen_jobs = HashSet::new();
 
     for (line_index, raw_line) in input.lines().enumerate() {
@@ -147,10 +195,10 @@ pub fn parse_verification_suite(
         let value = parser.parse_string().map_err(|(position, kind)| {
             VerificationSuiteParseError::new(line_number, leading + position + 1, kind)
         })?;
-        finish_line(&mut parser, line_number, leading)?;
 
         match directive.as_str() {
             SUITE => {
+                finish_line(&mut parser, line_number, leading)?;
                 if name.is_some() {
                     return Err(VerificationSuiteParseError::new(
                         line_number,
@@ -175,6 +223,8 @@ pub fn parse_verification_suite(
                         VerificationSuiteParseErrorKind::EmptyPath,
                     ));
                 }
+
+                let expected = parse_optional_expectation(&mut parser, line_number, leading)?;
                 if !seen_jobs.insert(value.clone()) {
                     return Err(VerificationSuiteParseError::new(
                         line_number,
@@ -192,6 +242,7 @@ pub fn parse_verification_suite(
                     ));
                 }
                 job_paths.push(value);
+                expected_outcomes.push(expected);
             }
             _ => {
                 return Err(VerificationSuiteParseError::new(
@@ -218,7 +269,49 @@ pub fn parse_verification_suite(
         ));
     }
 
-    Ok(VerificationSuite { name, job_paths })
+    Ok(VerificationSuite {
+        name,
+        job_paths,
+        expected_outcomes,
+    })
+}
+
+fn parse_optional_expectation(
+    parser: &mut LineParser<'_>,
+    line: usize,
+    leading: usize,
+) -> Result<Option<VerificationExpectedOutcome>, VerificationSuiteParseError> {
+    parser.skip_whitespace();
+    if parser.is_eof() {
+        return Ok(None);
+    }
+
+    let directive_start = parser.position;
+    let directive = parser.parse_directive().map_err(|kind| {
+        VerificationSuiteParseError::new(line, leading + directive_start + 1, kind)
+    })?;
+    if directive != EXPECT {
+        return Err(VerificationSuiteParseError::new(
+            line,
+            leading + directive_start + 1,
+            VerificationSuiteParseErrorKind::UnknownDirective { directive },
+        ));
+    }
+
+    parser.skip_whitespace();
+    let outcome_start = parser.position;
+    let outcome = parser.parse_string().map_err(|(position, kind)| {
+        VerificationSuiteParseError::new(line, leading + position + 1, kind)
+    })?;
+    let expected = VerificationExpectedOutcome::parse(&outcome).ok_or_else(|| {
+        VerificationSuiteParseError::new(
+            line,
+            leading + outcome_start + 1,
+            VerificationSuiteParseErrorKind::InvalidExpectedOutcome { outcome },
+        )
+    })?;
+    finish_line(parser, line, leading)?;
+    Ok(Some(expected))
 }
 
 fn finish_line(
