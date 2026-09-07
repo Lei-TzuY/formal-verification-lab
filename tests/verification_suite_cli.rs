@@ -22,7 +22,8 @@ fn stderr(output: &Output) -> String {
 
 fn fixture_dir(kind: &str) -> PathBuf {
     let id = NEXT_DIR.fetch_add(1, Ordering::Relaxed);
-    let root = std::env::temp_dir().join(format!("fvlab-m57-cli-{kind}-{}-{id}", std::process::id()));
+    let root =
+        std::env::temp_dir().join(format!("fvlab-m57-cli-{kind}-{}-{id}", std::process::id()));
     fs::create_dir_all(&root).unwrap();
     root
 }
@@ -85,9 +86,7 @@ fn suite_binary_preserves_order_and_aggregate_violation_precedence() {
         "{\"schema_version\":1,\"outcome\":\"violated\",\"status\":\"VIOLATED\",\"suite\":\"nightly\""
     ));
     let satisfied = json.find("\"manifest\":\"satisfied.fvj\"").unwrap();
-    let inconclusive = json
-        .find("\"manifest\":\"inconclusive.fvj\"")
-        .unwrap();
+    let inconclusive = json.find("\"manifest\":\"inconclusive.fvj\"").unwrap();
     let violated = json.find("\"manifest\":\"violated.fvj\"").unwrap();
     assert!(satisfied < inconclusive && inconclusive < violated);
     assert!(json.contains("\"outcome\":\"inconclusive\",\"status\":\"INCONCLUSIVE\""));
