@@ -35,6 +35,46 @@ fn mixed_multi_response_fairness_routes_and_reports_both_classes() {
 }
 
 #[test]
+fn weak_only_and_strong_only_multi_response_routes_preserve_compatibility() {
+    let weak = run(&[
+        "respond",
+        "dual-grant-unfair-b",
+        "--weak-fair-action",
+        "grant-b",
+    ]);
+    assert!(weak.status.success(), "{}", stderr(&weak));
+    let weak_text = stdout(&weak);
+    assert!(weak_text.contains("multi-response: SATISFIED"));
+    assert!(weak_text.contains("weak fairness actions: 1"));
+    assert!(weak_text.contains("weak-fair action: \"grant-b\""));
+    assert!(weak_text.contains("strong fairness actions: 0"));
+
+    let strong = run(&[
+        "respond",
+        "dual-grant-unfair-b",
+        "--strong-fair-action",
+        "grant-b",
+    ]);
+    assert!(strong.status.success(), "{}", stderr(&strong));
+    let strong_text = stdout(&strong);
+    assert!(strong_text.contains("multi-response: SATISFIED"));
+    assert!(strong_text.contains("weak fairness actions: 0"));
+    assert!(strong_text.contains("strong fairness actions: 1"));
+    assert!(strong_text.contains("strong-fair action: \"grant-b\""));
+
+    let unrelated = run(&[
+        "respond",
+        "dual-grant-unfair-b",
+        "--strong-fair-action",
+        "unrelated",
+    ]);
+    assert_eq!(unrelated.status.code(), Some(7));
+    let unrelated_text = stdout(&unrelated);
+    assert!(unrelated_text.contains("multi-response: VIOLATED"));
+    assert!(unrelated_text.contains("violated clause: class-b"));
+}
+
+#[test]
 fn overlapping_multi_response_fairness_is_canonicalized_to_strong() {
     let output = run(&[
         "respond",
