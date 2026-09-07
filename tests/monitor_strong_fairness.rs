@@ -54,7 +54,10 @@ fn intermittent_exit_model() -> TransitionSystem<IntermittentNode> {
             IntermittentNode::B => Ok(vec![Transition::new("to-a", IntermittentNode::A)]),
             IntermittentNode::Done => Ok(Vec::new()),
         },
-        vec![Invariant::new("recognized-node", |_state: &IntermittentNode| true)],
+        vec![Invariant::new(
+            "recognized-node",
+            |_state: &IntermittentNode| true,
+        )],
     )
     .unwrap()
 }
@@ -106,12 +109,9 @@ fn intermittent_enablement_distinguishes_strong_from_weak_fairness() {
         Some(MonitorCounterexample::ProgressCycle { .. })
     ));
 
-    let weak = check_monitor_with_weak_fairness(
-        &model,
-        &monitor,
-        &WeakFairness::new(["close"]).unwrap(),
-    )
-    .unwrap();
+    let weak =
+        check_monitor_with_weak_fairness(&model, &monitor, &WeakFairness::new(["close"]).unwrap())
+            .unwrap();
     assert_eq!(weak.status, MonitorStatus::Violated);
     assert!(matches!(
         weak.counterexample,
