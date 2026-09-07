@@ -41,8 +41,7 @@ impl FairnessProfile {
         ST: Into<String>,
     {
         let weak = WeakFairness::new(weak_actions).map_err(FairnessProfileError::Weak)?;
-        let strong =
-            StrongFairness::new(strong_actions).map_err(FairnessProfileError::Strong)?;
+        let strong = StrongFairness::new(strong_actions).map_err(FairnessProfileError::Strong)?;
         let weak_only = weak
             .actions()
             .iter()
@@ -148,13 +147,8 @@ where
         .iter()
         .map(Vec::is_empty)
         .collect::<Vec<_>>();
-    let counterexample = find_profile_buchi_counterexample(
-        &product,
-        &product,
-        &known_terminal,
-        automaton,
-        profile,
-    )?;
+    let counterexample =
+        find_profile_buchi_counterexample(&product, &product, &known_terminal, automaton, profile)?;
 
     Ok(BuchiResult {
         automaton: automaton.name().to_owned(),
@@ -234,12 +228,9 @@ where
         }
 
         let residual = induced_graph(product, &included);
-        for component in strong_fair_components(
-            enablement,
-            &residual,
-            &residual_to_product,
-            &profile.strong,
-        ) {
+        for component in
+            strong_fair_components(enablement, &residual, &residual_to_product, &profile.strong)
+        {
             if !weak_component_is_admissible(
                 enablement,
                 &residual,
