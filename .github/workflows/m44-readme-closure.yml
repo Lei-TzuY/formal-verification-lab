@@ -1,0 +1,117 @@
+name: M44 README closure
+
+on:
+  push:
+    branches:
+      - feature/milestone-44-strong-fair-monitor-cli
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: feature/milestone-44-strong-fair-monitor-cli
+      - name: Seal M44 documentation and promote roadmap
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('README.md')
+          text = path.read_text()
+
+          old = (
+              'The repository now has one coherent explicit-state stack from finite transition-system construction through safety, reachability, recurrence, liveness, single- and multi-response obligations, finite-monitor progress/rejection semantics, generalized Büchi acceptance, textual/declarative frontends, deterministic model/product resource budgets, deep-graph SCC traversal, opt-in exact-action weak fairness, and opt-in exact-action strong fairness. Strong fairness is available for generalized Büchi, single-response/action-temporal, multi-response, and finite-monitor verification across unbounded, product-bounded, and staged APIs. M41 exposes the action-temporal paths through the fixed, textual, and declarative temporal CLI routes; M42 keeps multi-response strong fairness at the typed/backend API layer; M43 adds the corresponding strong-fair finite-monitor backend/API layer while leaving direct monitor CLI routing for the next integration milestone.'
+          )
+          new = (
+              'The repository now has one coherent explicit-state stack from finite transition-system construction through safety, reachability, recurrence, liveness, single- and multi-response obligations, finite-monitor progress/rejection semantics, generalized Büchi acceptance, textual/declarative frontends, deterministic model/product resource budgets, deep-graph SCC traversal, opt-in exact-action weak fairness, and opt-in exact-action strong fairness. Strong fairness is available for generalized Büchi, single-response/action-temporal, multi-response, and finite-monitor verification across unbounded, product-bounded, and staged APIs. M41 exposes the action-temporal paths through the fixed, textual, and declarative temporal CLI routes; M42 keeps multi-response strong fairness at the typed/backend API layer; M43 adds the strong-fair finite-monitor backend/API layer; and M44 closes that backend-to-CLI gap for the direct `monitor` command.'
+          )
+          assert text.count(old) == 1, 'current capability anchor drifted'
+          text = text.replace(old, new)
+
+          table_anchor = '| M43 | Strong-fair finite-monitor progress semantics with rejecting/finite-terminal precedence and bounded/staged enablement provenance. |'
+          table_new = table_anchor + '\n| M44 | Direct strong-fair finite-monitor CLI/reporting integration across unbounded, product-bounded, and staged analysis. |'
+          assert text.count(table_anchor) == 1, 'milestone table anchor drifted'
+          text = text.replace(table_anchor, table_new)
+
+          m43_tail = (
+              'M43 is a typed/backend API milestone. It adds no direct `monitor --strong-fair-action` routing, mixed weak-plus-strong fairness semantics, fairness-by-default behavior, second traversal engine, wall-clock bound, or performance claim.\n\n## Architecture'
+          )
+          m44_section = '''M43 is a typed/backend API milestone. It adds no direct `monitor --strong-fair-action` routing, mixed weak-plus-strong fairness semantics, fairness-by-default behavior, second traversal engine, wall-clock bound, or performance claim.
+
+### M44 — direct strong-fair finite-monitor CLI and reporting integration
+
+M44 closes the remaining M43 backend-to-CLI gap without adding verification semantics. Repeated `--strong-fair-action <ACTION>` declarations on the direct `monitor` command route to the sealed M43 unbounded, product-bounded, or staged strong-fair monitor APIs according to the already shared model/product limit options.
+
+Strong-fair assumptions are rendered explicitly and separately from canonical monitor evidence. Historical no-fairness and weak-fairness monitor paths remain unchanged. Fairness still constrains only infinite progress cycles: reachable rejecting states and real finite active progress terminals retain their existing precedence and remain violations. Product/model cutoffs retain stage-qualified `INCONCLUSIVE` results and exit `3`; conclusive monitor violations retain exit `8`; malformed, duplicate, missing, empty, or mixed weak-plus-strong fairness input fails closed with exit `2`.
+
+Built-binary regressions exercise strong-fair elimination of the unfair `close` lasso, unrelated and actually taken fair actions, rejecting-state/finite-terminal precedence, exact product/model cutoff reason strings, and fairness-option validation. M44 adds no new fairness semantics, combined weak-plus-strong semantics, fairness-by-default behavior, second traversal engine, wall-clock bound, or performance claim.
+
+## Architecture'''
+          assert text.count(m43_tail) == 1, 'M43 section tail anchor drifted'
+          text = text.replace(m43_tail, m44_section)
+
+          arch_old = 'src/fairness_report.rs        explicit weak-fair monitor + weak/strong temporal assumption reports'
+          arch_new = 'src/fairness_report.rs        explicit weak/strong monitor + temporal fairness assumption reports'
+          assert text.count(arch_old) == 1, 'architecture report anchor drifted'
+          text = text.replace(arch_old, arch_new)
+
+          example_anchor = 'cargo run -- monitor session-unfair-close --weak-fair-action close --max-product-transitions 3'
+          example_new = example_anchor + '\ncargo run -- monitor session-unfair-close --strong-fair-action close\ncargo run -- monitor session-unfair-close --strong-fair-action close --max-model-transitions 2'
+          assert text.count(example_anchor) == 1, 'monitor example anchor drifted'
+          text = text.replace(example_anchor, example_new)
+
+          tests_anchor = 'M43 adds strong-fair finite-monitor precedence, independent-progress, product/staged provenance and generous-limit regressions plus the 5,184-case generated adapter differential against the sealed M38/M39 Büchi engines.'
+          tests_new = tests_anchor + ' M44 adds built-binary direct-monitor strong-fair routing/reporting, lasso-filtering, rejecting/finite-terminal precedence, exact cutoff-provenance, and malformed/mixed-assumption regressions.'
+          assert text.count(tests_anchor) == 1, 'tests summary anchor drifted'
+          text = text.replace(tests_anchor, tests_new)
+
+          trust_old = '- Strong fairness is also **never assumed by default**. M38–M43 support exact-action strong fairness for generalized Büchi, single-response/action-temporal, typed/backend multi-response, and typed/backend finite-monitor verification across unbounded, product-bounded, and staged APIs; M41 exposes the action-temporal paths through explicit `--strong-fair-action` assumptions.'
+          trust_new = '- Strong fairness is also **never assumed by default**. M38–M44 support exact-action strong fairness for generalized Büchi, single-response/action-temporal, typed/backend multi-response, and finite-monitor verification across unbounded, product-bounded, and staged APIs; M41 exposes the action-temporal paths and M44 exposes direct finite-monitor verification through explicit `--strong-fair-action` assumptions.'
+          assert text.count(trust_old) == 1, 'strong fairness trust anchor drifted'
+          text = text.replace(trust_old, trust_new)
+
+          mixed_old = '- Weak and strong fairness cannot currently be combined in one analysis; M41 fails closed on mixed CLI assumptions rather than inventing semantics.'
+          mixed_new = '- Weak and strong fairness cannot currently be combined in one analysis; M41/M44 CLI routing fails closed on mixed assumptions rather than inventing semantics. A combined profile requires an explicit semantic design rather than dispatch precedence.'
+          assert text.count(mixed_old) == 1, 'mixed fairness trust anchor drifted'
+          text = text.replace(mixed_old, mixed_new)
+
+          monitor_old = '- M37 exposes finite-monitor weak fairness on the direct `monitor` CLI. M43 now implements strong-fair finite-monitor semantics at the typed/backend API layer, but the direct `monitor --strong-fair-action` route remains intentionally unavailable until M44 wires the sealed backend into CLI/reporting; current CLI behavior therefore continues to fail closed rather than silently falling back.'
+          monitor_new = '- M37 exposes finite-monitor weak fairness on the direct `monitor` CLI, and M44 exposes the sealed M43 strong-fair finite-monitor backend through the same direct command for unbounded, product-bounded, and staged analysis.'
+          assert text.count(monitor_old) == 1, 'monitor trust anchor drifted'
+          text = text.replace(monitor_old, monitor_new)
+
+          roadmap = text.index('## Roadmap\n')
+          text = text[:roadmap] + '''## Roadmap
+
+Milestones 1–44 now form a coherent explicit-state stack: safety and bounded honesty -> typed models and independent graph validation -> reachability/deadlock/recurrence -> eventuality and response obligations -> finite monitors and generalized Büchi acceptance -> shared graph/product substrates -> typed/textual/declarative specification frontends -> bounded state properties -> product/staged temporal budgets -> iterative deep-graph SCC traversal -> opt-in exact-action weak fairness -> bounded/staged enablement provenance -> weak-fair response and finite-monitor composition -> direct weak-fair monitor integration -> opt-in exact-action strong fairness -> proof-honest bounded/staged strong-fair Büchi verification -> strong-fair single-response/action-temporal composition -> external strong-fair temporal CLI integration -> per-clause strong-fair multi-response composition -> strong-fair finite-monitor composition -> direct strong-fair monitor CLI/reporting integration.
+
+M44 completes the separate weak-fair and strong-fair verticals. Continuing to add one-off routing variants would now have low architectural value. The next architectural phase is **Milestone 45: explicit combined weak/strong fairness profile at the generalized Büchi/recurrent substrate**.
+
+M45 should define one validated fairness profile containing independently ordered weak- and strong-fair exact-action assumptions and verify infinite executions only when they satisfy **all** configured obligations. It must be a semantic core milestone first, not a CLI shortcut: existing no-fair, weak-only, and strong-only APIs remain compatibility authorities while mixed execution filtering is introduced once at the Büchi/recurrent layer and only then composed upward in later slices.
+
+Acceptance criteria for M45:
+
+- define explicit overlap semantics when the same exact action appears in both sets; because strong fairness implies the corresponding weak obligation, overlap must be canonicalized or otherwise specified deterministically rather than evaluated ambiguously;
+- preserve fairness as an infinite-execution filter only, leaving finite-terminal policy unchanged;
+- reuse complete-model action enablement and existing SCC/product substrates rather than creating another traversal engine;
+- return only real closed recurrent witnesses satisfying every weak and strong obligation simultaneously;
+- preserve exact no-fair, weak-only, and strong-only results/evidence through differential compatibility tests;
+- include independent small-graph validation that distinguishes continuously enabled weak obligations from intermittently enabled strong obligations and exercises overlapping assumptions;
+- do not expose mixed CLI syntax until the combined backend semantics and witness contracts are sealed;
+- make no performance claim from CI timing.
+'''
+
+          path.write_text(text)
+          Path('.github/workflows/m44-readme-closure.yml').unlink()
+      - name: Commit documentation closure
+        run: |
+          git config user.name "LeiZ"
+          git config user.email "52287354+Lei-TzuY@users.noreply.github.com"
+          git add README.md .github/workflows/m44-readme-closure.yml
+          git commit -m "Seal milestone 44 documentation"
+          git push origin HEAD:feature/milestone-44-strong-fair-monitor-cli
