@@ -2,9 +2,9 @@ use formal_verification_lab::{
     check_buchi_with_strong_fairness, check_buchi_with_strong_fairness_and_product_limits,
     check_monitor_with_strong_fairness, check_monitor_with_strong_fairness_and_product_limits,
     AcceptanceSet, BoundedOutcome, BuchiAutomaton, BuchiCounterexample, BuchiProductState,
-    BuchiStatus, ExplorationLimits, FiniteMonitor, FiniteRunPolicy, Invariant, MonitorCounterexample,
-    MonitorProductState, MonitorStatus, ProgressCondition, RejectCondition, StateVariable,
-    StrongFairness, TraceStep, Transition, TransitionSystem,
+    BuchiStatus, ExplorationLimits, FiniteMonitor, FiniteRunPolicy, Invariant,
+    MonitorCounterexample, MonitorProductState, MonitorStatus, ProgressCondition, RejectCondition,
+    StateVariable, StrongFairness, TraceStep, Transition, TransitionSystem,
 };
 
 const N: usize = 2;
@@ -106,26 +106,14 @@ fn generated_buchi() -> BuchiAutomaton<bool> {
 fn monitor_steps(trace: &[TraceStep<MonitorProductState<usize, bool>>]) -> Vec<StepSignature> {
     trace
         .iter()
-        .map(|step| {
-            (
-                step.action.clone(),
-                step.state.state,
-                step.state.monitor,
-            )
-        })
+        .map(|step| (step.action.clone(), step.state.state, step.state.monitor))
         .collect()
 }
 
 fn buchi_steps(trace: &[TraceStep<BuchiProductState<usize, bool>>]) -> Vec<StepSignature> {
     trace
         .iter()
-        .map(|step| {
-            (
-                step.action.clone(),
-                step.state.state,
-                step.state.automaton,
-            )
-        })
+        .map(|step| (step.action.clone(), step.state.state, step.state.automaton))
         .collect()
 }
 
@@ -218,8 +206,15 @@ fn generated_unbounded_monitor_composition_matches_direct_strong_fair_buchi() {
                 check_buchi_with_strong_fairness(&model, &automaton, &fairness).unwrap();
             let context = format!("graph={graph_mask} assignment={assignment} codes={codes:?}");
 
-            assert_eq!(monitor_result.status, monitor_status(buchi_result.status), "{context}");
-            assert_eq!(monitor_result.model_states, buchi_result.model_states, "{context}");
+            assert_eq!(
+                monitor_result.status,
+                monitor_status(buchi_result.status),
+                "{context}"
+            );
+            assert_eq!(
+                monitor_result.model_states, buchi_result.model_states,
+                "{context}"
+            );
             assert_eq!(
                 monitor_result.model_transitions, buchi_result.model_transitions,
                 "{context}"
@@ -254,30 +249,34 @@ fn generated_product_bounded_monitor_composition_matches_direct_strong_fair_buch
                 let model = generated_model(graph_mask, codes);
                 let limits = transition_limit(limit);
                 let monitor_result = check_monitor_with_strong_fairness_and_product_limits(
-                    &model,
-                    &monitor,
-                    &fairness,
-                    limits,
+                    &model, &monitor, &fairness, limits,
                 )
                 .unwrap();
                 let buchi_result = check_buchi_with_strong_fairness_and_product_limits(
-                    &model,
-                    &automaton,
-                    &fairness,
-                    limits,
+                    &model, &automaton, &fairness, limits,
                 )
                 .unwrap();
                 let context = format!(
                     "graph={graph_mask} assignment={assignment} codes={codes:?} limit={limit}"
                 );
 
-                assert_eq!(monitor_result.outcome, monitor_outcome(&buchi_result.outcome), "{context}");
-                assert_eq!(monitor_result.model_states, buchi_result.model_states, "{context}");
+                assert_eq!(
+                    monitor_result.outcome,
+                    monitor_outcome(&buchi_result.outcome),
+                    "{context}"
+                );
+                assert_eq!(
+                    monitor_result.model_states, buchi_result.model_states,
+                    "{context}"
+                );
                 assert_eq!(
                     monitor_result.model_transitions, buchi_result.model_transitions,
                     "{context}"
                 );
-                assert_eq!(monitor_result.product_states, buchi_result.product_states, "{context}");
+                assert_eq!(
+                    monitor_result.product_states, buchi_result.product_states,
+                    "{context}"
+                );
                 assert_eq!(
                     monitor_result.checked_product_states, buchi_result.checked_product_states,
                     "{context}"
