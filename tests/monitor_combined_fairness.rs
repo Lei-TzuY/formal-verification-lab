@@ -48,10 +48,7 @@ fn mixed_fairness_model() -> TransitionSystem<MixedNode> {
                 Transition::new("strong-cycle-a", MixedNode::StrongB),
                 Transition::new("strong-exit", MixedNode::Done),
             ]),
-            MixedNode::StrongB => Ok(vec![Transition::new(
-                "strong-cycle-b",
-                MixedNode::StrongA,
-            )]),
+            MixedNode::StrongB => Ok(vec![Transition::new("strong-cycle-b", MixedNode::StrongA)]),
             MixedNode::Done => Ok(Vec::new()),
         },
         vec![Invariant::new("recognized-node", |_state: &MixedNode| true)],
