@@ -58,6 +58,8 @@ pub mod verification_execution;
 pub mod verification_job;
 pub mod verification_job_run;
 pub mod verification_result;
+pub mod verification_suite;
+pub mod verification_suite_run;
 
 pub use bounded::{
     AnalysisInconclusiveReason, AnalysisLimits, AnalysisOutcome, AnalysisStage, BoundedOutcome,
@@ -221,4 +223,13 @@ pub use verification_result::{
     VerificationJobCutoffStage, VerificationJobEvidence, VerificationJobLimits,
     VerificationJobOutcome, VerificationJobResultEnvelope, VerificationJobTraceStep,
     VERIFICATION_JOB_RESULT_SCHEMA_VERSION,
+};
+pub use verification_suite::{
+    parse_verification_suite, VerificationSuite, VerificationSuiteParseError,
+    VerificationSuiteParseErrorKind, MAX_VERIFICATION_SUITE_JOBS,
+};
+pub use verification_suite_run::{
+    load_verification_suite, run_verification_suite_json, VerificationSuiteEntryResult,
+    VerificationSuiteJsonRun, VerificationSuiteLoadError, VerificationSuiteOutcome,
+    VerificationSuiteResultEnvelope, VERIFICATION_SUITE_RESULT_SCHEMA_VERSION,
 };
