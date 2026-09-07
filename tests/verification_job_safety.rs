@@ -14,10 +14,8 @@ static NEXT_DIR: AtomicUsize = AtomicUsize::new(0);
 
 fn fixture_dir(kind: &str) -> PathBuf {
     let id = NEXT_DIR.fetch_add(1, Ordering::Relaxed);
-    let root = std::env::temp_dir().join(format!(
-        "fvlab-m59-safety-job-{kind}-{}-{id}",
-        std::process::id()
-    ));
+    let root =
+        std::env::temp_dir().join(format!("fvlab-m59-safety-job-{kind}-{}-{id}", std::process::id()));
     fs::create_dir_all(&root).unwrap();
     root
 }
@@ -40,9 +38,7 @@ fn write_safety_job(root: &Path, model: &str, tail: &str) -> PathBuf {
     let manifest = root.join("job.fvj");
     fs::write(
         &manifest,
-        format!(
-            "analysis \"safety\"\nmodel \"model.fvl\"\nproperty \"property.fvp\"\n{tail}"
-        ),
+        format!("analysis \"safety\"\nmodel \"model.fvl\"\nproperty \"property.fvp\"\n{tail}"),
     )
     .unwrap();
     manifest
@@ -64,20 +60,19 @@ fn explicit_analysis_round_trips_and_unknown_or_duplicate_family_fails_closed() 
         ("multi-response", VerificationJobAnalysis::MultiResponse),
         ("safety", VerificationJobAnalysis::Safety),
     ] {
-        let source = format!(
-            "analysis \"{name}\"\nmodel \"m.fvl\"\nproperty \"p.fvp\""
-        );
+        let source = format!("analysis \"{name}\"\nmodel \"m.fvl\"\nproperty \"p.fvp\"");
         let job = parse_verification_job(&source).unwrap();
         assert_eq!(job.analysis(), expected);
         assert_eq!(job.declared_analysis(), Some(expected));
         assert_eq!(job.canonical_document(), source);
-        assert_eq!(parse_verification_job(&job.canonical_document()).unwrap(), job);
+        assert_eq!(
+            parse_verification_job(&job.canonical_document()).unwrap(),
+            job
+        );
     }
 
-    let unknown = parse_verification_job(
-        "analysis \"ctl\"\nmodel \"m.fvl\"\nproperty \"p.fvp\"\n",
-    )
-    .unwrap_err();
+    let unknown = parse_verification_job("analysis \"ctl\"\nmodel \"m.fvl\"\nproperty \"p.fvp\"\n")
+        .unwrap_err();
     assert_eq!(unknown.line(), 1);
     assert_eq!(
         unknown.kind(),
@@ -105,7 +100,10 @@ fn safety_job_matches_direct_m24_backend_for_safe_violated_and_inconclusive_case
     let safe_manifest = write_safety_job(&safe_root, safe_model(), "");
     let safe_run = run_verification_job_json(&safe_manifest);
     assert_eq!(safe_run.exit_code, 0);
-    assert_eq!(safe_run.envelope.schema_version, VERIFICATION_JOB_SAFETY_RESULT_SCHEMA_VERSION);
+    assert_eq!(
+        safe_run.envelope.schema_version,
+        VERIFICATION_JOB_SAFETY_RESULT_SCHEMA_VERSION
+    );
     assert_eq!(safe_run.envelope.analysis.as_deref(), Some("safety"));
     assert_eq!(safe_run.envelope.outcome, VerificationJobOutcome::Satisfied);
     assert_eq!(safe_run.envelope.model.as_deref(), Some("safe"));
@@ -131,8 +129,14 @@ fn safety_job_matches_direct_m24_backend_for_safe_violated_and_inconclusive_case
         ExplorationLimits::unbounded(),
     )
     .unwrap();
-    assert_eq!(safe_direct.outcome, BoundedOutcome::Conclusive(SafetyStatus::Safe));
-    assert_eq!(safe_run.envelope.accounting.model_states, Some(safe_direct.discovered_states));
+    assert_eq!(
+        safe_direct.outcome,
+        BoundedOutcome::Conclusive(SafetyStatus::Safe)
+    );
+    assert_eq!(
+        safe_run.envelope.accounting.model_states,
+        Some(safe_direct.discovered_states)
+    );
     assert_eq!(
         safe_run.envelope.accounting.checked_model_states,
         Some(safe_direct.checked_states)
@@ -146,7 +150,10 @@ fn safety_job_matches_direct_m24_backend_for_safe_violated_and_inconclusive_case
     let violated_manifest = write_safety_job(&violated_root, violated_model(), "");
     let violated_run = run_verification_job_json(&violated_manifest);
     assert_eq!(violated_run.exit_code, 12);
-    assert_eq!(violated_run.envelope.outcome, VerificationJobOutcome::Violated);
+    assert_eq!(
+        violated_run.envelope.outcome,
+        VerificationJobOutcome::Violated
+    );
     let Some(VerificationJobEvidence::Safety { trace }) = &violated_run.envelope.evidence else {
         panic!("expected structured safety trace");
     };
@@ -158,15 +165,18 @@ fn safety_job_matches_direct_m24_backend_for_safe_violated_and_inconclusive_case
     assert!(!violated_run.to_json().contains("\"pending\""));
 
     let bounded_root = fixture_dir("inconclusive");
-    let bounded_manifest = write_safety_job(
-        &bounded_root,
-        safe_model(),
-        "max-model-transitions 0\n",
-    );
+    let bounded_manifest =
+        write_safety_job(&bounded_root, safe_model(), "max-model-transitions 0\n");
     let bounded_run = run_verification_job_json(&bounded_manifest);
     assert_eq!(bounded_run.exit_code, 3);
-    assert_eq!(bounded_run.envelope.outcome, VerificationJobOutcome::Inconclusive);
-    let cutoff = bounded_run.envelope.cutoff.expect("bounded run should expose cutoff");
+    assert_eq!(
+        bounded_run.envelope.outcome,
+        VerificationJobOutcome::Inconclusive
+    );
+    let cutoff = bounded_run
+        .envelope
+        .cutoff
+        .expect("bounded run should expose cutoff");
     assert_eq!(cutoff.stage, VerificationJobCutoffStage::Model);
     assert_eq!(cutoff.kind, VerificationJobCutoffKind::TransitionLimit);
     assert_eq!(cutoff.limit, 0);
@@ -189,7 +199,10 @@ fn safety_job_matches_direct_m24_backend_for_safe_violated_and_inconclusive_case
         },
     )
     .unwrap();
-    assert_eq!(bounded_run.envelope.accounting.model_states, Some(bounded_direct.discovered_states));
+    assert_eq!(
+        bounded_run.envelope.accounting.model_states,
+        Some(bounded_direct.discovered_states)
+    );
     assert_eq!(
         bounded_run.envelope.accounting.checked_model_states,
         Some(bounded_direct.checked_states)
@@ -254,7 +267,10 @@ fn safety_jobs_reject_temporal_only_fairness_and_product_limits_before_execution
 
         let run = run_verification_job_json(&manifest);
         assert_eq!(run.exit_code, 2);
-        assert_eq!(run.envelope.schema_version, VERIFICATION_JOB_SAFETY_RESULT_SCHEMA_VERSION);
+        assert_eq!(
+            run.envelope.schema_version,
+            VERIFICATION_JOB_SAFETY_RESULT_SCHEMA_VERSION
+        );
         assert_eq!(run.envelope.analysis.as_deref(), Some("safety"));
         assert_eq!(run.envelope.outcome, VerificationJobOutcome::Error);
         assert_eq!(run.envelope.error.as_deref(), Some(expected_message));
@@ -287,11 +303,14 @@ fn explicit_multi_response_keeps_schema_v1_and_historical_json_shape() {
 
     let run = run_verification_job_json(&manifest);
     assert_eq!(run.exit_code, 0);
-    assert_eq!(run.envelope.schema_version, VERIFICATION_JOB_RESULT_SCHEMA_VERSION);
+    assert_eq!(
+        run.envelope.schema_version,
+        VERIFICATION_JOB_RESULT_SCHEMA_VERSION
+    );
     assert_eq!(run.envelope.analysis, None);
-    assert!(run.to_json().starts_with(
-        "{\"schema_version\":1,\"outcome\":\"satisfied\",\"status\":\"SATISFIED\""
-    ));
+    assert!(run
+        .to_json()
+        .starts_with("{\"schema_version\":1,\"outcome\":\"satisfied\",\"status\":\"SATISFIED\""));
     assert!(!run.to_json().contains("\"analysis\""));
 
     let _ = fs::remove_dir_all(root);
