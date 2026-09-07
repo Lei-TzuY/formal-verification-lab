@@ -35,6 +35,7 @@ pub mod monitor_strong_fairness;
 pub mod multi_response;
 pub mod multi_response_examples;
 pub mod multi_response_report;
+pub mod multi_temporal;
 mod product;
 pub mod property;
 pub mod proposition;
@@ -131,6 +132,15 @@ pub use multi_response::{
     ResponseClause,
 };
 pub use multi_response_report::render_multi_response_report;
+pub use multi_temporal::{
+    check_multi_response_temporal, check_multi_response_temporal_with_fairness_profile,
+    check_multi_response_temporal_with_fairness_profile_and_limits,
+    check_multi_response_temporal_with_fairness_profile_and_product_limits,
+    check_multi_response_temporal_with_limits, check_multi_response_temporal_with_product_limits,
+    parse_multi_response_temporal, ExactResponseClause, MultiResponseTemporalParseError,
+    MultiResponseTemporalParseErrorKind, MultiResponseTemporalSpec, MultiResponseTemporalSpecError,
+    ResponseActionRole,
+};
 pub use property::{
     check_deadlock, check_reachability, check_reachability_with_limits, BoundedReachabilityResult,
     DeadlockError, DeadlockProperty, DeadlockResult, DeadlockStatus, ReachabilityError,
