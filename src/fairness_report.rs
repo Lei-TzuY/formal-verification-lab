@@ -1,3 +1,8 @@
+//! Fairness-specific report adapters keep assumptions separate from canonical
+//! verification evidence. M44 extends the established temporal/weak-monitor
+//! pattern to direct strong-fair monitor CLI routing without changing monitor
+//! witness, accounting, or cutoff semantics.
+
 use crate::fairness::WeakFairness;
 use crate::monitor::{AnalysisMonitorResult, BoundedMonitorResult, MonitorResult};
 use crate::monitor_report::{
@@ -119,6 +124,42 @@ pub fn render_analysis_weak_fair_monitor_report<S: Debug, M: Debug>(
 ) -> String {
     let mut output = render_analysis_monitor_report(model_name, result);
     append_fairness(&mut output, "weak", fairness.actions());
+    output
+}
+
+/// Render one unbounded finite-monitor result with the exact-action strong
+/// fairness assumptions used only to filter its infinite progress cycles.
+pub fn render_strong_fair_monitor_report<S: Debug, M: Debug>(
+    model_name: &str,
+    result: &MonitorResult<S, M>,
+    fairness: &StrongFairness,
+) -> String {
+    let mut output = render_monitor_report(model_name, result);
+    append_fairness(&mut output, "strong", fairness.actions());
+    output
+}
+
+/// Render a product-bounded strong-fair finite-monitor result while preserving
+/// the canonical product cutoff accounting and reason text.
+pub fn render_bounded_strong_fair_monitor_report<S: Debug, M: Debug>(
+    model_name: &str,
+    result: &BoundedMonitorResult<S, M>,
+    fairness: &StrongFairness,
+) -> String {
+    let mut output = render_bounded_monitor_report(model_name, result);
+    append_fairness(&mut output, "strong", fairness.actions());
+    output
+}
+
+/// Render staged model/product strong-fair monitor analysis while preserving
+/// canonical stage-qualified cutoff provenance and appending assumptions separately.
+pub fn render_analysis_strong_fair_monitor_report<S: Debug, M: Debug>(
+    model_name: &str,
+    result: &AnalysisMonitorResult<S, M>,
+    fairness: &StrongFairness,
+) -> String {
+    let mut output = render_analysis_monitor_report(model_name, result);
+    append_fairness(&mut output, "strong", fairness.actions());
     output
 }
 

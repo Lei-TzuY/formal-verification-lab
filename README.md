@@ -6,7 +6,7 @@ The project is an explicit-state verification lab, not a wrapper around an exist
 
 ## Current capability
 
-The repository now has one coherent explicit-state stack from finite transition-system construction through safety, reachability, recurrence, liveness, single- and multi-response obligations, finite-monitor progress/rejection semantics, generalized Büchi acceptance, textual/declarative frontends, deterministic model/product resource budgets, deep-graph SCC traversal, opt-in exact-action weak fairness, and opt-in exact-action strong fairness. Strong fairness is available for generalized Büchi, single-response/action-temporal, multi-response, and finite-monitor verification across unbounded, product-bounded, and staged APIs. M41 exposes the action-temporal paths through the fixed, textual, and declarative temporal CLI routes; M42 keeps multi-response strong fairness at the typed/backend API layer; M43 adds the corresponding strong-fair finite-monitor backend/API layer while leaving direct monitor CLI routing for the next integration milestone.
+The repository now has one coherent explicit-state stack from finite transition-system construction through safety, reachability, recurrence, liveness, single- and multi-response obligations, finite-monitor progress/rejection semantics, generalized Büchi acceptance, textual/declarative frontends, deterministic model/product resource budgets, deep-graph SCC traversal, opt-in exact-action weak fairness, and opt-in exact-action strong fairness. Strong fairness is available for generalized Büchi, single-response/action-temporal, multi-response, and finite-monitor verification across unbounded, product-bounded, and staged APIs. M41 exposes the action-temporal paths through the fixed, textual, and declarative temporal CLI routes; M42 keeps multi-response strong fairness at the typed/backend API layer; M43 adds the strong-fair finite-monitor backend/API layer; and M44 closes that backend-to-CLI gap for the direct `monitor` command.
 
 Historical no-fairness behavior remains the default. Weak or strong fairness is enabled only when explicitly supplied, and fairness constrains infinite executions only. Product and staged cutoffs remain proof-honest: missing prefix edges are never treated as proof that an action is disabled, and unresolved enablement provenance produces `INCONCLUSIVE` rather than a false proof or counterexample. Mixed weak-plus-strong assumptions are not silently combined: the CLI fails closed until an explicit combined-fairness semantics is implemented.
 
@@ -57,6 +57,7 @@ Historical no-fairness behavior remains the default. Weak or strong fairness is 
 | M41 | External `--strong-fair-action` temporal CLI/reporting integration with fail-closed mixed-fairness validation and cutoff provenance. |
 | M42 | Strong-fair multi-response composition with per-clause acceptance, finite-terminal preservation, and bounded/staged provenance. |
 | M43 | Strong-fair finite-monitor progress semantics with rejecting/finite-terminal precedence and bounded/staged enablement provenance. |
+| M44 | Direct strong-fair finite-monitor CLI/reporting integration across unbounded, product-bounded, and staged analysis. |
 
 ### M31 — explicit weak-fairness liveness core
 
@@ -208,6 +209,14 @@ Focused regressions cover intermittent strong-versus-weak fairness, unrelated an
 
 M43 is a typed/backend API milestone. It adds no direct `monitor --strong-fair-action` routing, mixed weak-plus-strong fairness semantics, fairness-by-default behavior, second traversal engine, wall-clock bound, or performance claim.
 
+### M44 — direct strong-fair finite-monitor CLI and reporting integration
+
+M44 closes the remaining M43 backend-to-CLI gap without adding verification semantics. Repeated `--strong-fair-action <ACTION>` declarations on the direct `monitor` command route to the sealed M43 unbounded, product-bounded, or staged strong-fair monitor APIs according to the already shared model/product limit options.
+
+Strong-fair assumptions are rendered explicitly and separately from canonical monitor evidence. Historical no-fairness and weak-fairness monitor paths remain unchanged. Fairness still constrains only infinite progress cycles: reachable rejecting states and real finite active progress terminals retain their existing precedence and remain violations. Product/model cutoffs retain stage-qualified `INCONCLUSIVE` results and exit `3`; conclusive monitor violations retain exit `8`; malformed, duplicate, missing, empty, or mixed weak-plus-strong fairness input fails closed with exit `2`.
+
+Built-binary regressions exercise strong-fair elimination of the unfair `close` lasso, unrelated and actually taken fair actions, rejecting-state/finite-terminal precedence, exact product/model cutoff reason strings, and fairness-option validation. M44 adds no new fairness semantics, combined weak-plus-strong semantics, fairness-by-default behavior, second traversal engine, wall-clock bound, or performance claim.
+
 ## Architecture
 
 ```text
@@ -228,7 +237,7 @@ src/strong_fairness.rs        exact-action strong fairness + Streett-style recur
 src/fair_enablement.rs        complete/conservative model-action enablement projection
 src/bounded_fairness.rs       product-bounded/staged weak-fair Büchi composition
 src/bounded_strong_fairness.rs product-bounded/staged strong-fair Büchi composition
-src/fairness_report.rs        explicit weak-fair monitor + weak/strong temporal assumption reports
+src/fairness_report.rs        explicit weak/strong monitor + temporal fairness assumption reports
 src/eventuality.rs            universal eventuality over target-cut residuals
 src/multi_response.rs         no-fair + weak/strong multi-clause response semantics
 src/response.rs               no-fair + weak/strong single-response adapters
@@ -272,6 +281,8 @@ cargo run -- monitor session-ok
 cargo run -- monitor session-stuck --max-model-transitions 3 --max-product-transitions 4
 cargo run -- monitor session-unfair-close --weak-fair-action close
 cargo run -- monitor session-unfair-close --weak-fair-action close --max-product-transitions 3
+cargo run -- monitor session-unfair-close --strong-fair-action close
+cargo run -- monitor session-unfair-close --strong-fair-action close --max-model-transitions 2
 cargo run -- buchi pulses
 cargo run -- buchi pulses-unfair --max-model-transitions 2
 
@@ -356,7 +367,7 @@ Independent/generated evidence retained by the repository includes:
 - M39: **20,480** independent bounded strong-fair product-prefix cases across graph/action/transition-limit combinations;
 - M43: **5,184** strong-fair monitor-to-Büchi composition differential cases across unbounded and product-bounded graph/action/limit combinations.
 
-M25–M29 retain product/staged semantic and built-binary regression suites. M32 verifies external fairness routing and validation. M33 verifies product/staged fairness, enablement provenance, conclusive retained fair cycles, stage-qualified cutoff honesty, and generous-limit equivalence. M34 adds weak-fair single-response backend/frontend and built-binary regressions. M35 adds per-clause weak-fair multi-response, finite-terminal, fair-cycle, empty-fairness, product-cutoff, staged-cutoff, and generous-limit regressions while retaining all historical M11/M31–M34 gates. M36 adds weak-fair finite-monitor precedence, independent-progress, product/staged cutoff, enablement-provenance, and empty-fairness compatibility regressions while retaining historical M12/M26/M29/M31–M35 coverage. M37 adds built-binary direct-monitor fairness routing, finite-violation precedence, product/model cutoff, and malformed-assumption regressions while preserving all historical no-fairness monitor gates. M38 adds strong-versus-weak fairness separation, Streett-pruning regressions, independent strong-fair recurrent existence, deterministic witness validation, and exact empty-strong-fairness compatibility. M39 adds product/staged cutoff honesty, conservative enablement provenance, conclusive retained strong-fair witness checks, finite-terminal precedence, empty-fairness/generous-limit compatibility, stage-qualified inconclusive reasons, and the 20,480-case independent prefix oracle. M40 adds strong-fair single-response and typed/textual/declarative temporal differential regressions, including intermittent enablement, finite terminals, empty-fairness compatibility, bounded/staged provenance, generous limits, and real external-file integration. M41 adds built-binary strong-fair temporal CLI routing/reporting and fail-closed malformed/mixed-assumption regressions while retaining all historical no-fair and weak-fair CLI gates. M42 adds per-clause strong-fair multi-response regressions for intermittent enablement, unrelated/taken fairness, finite-terminal precedence, exact empty-fairness compatibility, product/model cutoff honesty, and generous-limit equivalence while retaining the historical 38,416-case M11 oracle and M39 strong-fair cutoff coverage. M43 adds strong-fair finite-monitor precedence, independent-progress, product/staged provenance and generous-limit regressions plus the 5,184-case generated adapter differential against the sealed M38/M39 Büchi engines.
+M25–M29 retain product/staged semantic and built-binary regression suites. M32 verifies external fairness routing and validation. M33 verifies product/staged fairness, enablement provenance, conclusive retained fair cycles, stage-qualified cutoff honesty, and generous-limit equivalence. M34 adds weak-fair single-response backend/frontend and built-binary regressions. M35 adds per-clause weak-fair multi-response, finite-terminal, fair-cycle, empty-fairness, product-cutoff, staged-cutoff, and generous-limit regressions while retaining all historical M11/M31–M34 gates. M36 adds weak-fair finite-monitor precedence, independent-progress, product/staged cutoff, enablement-provenance, and empty-fairness compatibility regressions while retaining historical M12/M26/M29/M31–M35 coverage. M37 adds built-binary direct-monitor fairness routing, finite-violation precedence, product/model cutoff, and malformed-assumption regressions while preserving all historical no-fairness monitor gates. M38 adds strong-versus-weak fairness separation, Streett-pruning regressions, independent strong-fair recurrent existence, deterministic witness validation, and exact empty-strong-fairness compatibility. M39 adds product/staged cutoff honesty, conservative enablement provenance, conclusive retained strong-fair witness checks, finite-terminal precedence, empty-fairness/generous-limit compatibility, stage-qualified inconclusive reasons, and the 20,480-case independent prefix oracle. M40 adds strong-fair single-response and typed/textual/declarative temporal differential regressions, including intermittent enablement, finite terminals, empty-fairness compatibility, bounded/staged provenance, generous limits, and real external-file integration. M41 adds built-binary strong-fair temporal CLI routing/reporting and fail-closed malformed/mixed-assumption regressions while retaining all historical no-fair and weak-fair CLI gates. M42 adds per-clause strong-fair multi-response regressions for intermittent enablement, unrelated/taken fairness, finite-terminal precedence, exact empty-fairness compatibility, product/model cutoff honesty, and generous-limit equivalence while retaining the historical 38,416-case M11 oracle and M39 strong-fair cutoff coverage. M43 adds strong-fair finite-monitor precedence, independent-progress, product/staged provenance and generous-limit regressions plus the 5,184-case generated adapter differential against the sealed M38/M39 Büchi engines. M44 adds built-binary direct-monitor strong-fair routing/reporting, lasso-filtering, rejecting/finite-terminal precedence, exact cutoff-provenance, and malformed/mixed-assumption regressions.
 
 ## Trust boundaries and limitations
 
@@ -369,12 +380,12 @@ M25–M29 retain product/staged semantic and built-binary regression suites. M32
 - Product-only `--max-product-*` limits run after complete model capture and are not a bound on model capture.
 - Weak fairness is **never assumed by default**. It is enabled only through explicit `WeakFairness`/`--weak-fair-action` assumptions.
 - Weak fairness means continuously enabled actions cannot be postponed forever.
-- Strong fairness is also **never assumed by default**. M38–M43 support exact-action strong fairness for generalized Büchi, single-response/action-temporal, typed/backend multi-response, and typed/backend finite-monitor verification across unbounded, product-bounded, and staged APIs; M41 exposes the action-temporal paths through explicit `--strong-fair-action` assumptions.
+- Strong fairness is also **never assumed by default**. M38–M44 support exact-action strong fairness for generalized Büchi, single-response/action-temporal, typed/backend multi-response, and finite-monitor verification across unbounded, product-bounded, and staged APIs; M41 exposes the action-temporal paths and M44 exposes direct finite-monitor verification through explicit `--strong-fair-action` assumptions.
 - Strong fairness means an action enabled infinitely often on an admitted infinite execution must also be taken infinitely often; intermittent enablement therefore matters.
 - Fairness assumptions remain external to the textual temporal grammar. The grammar is still deliberately limited to `response(...)` and `infinitely-often(...)`.
-- Weak and strong fairness cannot currently be combined in one analysis; M41 fails closed on mixed CLI assumptions rather than inventing semantics.
+- Weak and strong fairness cannot currently be combined in one analysis; M41/M44 CLI routing fails closed on mixed assumptions rather than inventing semantics. A combined profile requires an explicit semantic design rather than dispatch precedence.
 - M42 exposes multi-response weak/strong fairness through typed/backend APIs. The direct `respond dual-grant` CLI remains the historical no-fairness surface, and no multi-clause textual temporal syntax is introduced.
-- M37 exposes finite-monitor weak fairness on the direct `monitor` CLI. M43 now implements strong-fair finite-monitor semantics at the typed/backend API layer, but the direct `monitor --strong-fair-action` route remains intentionally unavailable until M44 wires the sealed backend into CLI/reporting; current CLI behavior therefore continues to fail closed rather than silently falling back.
+- M37 exposes finite-monitor weak fairness on the direct `monitor` CLI, and M44 exposes the sealed M43 strong-fair finite-monitor backend through the same direct command for unbounded, product-bounded, and staged analysis.
 - Response obligations remain Boolean pending obligations, not per-request identity queues.
 - The action-temporal frontend supports exact action atoms only; it has no wildcard/Boolean action predicate language, nested temporal operators, temporal negation, or arbitrary formula composition.
 - `all_infinitely_often` is intentionally an infinite-run-only property; finite terminals are ignored for that form. Response fairness instead uses strict finite-terminal handling so a pending finite terminal remains a violation.
@@ -386,18 +397,19 @@ M25–M29 retain product/staged semantic and built-binary regression suites. M32
 
 ## Roadmap
 
-Milestones 1–43 now form a coherent explicit-state stack: safety and bounded honesty -> typed models and independent graph validation -> reachability/deadlock/recurrence -> eventuality and response obligations -> finite monitors and generalized Büchi acceptance -> shared graph/product substrates -> typed/textual/declarative specification frontends -> bounded state properties -> product/staged temporal budgets -> iterative deep-graph SCC traversal -> opt-in exact-action weak fairness -> bounded/staged enablement provenance -> weak-fair response and finite-monitor composition -> direct weak-fair monitor integration -> opt-in exact-action strong fairness -> proof-honest bounded/staged strong-fair Büchi verification -> strong-fair single-response/action-temporal composition -> external strong-fair temporal CLI integration -> per-clause strong-fair multi-response composition -> strong-fair finite-monitor composition.
+Milestones 1–44 now form a coherent explicit-state stack: safety and bounded honesty -> typed models and independent graph validation -> reachability/deadlock/recurrence -> eventuality and response obligations -> finite monitors and generalized Büchi acceptance -> shared graph/product substrates -> typed/textual/declarative specification frontends -> bounded state properties -> product/staged temporal budgets -> iterative deep-graph SCC traversal -> opt-in exact-action weak fairness -> bounded/staged enablement provenance -> weak-fair response and finite-monitor composition -> direct weak-fair monitor integration -> opt-in exact-action strong fairness -> proof-honest bounded/staged strong-fair Büchi verification -> strong-fair single-response/action-temporal composition -> external strong-fair temporal CLI integration -> per-clause strong-fair multi-response composition -> strong-fair finite-monitor composition -> direct strong-fair monitor CLI/reporting integration.
 
-The next architectural phase is **Milestone 44: direct strong-fair finite-monitor CLI and reporting integration**.
+M44 completes the separate weak-fair and strong-fair verticals. Continuing to add one-off routing variants would now have low architectural value. The next architectural phase is **Milestone 45: explicit combined weak/strong fairness profile at the generalized Büchi/recurrent substrate**.
 
-M44 should close the same backend-to-CLI gap that M37 closed for weak fairness. It must reuse the sealed M43 APIs and the existing temporal-option parser/report conventions rather than adding any verification semantics.
+M45 should define one validated fairness profile containing independently ordered weak- and strong-fair exact-action assumptions and verify infinite executions only when they satisfy **all** configured obligations. It must be a semantic core milestone first, not a CLI shortcut: existing no-fair, weak-only, and strong-only APIs remain compatibility authorities while mixed execution filtering is introduced once at the Büchi/recurrent layer and only then composed upward in later slices.
 
-Acceptance criteria for M44:
+Acceptance criteria for M45:
 
-- accept repeated `--strong-fair-action <ACTION>` on the direct `monitor` command and route unbounded, product-bounded, and staged invocations to the corresponding M43 APIs;
-- render strong-fair assumptions explicitly and separately from canonical monitor evidence, preserving existing model/product cutoff reason strings and accounting;
-- preserve historical no-option and weak-fair monitor behavior exactly;
-- fail closed when weak and strong fairness are supplied together until an explicit combined-fairness semantics is designed;
-- retain exit `8` for conclusive monitor violations, exit `3` for product/model `INCONCLUSIVE`, and exit `2` for malformed, duplicate, missing, or mixed fairness input;
-- add built-binary regressions for intermittent strong-fair progress-cycle elimination, unrelated/taken fairness, rejecting-state and finite-terminal precedence, product/model cutoff honesty, explicit report output, and malformed/duplicate/mixed assumption validation;
-- do not add a new traversal engine, fairness-by-default behavior, mixed-fairness semantics, wall-clock bounds, or performance claims.
+- define explicit overlap semantics when the same exact action appears in both sets; because strong fairness implies the corresponding weak obligation, overlap must be canonicalized or otherwise specified deterministically rather than evaluated ambiguously;
+- preserve fairness as an infinite-execution filter only, leaving finite-terminal policy unchanged;
+- reuse complete-model action enablement and existing SCC/product substrates rather than creating another traversal engine;
+- return only real closed recurrent witnesses satisfying every weak and strong obligation simultaneously;
+- preserve exact no-fair, weak-only, and strong-only results/evidence through differential compatibility tests;
+- include independent small-graph validation that distinguishes continuously enabled weak obligations from intermittently enabled strong obligations and exercises overlapping assumptions;
+- do not expose mixed CLI syntax until the combined backend semantics and witness contracts are sealed;
+- make no performance claim from CI timing.
