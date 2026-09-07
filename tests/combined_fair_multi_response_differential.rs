@@ -203,7 +203,9 @@ fn multi_evidence(
     }
 }
 
-fn buchi_evidence(counterexample: &Option<BuchiCounterexample<usize, Vec<bool>>>) -> EvidenceSignature {
+fn buchi_evidence(
+    counterexample: &Option<BuchiCounterexample<usize, Vec<bool>>>,
+) -> EvidenceSignature {
     match counterexample {
         None => EvidenceSignature::None,
         Some(BuchiCounterexample::FiniteTerminal {
@@ -239,7 +241,9 @@ fn bounded_outcome(outcome: &BoundedOutcome<BuchiStatus>) -> BoundedOutcome<Mult
     }
 }
 
-fn analysis_outcome(outcome: &AnalysisOutcome<BuchiStatus>) -> AnalysisOutcome<MultiResponseStatus> {
+fn analysis_outcome(
+    outcome: &AnalysisOutcome<BuchiStatus>,
+) -> AnalysisOutcome<MultiResponseStatus> {
     match outcome {
         AnalysisOutcome::Conclusive(status) => AnalysisOutcome::Conclusive(multi_status(*status)),
         AnalysisOutcome::Inconclusive(reason) => AnalysisOutcome::Inconclusive(*reason),
@@ -263,9 +267,15 @@ fn all_two_node_products_match_direct_combined_fair_buchi() {
 
             assert_eq!(multi.status, multi_status(buchi.status), "{context}");
             assert_eq!(multi.model_states, buchi.model_states, "{context}");
-            assert_eq!(multi.model_transitions, buchi.model_transitions, "{context}");
+            assert_eq!(
+                multi.model_transitions, buchi.model_transitions,
+                "{context}"
+            );
             assert_eq!(multi.product_states, buchi.product_states, "{context}");
-            assert_eq!(multi.product_transitions, buchi.product_transitions, "{context}");
+            assert_eq!(
+                multi.product_transitions, buchi.product_transitions,
+                "{context}"
+            );
             assert_eq!(
                 multi_evidence(&multi.counterexample),
                 buchi_evidence(&buchi.counterexample),
@@ -301,25 +311,25 @@ fn all_two_node_product_budgets_match_direct_combined_fair_buchi() {
 
                 assert_eq!(multi.outcome, bounded_outcome(&buchi.outcome), "{context}");
                 assert_eq!(multi.model_states, buchi.model_states, "{context}");
-                assert_eq!(multi.model_transitions, buchi.model_transitions, "{context}");
+                assert_eq!(
+                    multi.model_transitions, buchi.model_transitions,
+                    "{context}"
+                );
                 assert_eq!(multi.product_states, buchi.product_states, "{context}");
                 assert_eq!(
                     multi.checked_product_states, buchi.checked_product_states,
                     "{context}"
                 );
                 assert_eq!(
-                    multi.explored_product_transitions,
-                    buchi.explored_product_transitions,
+                    multi.explored_product_transitions, buchi.explored_product_transitions,
                     "{context}"
                 );
                 assert_eq!(
-                    multi.retained_product_transitions,
-                    buchi.retained_product_transitions,
+                    multi.retained_product_transitions, buchi.retained_product_transitions,
                     "{context}"
                 );
                 assert_eq!(
-                    multi.max_product_depth_reached,
-                    buchi.max_product_depth_reached,
+                    multi.max_product_depth_reached, buchi.max_product_depth_reached,
                     "{context}"
                 );
                 assert_eq!(
@@ -358,22 +368,25 @@ fn all_two_node_staged_budgets_match_direct_combined_fair_buchi() {
 
                 assert_eq!(multi.outcome, analysis_outcome(&buchi.outcome), "{context}");
                 assert_eq!(multi.model_completion, buchi.model_completion, "{context}");
-                assert_eq!(multi.product_completion, buchi.product_completion, "{context}");
+                assert_eq!(
+                    multi.product_completion, buchi.product_completion,
+                    "{context}"
+                );
                 assert_eq!(multi.model_states, buchi.model_states, "{context}");
-                assert_eq!(multi.checked_model_states, buchi.checked_model_states, "{context}");
                 assert_eq!(
-                    multi.explored_model_transitions,
-                    buchi.explored_model_transitions,
+                    multi.checked_model_states, buchi.checked_model_states,
                     "{context}"
                 );
                 assert_eq!(
-                    multi.retained_model_transitions,
-                    buchi.retained_model_transitions,
+                    multi.explored_model_transitions, buchi.explored_model_transitions,
                     "{context}"
                 );
                 assert_eq!(
-                    multi.max_model_depth_reached,
-                    buchi.max_model_depth_reached,
+                    multi.retained_model_transitions, buchi.retained_model_transitions,
+                    "{context}"
+                );
+                assert_eq!(
+                    multi.max_model_depth_reached, buchi.max_model_depth_reached,
                     "{context}"
                 );
                 assert_eq!(multi.product_states, buchi.product_states, "{context}");
@@ -382,18 +395,15 @@ fn all_two_node_staged_budgets_match_direct_combined_fair_buchi() {
                     "{context}"
                 );
                 assert_eq!(
-                    multi.explored_product_transitions,
-                    buchi.explored_product_transitions,
+                    multi.explored_product_transitions, buchi.explored_product_transitions,
                     "{context}"
                 );
                 assert_eq!(
-                    multi.retained_product_transitions,
-                    buchi.retained_product_transitions,
+                    multi.retained_product_transitions, buchi.retained_product_transitions,
                     "{context}"
                 );
                 assert_eq!(
-                    multi.max_product_depth_reached,
-                    buchi.max_product_depth_reached,
+                    multi.max_product_depth_reached, buchi.max_product_depth_reached,
                     "{context}"
                 );
                 assert_eq!(
