@@ -138,8 +138,8 @@ pub use multi_temporal::{
     check_multi_response_temporal_with_fairness_profile_and_product_limits,
     check_multi_response_temporal_with_limits, check_multi_response_temporal_with_product_limits,
     parse_multi_response_temporal, ExactResponseClause, MultiResponseTemporalParseError,
-    MultiResponseTemporalParseErrorKind, MultiResponseTemporalSpec,
-    MultiResponseTemporalSpecError, ResponseActionRole,
+    MultiResponseTemporalParseErrorKind, MultiResponseTemporalSpec, MultiResponseTemporalSpecError,
+    ResponseActionRole,
 };
 pub use property::{
     check_deadlock, check_reachability, check_reachability_with_limits, BoundedReachabilityResult,
