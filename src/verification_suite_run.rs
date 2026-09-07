@@ -165,7 +165,9 @@ pub fn run_verification_suite_json(manifest_path: impl AsRef<Path>) -> Verificat
     }
 }
 
-fn run_verification_suite_json_inner(manifest_path: &Path) -> Result<VerificationSuiteJsonRun, String> {
+fn run_verification_suite_json_inner(
+    manifest_path: &Path,
+) -> Result<VerificationSuiteJsonRun, String> {
     let suite = load_verification_suite(manifest_path).map_err(|error| error.to_string())?;
     let base = manifest_path.parent().unwrap_or_else(|| Path::new(""));
     let mut jobs = Vec::with_capacity(suite.job_paths().len());
