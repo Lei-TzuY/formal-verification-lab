@@ -27,11 +27,12 @@ use formal_verification_lab::examples::{
 };
 use formal_verification_lab::fairness::WeakFairness;
 use formal_verification_lab::fairness_report::{
-    render_analysis_strong_fair_temporal_report, render_analysis_weak_fair_monitor_report,
-    render_analysis_weak_fair_temporal_report, render_bounded_strong_fair_temporal_report,
+    render_analysis_strong_fair_monitor_report, render_analysis_strong_fair_temporal_report,
+    render_analysis_weak_fair_monitor_report, render_analysis_weak_fair_temporal_report,
+    render_bounded_strong_fair_monitor_report, render_bounded_strong_fair_temporal_report,
     render_bounded_weak_fair_monitor_report, render_bounded_weak_fair_temporal_report,
-    render_strong_fair_temporal_report, render_weak_fair_monitor_report,
-    render_weak_fair_temporal_report,
+    render_strong_fair_monitor_report, render_strong_fair_temporal_report,
+    render_weak_fair_monitor_report, render_weak_fair_temporal_report,
 };
 use formal_verification_lab::monitor::{
     check_monitor, check_monitor_with_limits, check_monitor_with_product_limits, FiniteMonitor,
@@ -47,6 +48,10 @@ use formal_verification_lab::monitor_fairness::{
 };
 use formal_verification_lab::monitor_report::{
     render_analysis_monitor_report, render_bounded_monitor_report, render_monitor_report,
+};
+use formal_verification_lab::monitor_strong_fairness::{
+    check_monitor_with_strong_fairness, check_monitor_with_strong_fairness_and_limits,
+    check_monitor_with_strong_fairness_and_product_limits,
 };
 use formal_verification_lab::multi_response::{
     check_multi_response, check_multi_response_with_limits,
@@ -548,7 +553,63 @@ where
     let options = parse_temporal_options(option_args)?;
 
     if !options.strong_fairness.is_empty() {
-        return Err("strong fairness is not supported by monitor; use --weak-fair-action or omit fairness assumptions".to_owned());
+        if options.has_model_limits {
+            let limits = AnalysisLimits::new(options.model_limits, options.product_limits);
+            let result = check_monitor_with_strong_fairness_and_limits(
+                &model,
+                &monitor,
+                &options.strong_fairness,
+                limits,
+            )
+            .map_err(|error| error.to_string())?;
+            print!(
+                "{}",
+                render_analysis_strong_fair_monitor_report(
+                    model.name(),
+                    &result,
+                    &options.strong_fairness,
+                )
+            );
+            return Ok(match &result.outcome {
+                AnalysisOutcome::Conclusive(MonitorStatus::Satisfied) => ExitCode::SUCCESS,
+                AnalysisOutcome::Conclusive(MonitorStatus::Violated) => ExitCode::from(8),
+                AnalysisOutcome::Inconclusive(_) => ExitCode::from(3),
+            });
+        }
+
+        if options.has_product_limits {
+            let result = check_monitor_with_strong_fairness_and_product_limits(
+                &model,
+                &monitor,
+                &options.strong_fairness,
+                options.product_limits,
+            )
+            .map_err(|error| error.to_string())?;
+            print!(
+                "{}",
+                render_bounded_strong_fair_monitor_report(
+                    model.name(),
+                    &result,
+                    &options.strong_fairness,
+                )
+            );
+            return Ok(match &result.outcome {
+                BoundedOutcome::Conclusive(MonitorStatus::Satisfied) => ExitCode::SUCCESS,
+                BoundedOutcome::Conclusive(MonitorStatus::Violated) => ExitCode::from(8),
+                BoundedOutcome::Inconclusive(_) => ExitCode::from(3),
+            });
+        }
+
+        let result = check_monitor_with_strong_fairness(&model, &monitor, &options.strong_fairness)
+            .map_err(|error| error.to_string())?;
+        print!(
+            "{}",
+            render_strong_fair_monitor_report(model.name(), &result, &options.strong_fairness,)
+        );
+        return Ok(match result.status {
+            MonitorStatus::Satisfied => ExitCode::SUCCESS,
+            MonitorStatus::Violated => ExitCode::from(8),
+        });
     }
 
     if !options.fairness.is_empty() {
