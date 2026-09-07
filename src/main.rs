@@ -1389,8 +1389,7 @@ fn parse_temporal_options(args: &[String]) -> Result<TemporalCliOptions, String>
                     _ => unreachable!("temporal limit flag matched above"),
                 }
             }
-            _ => return Err(format!("unknown option '{flag}'\
-{}", usage())),
+            _ => return Err(format!("unknown option '{flag}'\n{}", usage())),
         }
         index += 2;
     }
@@ -1436,8 +1435,7 @@ fn parse_analysis_limits(args: &[String]) -> Result<AnalysisLimits, String> {
             "--max-product-states" => set_limit(&mut product.max_states, parsed, flag)?,
             "--max-product-transitions" => set_limit(&mut product.max_transitions, parsed, flag)?,
             "--max-product-depth" => set_limit(&mut product.max_depth, parsed, flag)?,
-            _ => return Err(format!("unknown option '{flag}'\
-{}", usage())),
+            _ => return Err(format!("unknown option '{flag}'\n{}", usage())),
         }
 
         index += 2;
@@ -1471,8 +1469,7 @@ fn parse_named_limits(
         } else if flag == depth_flag {
             set_limit(&mut limits.max_depth, parsed, flag)?;
         } else {
-            return Err(format!("unknown option '{flag}'\
-{}", usage()));
+            return Err(format!("unknown option '{flag}'\n{}", usage()));
         }
 
         index += 2;
@@ -1523,10 +1520,5 @@ fn usage() -> String {
 }
 
 fn print_examples() {
-    println!("counter\
-mutex-bug\
-traffic-light\
-peterson\
-peterson-bug\
-commuting-counters");
+    println!("counter\nmutex-bug\ntraffic-light\npeterson\npeterson-bug\ncommuting-counters");
 }
