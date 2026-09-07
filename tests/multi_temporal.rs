@@ -1,3 +1,8 @@
+use formal_verification_lab::multi_response::{
+    check_multi_response_with_fairness_profile,
+    check_multi_response_with_fairness_profile_and_limits,
+    check_multi_response_with_fairness_profile_and_product_limits,
+};
 use formal_verification_lab::multi_response_examples::{
     dual_response_protocol, unfair_dual_response_protocol,
 };
@@ -6,11 +11,8 @@ use formal_verification_lab::{
     check_multi_response_temporal_with_fairness_profile,
     check_multi_response_temporal_with_fairness_profile_and_limits,
     check_multi_response_temporal_with_fairness_profile_and_product_limits,
-    check_multi_response_with_fairness_profile,
-    check_multi_response_with_fairness_profile_and_limits,
-    check_multi_response_with_fairness_profile_and_product_limits, parse_declarative_model,
-    parse_multi_response_temporal, AnalysisLimits, AnalysisOutcome, BoundedOutcome,
-    ExplorationLimits, FairnessProfile, Invariant, MultiResponseCounterexample,
+    parse_declarative_model, parse_multi_response_temporal, AnalysisLimits, AnalysisOutcome,
+    BoundedOutcome, ExplorationLimits, FairnessProfile, Invariant, MultiResponseCounterexample,
     MultiResponseProperty, MultiResponseStatus, MultiResponseTemporalParseErrorKind,
     MultiResponseTemporalSpecError, ResponseActionRole, ResponseClause, StateVariable, Transition,
     TransitionSystem,
