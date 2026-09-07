@@ -24,9 +24,7 @@ fn main() -> ExitCode {
             ExitCode::from(2)
         }
         _ => {
-            eprintln!(
-                "usage: fvlab-suite <suite-manifest> [--check-expectations] --format json"
-            );
+            eprintln!("usage: fvlab-suite <suite-manifest> [--check-expectations] --format json");
             ExitCode::from(2)
         }
     }
