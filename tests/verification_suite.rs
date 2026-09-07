@@ -36,9 +36,7 @@ fn write_job(root: &Path, name: &str, model_source: &str, tail: &str) -> PathBuf
     fs::write(&property, property_source()).unwrap();
     fs::write(
         &job,
-        format!(
-            "model \"{name}.fvl\"\nproperty \"{name}.fvt\"\n{tail}"
-        ),
+        format!("model \"{name}.fvl\"\nproperty \"{name}.fvt\"\n{tail}"),
     )
     .unwrap();
     job
@@ -46,7 +44,8 @@ fn write_job(root: &Path, name: &str, model_source: &str, tail: &str) -> PathBuf
 
 #[test]
 fn suite_parser_preserves_order_and_canonical_round_trip() {
-    let input = "# ordered batch\nsuite \"nightly \\\"core\\\"\"\njob \"a.fvj\"\njob \"nested/b.fvj\"\n";
+    let input =
+        "# ordered batch\nsuite \"nightly \\\"core\\\"\"\njob \"a.fvj\"\njob \"nested/b.fvj\"\n";
     let suite = parse_verification_suite(input).unwrap();
     assert_eq!(suite.name(), "nightly \"core\"");
     assert_eq!(suite.job_paths(), ["a.fvj", "nested/b.fvj"]);
@@ -59,10 +58,9 @@ fn suite_parser_preserves_order_and_canonical_round_trip() {
 
 #[test]
 fn suite_parser_rejects_duplicate_jobs_and_bounded_overflow() {
-    let duplicate = parse_verification_suite(
-        "suite \"duplicate\"\njob \"same.fvj\"\njob \"same.fvj\"\n",
-    )
-    .unwrap_err();
+    let duplicate =
+        parse_verification_suite("suite \"duplicate\"\njob \"same.fvj\"\njob \"same.fvj\"\n")
+            .unwrap_err();
     assert!(matches!(
         duplicate.kind(),
         VerificationSuiteParseErrorKind::DuplicateJob { path } if path == "same.fvj"
@@ -113,10 +111,22 @@ fn suite_execution_matches_single_job_envelopes_and_aggregate_precedence() {
     for (entry, expected) in run.envelope.jobs.iter().zip(direct.iter()) {
         assert_eq!(entry.result, expected.envelope);
     }
-    assert_eq!(run.envelope.jobs[0].result.outcome, VerificationJobOutcome::Satisfied);
-    assert_eq!(run.envelope.jobs[1].result.outcome, VerificationJobOutcome::Inconclusive);
-    assert_eq!(run.envelope.jobs[2].result.outcome, VerificationJobOutcome::Violated);
-    assert_eq!(run.to_json(), run_verification_suite_json(&suite_path).to_json());
+    assert_eq!(
+        run.envelope.jobs[0].result.outcome,
+        VerificationJobOutcome::Satisfied
+    );
+    assert_eq!(
+        run.envelope.jobs[1].result.outcome,
+        VerificationJobOutcome::Inconclusive
+    );
+    assert_eq!(
+        run.envelope.jobs[2].result.outcome,
+        VerificationJobOutcome::Violated
+    );
+    assert_eq!(
+        run.to_json(),
+        run_verification_suite_json(&suite_path).to_json()
+    );
 
     let _ = fs::remove_dir_all(root);
 }
@@ -138,7 +148,10 @@ fn per_job_error_has_aggregate_precedence_without_suppressing_later_results() {
     assert_eq!(run.exit_code, 2);
     assert_eq!(run.envelope.outcome, VerificationSuiteOutcome::Error);
     assert_eq!(run.envelope.jobs.len(), 2);
-    assert_eq!(run.envelope.jobs[0].result.outcome, VerificationJobOutcome::Error);
+    assert_eq!(
+        run.envelope.jobs[0].result.outcome,
+        VerificationJobOutcome::Error
+    );
     assert_eq!(
         run.envelope.jobs[1].result.outcome,
         VerificationJobOutcome::Satisfied
@@ -158,7 +171,9 @@ fn suite_level_parse_error_is_structured_and_has_no_job_results() {
     assert_eq!(run.envelope.outcome, VerificationSuiteOutcome::Error);
     assert!(run.envelope.jobs.is_empty());
     assert!(run.envelope.error.is_some());
-    assert!(run.to_json().contains("verification suite requires at least one job"));
+    assert!(run
+        .to_json()
+        .contains("verification suite requires at least one job"));
 
     let _ = fs::remove_dir_all(root);
 }
