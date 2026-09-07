@@ -2,13 +2,14 @@ use formal_verification_lab::buchi::{
     check_buchi_with_limits, check_buchi_with_product_limits, AcceptanceSet, BuchiAutomaton,
     BuchiCounterexample, BuchiProductState, BuchiStatus, FiniteRunPolicy,
 };
-use formal_verification_lab::buchi_examples::{finite_quiet_run, pulse_automaton, unfair_second_pulse};
+use formal_verification_lab::buchi_examples::{
+    finite_quiet_run, pulse_automaton, unfair_second_pulse,
+};
 use formal_verification_lab::{
     check_buchi_with_fairness_profile, check_buchi_with_fairness_profile_and_limits,
     check_buchi_with_fairness_profile_and_product_limits,
     check_buchi_with_strong_fairness_and_limits,
-    check_buchi_with_strong_fairness_and_product_limits,
-    check_buchi_with_weak_fairness_and_limits,
+    check_buchi_with_strong_fairness_and_product_limits, check_buchi_with_weak_fairness_and_limits,
     check_buchi_with_weak_fairness_and_product_limits, AnalysisInconclusiveReason, AnalysisLimits,
     AnalysisOutcome, AnalysisStage, BoundedOutcome, ExplorationLimits, FairnessProfile,
     InconclusiveReason, Invariant, StateVariable, StrongFairness, TraceStep, Transition,
@@ -195,9 +196,7 @@ fn recurrent_subset(prefix: OraclePrefix, subset: usize) -> bool {
         .filter(|node| subset_contains(subset, *node))
         .collect::<Vec<_>>();
     if members.is_empty()
-        || members
-            .iter()
-            .any(|node| !prefix.discovered[*node])
+        || members.iter().any(|node| !prefix.discovered[*node])
         || !members
             .iter()
             .any(|node| reachable_from_initial(&prefix.retained, *node))
@@ -235,9 +234,7 @@ fn internal_take(
     (0..N).any(|from| {
         subset_contains(subset, from)
             && (0..N).any(|to| {
-                subset_contains(subset, to)
-                    && retained[from][to]
-                    && codes[from * N + to] == code
+                subset_contains(subset, to) && retained[from][to] && codes[from * N + to] == code
             })
     })
 }
@@ -264,8 +261,7 @@ fn subset_is_fair(
         some_disabled || internal_take(codes, &prefix.retained, subset, *code)
     });
     let strong_ok = strong_codes.iter().all(|code| {
-        let some_enabled =
-            (0..N).any(|node| subset_contains(subset, node) && enabled(node, *code));
+        let some_enabled = (0..N).any(|node| subset_contains(subset, node) && enabled(node, *code));
         !some_enabled || internal_take(codes, &prefix.retained, subset, *code)
     });
     weak_ok && strong_ok
@@ -389,7 +385,8 @@ fn empty_and_single_class_profiles_delegate_exactly_under_bounds() {
             staged_limits,
         )
         .unwrap(),
-        check_buchi_with_weak_fairness_and_limits(&model, &automaton, &weak, staged_limits).unwrap()
+        check_buchi_with_weak_fairness_and_limits(&model, &automaton, &weak, staged_limits)
+            .unwrap()
     );
 
     let strong_profile = FairnessProfile::new(Vec::<&str>::new(), ["pulse-b"]).unwrap();
@@ -437,7 +434,10 @@ fn generous_limits_preserve_unbounded_mixed_result_and_evidence() {
         ExplorationLimits::unbounded(),
     )
     .unwrap();
-    assert_eq!(product.outcome, BoundedOutcome::Conclusive(unbounded.status));
+    assert_eq!(
+        product.outcome,
+        BoundedOutcome::Conclusive(unbounded.status)
+    );
     assert_eq!(product.model_states, unbounded.model_states);
     assert_eq!(product.model_transitions, unbounded.model_transitions);
     assert_eq!(product.product_states, unbounded.product_states);
@@ -454,7 +454,10 @@ fn generous_limits_preserve_unbounded_mixed_result_and_evidence() {
         AnalysisLimits::unbounded(),
     )
     .unwrap();
-    assert_eq!(staged.outcome, AnalysisOutcome::Conclusive(unbounded.status));
+    assert_eq!(
+        staged.outcome,
+        AnalysisOutcome::Conclusive(unbounded.status)
+    );
     assert_eq!(staged.model_states, unbounded.model_states);
     assert_eq!(staged.product_states, unbounded.product_states);
     assert_eq!(
@@ -606,9 +609,9 @@ fn product_and_staged_transition_limits_match_independent_mixed_oracle() {
                 } else {
                     assert_eq!(
                         product.outcome,
-                        BoundedOutcome::Inconclusive(
-                            InconclusiveReason::TransitionLimitReached { limit }
-                        ),
+                        BoundedOutcome::Inconclusive(InconclusiveReason::TransitionLimitReached {
+                            limit
+                        }),
                         "product inconclusive: {label} assignment={assignment} limit={limit}"
                     );
                     assert!(product.counterexample.is_none());
