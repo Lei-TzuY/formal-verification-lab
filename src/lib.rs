@@ -13,6 +13,7 @@ pub mod buchi_examples;
 pub mod buchi_report;
 pub mod builder;
 pub mod checker;
+pub mod combined_fairness;
 pub mod declarative;
 pub mod eventuality;
 pub mod eventuality_report;
@@ -70,6 +71,9 @@ pub use builder::TransitionSystemBuilder;
 pub use checker::{
     check, check_with_limits, CheckResult, Counterexample, ExplorationLimits, InconclusiveReason,
     TraceStep, VerificationStatus,
+};
+pub use combined_fairness::{
+    check_buchi_with_fairness_profile, FairnessProfile, FairnessProfileError,
 };
 pub use declarative::{
     parse_declarative_document, parse_declarative_model, DeclarativeDocument, DeclarativeModelError,
