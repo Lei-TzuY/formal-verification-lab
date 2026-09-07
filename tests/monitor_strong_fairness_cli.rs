@@ -103,7 +103,9 @@ fn bounded_strong_fair_monitor_cli_preserves_cutoff_honesty_and_exit_three() {
     assert_eq!(product.status.code(), Some(3));
     let product_text = stdout(&product);
     assert!(product_text.contains("monitor verification: INCONCLUSIVE"));
-    assert!(product_text.contains("product inconclusive reason:"));
+    assert!(
+        product_text.contains("product inconclusive reason: transition limit reached (max 3)")
+    );
     assert!(product_text.contains("strong-fair action: \"close\""));
     assert!(!product_text.contains("counterexample: PROGRESS_CYCLE"));
 
@@ -119,6 +121,9 @@ fn bounded_strong_fair_monitor_cli_preserves_cutoff_honesty_and_exit_three() {
     let staged_text = stdout(&staged);
     assert!(staged_text.contains("monitor verification: INCONCLUSIVE"));
     assert!(staged_text.contains("analysis inconclusive stage: model"));
+    assert!(
+        staged_text.contains("analysis inconclusive reason: transition limit reached (max 2)")
+    );
     assert!(staged_text.contains("strong-fair action: \"close\""));
     assert!(!staged_text.contains("counterexample: PROGRESS_CYCLE"));
 }
