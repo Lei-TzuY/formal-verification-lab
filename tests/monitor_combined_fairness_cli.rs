@@ -115,3 +115,13 @@ fn mixed_monitor_fairness_preserves_product_and_model_cutoff_provenance() {
     assert!(staged_text.contains("weak-fair action: \"close\""));
     assert!(staged_text.contains("strong-fair action: \"unrelated\""));
 }
+
+#[test]
+fn monitor_usage_advertises_both_fairness_classes() {
+    let output = run(&["monitor", "session-ok", "--unknown-option", "1"]);
+    assert_eq!(output.status.code(), Some(2));
+    let text = stderr(&output);
+    assert!(text.contains("monitor <session-ok|session-double-open|session-stuck|session-unfair-close|session-open-terminal>"));
+    assert!(text.contains("[--weak-fair-action ACTION]..."));
+    assert!(text.contains("[--strong-fair-action ACTION]..."));
+}
