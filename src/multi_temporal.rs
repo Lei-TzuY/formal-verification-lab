@@ -390,6 +390,10 @@ fn parse_clause_line(
     })
 }
 
+type ParseArgument = (String, usize);
+type ParseError = (usize, MultiResponseTemporalParseErrorKind);
+type ParsedArguments = (Vec<ParseArgument>, usize);
+
 struct LineParser<'a> {
     input: &'a str,
     position: usize,
@@ -435,7 +439,7 @@ impl<'a> LineParser<'a> {
         &mut self,
         expected: u8,
         kind: MultiResponseTemporalParseErrorKind,
-    ) -> Result<(), (usize, MultiResponseTemporalParseErrorKind)> {
+    ) -> Result<(), ParseError> {
         if self.current_byte() == Some(expected) {
             self.position += 1;
             Ok(())
@@ -444,9 +448,7 @@ impl<'a> LineParser<'a> {
         }
     }
 
-    fn parse_arguments(
-        &mut self,
-    ) -> Result<(Vec<(String, usize)>, usize), (usize, MultiResponseTemporalParseErrorKind)> {
+    fn parse_arguments(&mut self) -> Result<ParsedArguments, ParseError> {
         let mut arguments = Vec::new();
         self.skip_whitespace();
         if self.current_byte() == Some(b')') {
@@ -478,9 +480,7 @@ impl<'a> LineParser<'a> {
         }
     }
 
-    fn parse_string(
-        &mut self,
-    ) -> Result<(String, usize), (usize, MultiResponseTemporalParseErrorKind)> {
+    fn parse_string(&mut self) -> Result<ParseArgument, ParseError> {
         let start = self.position;
         if self.current_byte() != Some(b'"') {
             return Err((start, MultiResponseTemporalParseErrorKind::ExpectedString));
