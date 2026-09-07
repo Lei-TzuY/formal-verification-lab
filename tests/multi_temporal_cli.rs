@@ -133,20 +133,15 @@ fn multi_file_preserves_product_and_model_cutoff_provenance() {
     let property = write_temp("property", "fvt", property_source());
 
     let mut product_args = multi_file_args(&model, &property);
-    product_args.extend([
-        "--max-product-transitions".to_owned(),
-        "3".to_owned(),
-    ]);
+    product_args.extend(["--max-product-transitions".to_owned(), "3".to_owned()]);
     let product = run_owned(&product_args);
     assert_eq!(product.status.code(), Some(3));
-    assert!(stdout(&product)
-        .contains("product inconclusive reason: transition limit reached (max 3)"));
+    assert!(
+        stdout(&product).contains("product inconclusive reason: transition limit reached (max 3)")
+    );
 
     let mut model_args = multi_file_args(&model, &property);
-    model_args.extend([
-        "--max-model-transitions".to_owned(),
-        "2".to_owned(),
-    ]);
+    model_args.extend(["--max-model-transitions".to_owned(), "2".to_owned()]);
     let model_cutoff = run_owned(&model_args);
     assert_eq!(model_cutoff.status.code(), Some(3));
     let model_text = stdout(&model_cutoff);
