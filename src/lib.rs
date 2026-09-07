@@ -225,11 +225,15 @@ pub use verification_result::{
     VERIFICATION_JOB_RESULT_SCHEMA_VERSION,
 };
 pub use verification_suite::{
-    parse_verification_suite, VerificationSuite, VerificationSuiteParseError,
-    VerificationSuiteParseErrorKind, MAX_VERIFICATION_SUITE_JOBS,
+    parse_verification_suite, VerificationExpectedOutcome, VerificationSuite,
+    VerificationSuiteParseError, VerificationSuiteParseErrorKind, MAX_VERIFICATION_SUITE_JOBS,
 };
 pub use verification_suite_run::{
-    load_verification_suite, run_verification_suite_json, VerificationSuiteEntryResult,
-    VerificationSuiteJsonRun, VerificationSuiteLoadError, VerificationSuiteOutcome,
-    VerificationSuiteResultEnvelope, VERIFICATION_SUITE_RESULT_SCHEMA_VERSION,
+    load_verification_suite, run_verification_suite_expectations_json, run_verification_suite_json,
+    VerificationRegressionSuiteEntryResult, VerificationRegressionSuiteJsonRun,
+    VerificationRegressionSuiteOutcome, VerificationRegressionSuiteResultEnvelope,
+    VerificationSuiteEntryResult, VerificationSuiteJsonRun, VerificationSuiteLoadError,
+    VerificationSuiteOutcome, VerificationSuiteResultEnvelope,
+    VERIFICATION_REGRESSION_MISMATCH_EXIT_CODE,
+    VERIFICATION_REGRESSION_SUITE_RESULT_SCHEMA_VERSION, VERIFICATION_SUITE_RESULT_SCHEMA_VERSION,
 };
