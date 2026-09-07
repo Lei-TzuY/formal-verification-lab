@@ -595,9 +595,7 @@ where
     S: Clone + Eq + Hash,
 {
     let property = spec.to_property()?;
-    check_multi_response_with_fairness_profile_and_product_limits(
-        model, &property, profile, limits,
-    )
+    check_multi_response_with_fairness_profile_and_product_limits(model, &property, profile, limits)
 }
 
 pub fn check_multi_response_temporal_with_limits<S>(
