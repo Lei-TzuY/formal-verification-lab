@@ -54,6 +54,7 @@ pub mod strong_fairness;
 pub mod temporal;
 pub mod temporal_parse;
 pub mod temporal_report;
+pub mod verification_execution;
 pub mod verification_job;
 pub mod verification_result;
 
@@ -203,6 +204,9 @@ pub use temporal::{
 };
 pub use temporal_parse::{parse_action_temporal, TemporalParseError, TemporalParseErrorKind};
 pub use temporal_report::{render_bounded_temporal_report, render_temporal_report};
+pub use verification_execution::{
+    execute_multi_response, MultiResponseExecutionConfig, MultiResponseExecutionResult,
+};
 pub use verification_job::{
     parse_verification_job, VerificationJob, VerificationJobParseError,
     VerificationJobParseErrorKind,
