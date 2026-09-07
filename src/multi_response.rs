@@ -1,6 +1,10 @@
 use crate::bounded::{
     AnalysisInconclusiveReason, AnalysisLimits, AnalysisOutcome, AnalysisStage, BoundedOutcome,
 };
+use crate::bounded_combined_fairness::{
+    check_buchi_with_fairness_profile_and_limits,
+    check_buchi_with_fairness_profile_and_product_limits,
+};
 use crate::bounded_fairness::{
     check_buchi_with_weak_fairness_and_limits, check_buchi_with_weak_fairness_and_product_limits,
 };
@@ -13,6 +17,7 @@ use crate::buchi::{
     BuchiError, BuchiProductState, BuchiResult, BuchiStatus, FiniteRunPolicy,
 };
 use crate::checker::{ExplorationLimits, TraceStep};
+use crate::combined_fairness::{check_buchi_with_fairness_profile, FairnessProfile};
 use crate::fairness::{check_buchi_with_weak_fairness, WeakFairness};
 use crate::graph::{capture_reachable_graph, induced_graph, shortest_path, ReachableGraph};
 use crate::model::TransitionSystem;
@@ -541,6 +546,35 @@ where
     normalize_fair_buchi_result(property, result)
 }
 
+/// Verify the conjunction of response clauses under one canonical weak/strong
+/// fairness profile. Empty, weak-only, and strong-only profiles delegate
+/// exactly to the sealed no-fair, M35 weak-fair, and M42 strong-fair engines.
+/// Only genuinely mixed profiles enter the M45 combined-fair Büchi backend.
+/// Fairness constrains only infinite executions; finite pending terminals remain
+/// violations through the strict terminal policy of the shared response automaton.
+pub fn check_multi_response_with_fairness_profile<S>(
+    model: &TransitionSystem<S>,
+    property: &MultiResponseProperty,
+    profile: &FairnessProfile,
+) -> Result<MultiResponseResult<S>, MultiResponseError>
+where
+    S: Clone + Eq + Hash,
+{
+    if profile.is_empty() {
+        return check_multi_response(model, property);
+    }
+    if profile.strong().is_empty() {
+        return check_multi_response_with_weak_fairness(model, property, profile.weak());
+    }
+    if profile.weak().is_empty() {
+        return check_multi_response_with_strong_fairness(model, property, profile.strong());
+    }
+
+    let automaton = fair_multi_response_automaton(property)?;
+    let result = check_buchi_with_fairness_profile(model, &automaton, profile)?;
+    normalize_fair_buchi_result(property, result)
+}
+
 /// Product-bounded weak-fair multi-response verification after complete model
 /// capture. Unknown product work remains `INCONCLUSIVE` unless a real weakly
 /// fair violating terminal/cycle is already justified by the retained prefix.
@@ -585,6 +619,46 @@ where
     normalize_fair_bounded_buchi_result(property, result)
 }
 
+/// Product-bounded combined-fair multi-response verification after complete
+/// model capture. Compatibility profiles delegate exactly to their historical
+/// authorities. Mixed profiles inherit M46's full-model enablement authority and
+/// proof-honest cutoff handling, so missing prefix work cannot prove a fair
+/// action disabled.
+pub fn check_multi_response_with_fairness_profile_and_product_limits<S>(
+    model: &TransitionSystem<S>,
+    property: &MultiResponseProperty,
+    profile: &FairnessProfile,
+    limits: ExplorationLimits,
+) -> Result<BoundedMultiResponseResult<S>, MultiResponseError>
+where
+    S: Clone + Eq + Hash,
+{
+    if profile.is_empty() {
+        return check_multi_response_with_product_limits(model, property, limits);
+    }
+    if profile.strong().is_empty() {
+        return check_multi_response_with_weak_fairness_and_product_limits(
+            model,
+            property,
+            profile.weak(),
+            limits,
+        );
+    }
+    if profile.weak().is_empty() {
+        return check_multi_response_with_strong_fairness_and_product_limits(
+            model,
+            property,
+            profile.strong(),
+            limits,
+        );
+    }
+
+    let automaton = fair_multi_response_automaton(property)?;
+    let result =
+        check_buchi_with_fairness_profile_and_product_limits(model, &automaton, profile, limits)?;
+    normalize_fair_bounded_buchi_result(property, result)
+}
+
 /// Staged model/product-bounded weak-fair multi-response verification. Fairness
 /// enablement provenance is inherited from the M33 bounded fair Buchi engine;
 /// unknown enablement can never be treated as proof that a fair action is
@@ -625,6 +699,44 @@ where
 
     let automaton = fair_multi_response_automaton(property)?;
     let result = check_buchi_with_strong_fairness_and_limits(model, &automaton, fairness, limits)?;
+    normalize_fair_analysis_buchi_result(property, result)
+}
+
+/// Staged combined-fair multi-response verification under independent model and
+/// product budgets. Compatibility profiles delegate exactly to their existing
+/// staged paths. Genuinely mixed profiles inherit M46's conservative enablement
+/// provenance and deterministic model-before-product inconclusive precedence.
+pub fn check_multi_response_with_fairness_profile_and_limits<S>(
+    model: &TransitionSystem<S>,
+    property: &MultiResponseProperty,
+    profile: &FairnessProfile,
+    limits: AnalysisLimits,
+) -> Result<AnalysisMultiResponseResult<S>, MultiResponseError>
+where
+    S: Clone + Eq + Hash,
+{
+    if profile.is_empty() {
+        return check_multi_response_with_limits(model, property, limits);
+    }
+    if profile.strong().is_empty() {
+        return check_multi_response_with_weak_fairness_and_limits(
+            model,
+            property,
+            profile.weak(),
+            limits,
+        );
+    }
+    if profile.weak().is_empty() {
+        return check_multi_response_with_strong_fairness_and_limits(
+            model,
+            property,
+            profile.strong(),
+            limits,
+        );
+    }
+
+    let automaton = fair_multi_response_automaton(property)?;
+    let result = check_buchi_with_fairness_profile_and_limits(model, &automaton, profile, limits)?;
     normalize_fair_analysis_buchi_result(property, result)
 }
 
