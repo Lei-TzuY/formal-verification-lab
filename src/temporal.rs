@@ -1047,3 +1047,146 @@ fn strip_buchi_trace<S, A>(trace: Vec<TraceStep<BuchiProductState<S, A>>>) -> Ve
         })
         .collect()
 }
+
+/// Verify one typed action-temporal specification under a canonical combined
+/// weak/strong fairness profile. Compatibility profiles delegate exactly to the
+/// existing no-fair, weak-only, or strong-only temporal frontend. Mixed response
+/// specs reuse the M47 response adapter, while recurring specs compile to the
+/// M45 combined-fair Buchi backend with finite terminals still ignored.
+pub fn check_action_temporal_with_fairness_profile<S>(
+    model: &TransitionSystem<S>,
+    spec: &ActionTemporalSpec,
+    profile: &crate::combined_fairness::FairnessProfile,
+) -> Result<TemporalResult<S>, TemporalError>
+where
+    S: Clone + Eq + Hash,
+{
+    if profile.is_empty() {
+        return check_action_temporal(model, spec);
+    }
+    if profile.strong().is_empty() {
+        return check_action_temporal_with_weak_fairness(model, spec, profile.weak());
+    }
+    if profile.weak().is_empty() {
+        return check_action_temporal_with_strong_fairness(model, spec, profile.strong());
+    }
+
+    match &spec.kind {
+        ActionTemporalKind::Response { trigger, response } => {
+            let property = response_property(spec, trigger, response)?;
+            let result =
+                crate::response::check_response_with_fairness_profile(model, &property, profile)?;
+            temporal_result_from_response(result)
+        }
+        ActionTemporalKind::AllInfinitelyOften { actions } => {
+            let automaton = recurring_automaton(spec, actions)?;
+            let result = crate::combined_fairness::check_buchi_with_fairness_profile(
+                model, &automaton, profile,
+            )?;
+            temporal_result_from_buchi(result)
+        }
+    }
+}
+
+/// Verify one typed action-temporal specification under combined fairness while
+/// bounding only action-product construction. The complete model remains the
+/// enablement authority; a real retained fair counterexample is conclusive and
+/// an unresolved cutoff remains `INCONCLUSIVE`.
+pub fn check_action_temporal_with_fairness_profile_and_product_limits<S>(
+    model: &TransitionSystem<S>,
+    spec: &ActionTemporalSpec,
+    profile: &crate::combined_fairness::FairnessProfile,
+    limits: ExplorationLimits,
+) -> Result<BoundedTemporalResult<S>, TemporalError>
+where
+    S: Clone + Eq + Hash,
+{
+    if profile.is_empty() {
+        return check_action_temporal_with_product_limits(model, spec, limits);
+    }
+    if profile.strong().is_empty() {
+        return check_action_temporal_with_weak_fairness_and_product_limits(
+            model,
+            spec,
+            profile.weak(),
+            limits,
+        );
+    }
+    if profile.weak().is_empty() {
+        return check_action_temporal_with_strong_fairness_and_product_limits(
+            model,
+            spec,
+            profile.strong(),
+            limits,
+        );
+    }
+
+    match &spec.kind {
+        ActionTemporalKind::Response { trigger, response } => {
+            let property = response_property(spec, trigger, response)?;
+            let result = crate::response::check_response_with_fairness_profile_and_product_limits(
+                model, &property, profile, limits,
+            )?;
+            bounded_temporal_result_from_response(result)
+        }
+        ActionTemporalKind::AllInfinitelyOften { actions } => {
+            let automaton = recurring_automaton(spec, actions)?;
+            let result = crate::bounded_combined_fairness::check_buchi_with_fairness_profile_and_product_limits(
+                model, &automaton, profile, limits,
+            )?;
+            bounded_temporal_result_from_buchi(result)
+        }
+    }
+}
+
+/// Verify one typed action-temporal specification under combined fairness with
+/// independent model-capture and product budgets. Mixed profiles inherit M46's
+/// conservative enablement provenance and exact model-before-product stage
+/// precedence; compatibility profiles preserve their historical paths exactly.
+pub fn check_action_temporal_with_fairness_profile_and_limits<S>(
+    model: &TransitionSystem<S>,
+    spec: &ActionTemporalSpec,
+    profile: &crate::combined_fairness::FairnessProfile,
+    limits: AnalysisLimits,
+) -> Result<AnalysisTemporalResult<S>, TemporalError>
+where
+    S: Clone + Eq + Hash,
+{
+    if profile.is_empty() {
+        return check_action_temporal_with_limits(model, spec, limits);
+    }
+    if profile.strong().is_empty() {
+        return check_action_temporal_with_weak_fairness_and_limits(
+            model,
+            spec,
+            profile.weak(),
+            limits,
+        );
+    }
+    if profile.weak().is_empty() {
+        return check_action_temporal_with_strong_fairness_and_limits(
+            model,
+            spec,
+            profile.strong(),
+            limits,
+        );
+    }
+
+    match &spec.kind {
+        ActionTemporalKind::Response { trigger, response } => {
+            let property = response_property(spec, trigger, response)?;
+            let result = crate::response::check_response_with_fairness_profile_and_limits(
+                model, &property, profile, limits,
+            )?;
+            analysis_temporal_result_from_response(result)
+        }
+        ActionTemporalKind::AllInfinitelyOften { actions } => {
+            let automaton = recurring_automaton(spec, actions)?;
+            let result =
+                crate::bounded_combined_fairness::check_buchi_with_fairness_profile_and_limits(
+                    model, &automaton, profile, limits,
+                )?;
+            analysis_temporal_result_from_buchi(result)
+        }
+    }
+}
