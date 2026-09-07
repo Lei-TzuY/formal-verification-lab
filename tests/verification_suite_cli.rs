@@ -12,6 +12,19 @@ fn run(args: &[String]) -> Output {
         .expect("fvlab-suite binary should execute")
 }
 
+fn run_job_json(manifest: &Path) -> Output {
+    Command::new(env!("CARGO_BIN_EXE_fvlab"))
+        .args([
+            "temporal",
+            "job",
+            manifest.to_str().expect("fixture path should be UTF-8"),
+            "--format",
+            "json",
+        ])
+        .output()
+        .expect("fvlab binary should execute")
+}
+
 fn stdout(output: &Output) -> String {
     String::from_utf8(output.stdout.clone()).expect("stdout should be UTF-8")
 }
@@ -38,6 +51,10 @@ fn satisfied_model_source() -> &'static str {
 
 fn unfair_model_source() -> &'static str {
     "model \"unfair\"\nstate \"idle\"\nstate \"waiting\"\ninitial \"idle\"\nedge \"idle\" \"request\" \"waiting\"\nedge \"waiting\" \"wait\" \"waiting\"\nedge \"waiting\" \"grant\" \"idle\"\n"
+}
+
+fn terminal_model_source() -> &'static str {
+    "model \"terminal\"\nstate \"idle\"\nstate \"waiting\"\ninitial \"idle\"\nedge \"idle\" \"request\" \"waiting\"\n"
 }
 
 fn write_job(root: &Path, name: &str, model_source: &str, tail: &str) {
@@ -91,6 +108,86 @@ fn suite_binary_preserves_order_and_aggregate_violation_precedence() {
     assert!(satisfied < inconclusive && inconclusive < violated);
     assert!(json.contains("\"outcome\":\"inconclusive\",\"status\":\"INCONCLUSIVE\""));
     assert!(json.contains("\"kind\":\"lasso\""));
+
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn suite_binary_differentially_preserves_every_m57_job_class() {
+    let root = fixture_dir("differential");
+    fs::write(root.join("bad.fvj"), "model \"missing.fvl\"\n").unwrap();
+    write_job(&root, "satisfied", satisfied_model_source(), "");
+    write_job(&root, "finite", terminal_model_source(), "");
+    write_job(&root, "lasso", unfair_model_source(), "");
+    write_job(
+        &root,
+        "product-cutoff",
+        unfair_model_source(),
+        "max-product-transitions 1\n",
+    );
+    write_job(
+        &root,
+        "model-cutoff",
+        unfair_model_source(),
+        "max-model-transitions 1\n",
+    );
+    write_job(
+        &root,
+        "mixed-fair",
+        unfair_model_source(),
+        "weak-fair-action \"grant\"\nstrong-fair-action \"unrelated\"\n",
+    );
+
+    let names = [
+        "bad",
+        "satisfied",
+        "finite",
+        "lasso",
+        "product-cutoff",
+        "model-cutoff",
+        "mixed-fair",
+    ];
+    let suite = root.join("suite.fvs");
+    let mut suite_source = String::from("suite \"differential\"\n");
+    for name in names {
+        suite_source.push_str(&format!("job \"{name}.fvj\"\n"));
+    }
+    fs::write(&suite, suite_source).unwrap();
+
+    let suite_output = run(&args(&suite));
+    assert_eq!(suite_output.status.code(), Some(2));
+    assert!(stderr(&suite_output).is_empty());
+    let suite_json = stdout(&suite_output);
+
+    let expected_exit_codes = [Some(2), Some(0), Some(7), Some(7), Some(3), Some(3), Some(0)];
+    let mut previous_position = None;
+    for (name, expected_exit) in names.into_iter().zip(expected_exit_codes) {
+        let manifest = root.join(format!("{name}.fvj"));
+        let direct = run_job_json(&manifest);
+        assert_eq!(direct.status.code(), expected_exit, "job {name}");
+        assert!(stderr(&direct).is_empty(), "job {name}: {}", stderr(&direct));
+        let direct_json = stdout(&direct).trim_end().to_owned();
+        let expected_entry = format!("{{\"manifest\":\"{name}.fvj\",\"result\":{direct_json}}}");
+        assert!(
+            suite_json.contains(&expected_entry),
+            "suite entry for {name} must exactly preserve the direct M56 envelope"
+        );
+
+        let position = suite_json
+            .find(&format!("\"manifest\":\"{name}.fvj\""))
+            .expect("suite result should retain every manifest");
+        if let Some(previous) = previous_position {
+            assert!(previous < position, "suite entry order must be deterministic");
+        }
+        previous_position = Some(position);
+    }
+
+    assert!(suite_json.contains("\"kind\":\"finite\""));
+    assert!(suite_json.contains("\"kind\":\"lasso\""));
+    assert!(suite_json.contains("\"stage\":\"product\""));
+    assert!(suite_json.contains("\"stage\":\"model\""));
+    assert!(suite_json.contains("\"weak_fair_actions\":[\"grant\"]"));
+    assert!(suite_json.contains("\"strong_fair_actions\":[\"unrelated\"]"));
 
     let _ = fs::remove_dir_all(root);
 }
