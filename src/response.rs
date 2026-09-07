@@ -1,4 +1,8 @@
 use crate::bounded::{AnalysisLimits, AnalysisOutcome, BoundedOutcome};
+use crate::bounded_combined_fairness::{
+    check_buchi_with_fairness_profile_and_limits,
+    check_buchi_with_fairness_profile_and_product_limits,
+};
 use crate::bounded_fairness::{
     check_buchi_with_weak_fairness_and_limits, check_buchi_with_weak_fairness_and_product_limits,
 };
@@ -11,6 +15,7 @@ use crate::buchi::{
     BuchiError, BuchiProductState, BuchiResult, BuchiStatus, FiniteRunPolicy,
 };
 use crate::checker::{ExplorationLimits, TraceStep};
+use crate::combined_fairness::{check_buchi_with_fairness_profile, FairnessProfile};
 use crate::fairness::{check_buchi_with_weak_fairness, WeakFairness};
 use crate::model::TransitionSystem;
 use crate::multi_response::{
@@ -272,6 +277,33 @@ where
     normalize_fair_buchi_result(property, result)
 }
 
+/// Verify one response obligation under a canonical weak/strong fairness
+/// profile. Empty, weak-only, and strong-only profiles delegate exactly to the
+/// already sealed response adapters; only genuinely mixed profiles compile the
+/// pending-bit obligation into the M45 combined-fair Buchi backend.
+pub fn check_response_with_fairness_profile<S>(
+    model: &TransitionSystem<S>,
+    property: &ResponseProperty,
+    profile: &FairnessProfile,
+) -> Result<ResponseResult<S>, ResponseError>
+where
+    S: Clone + Eq + Hash,
+{
+    if profile.is_empty() {
+        return check_response(model, property);
+    }
+    if profile.strong().is_empty() {
+        return check_response_with_weak_fairness(model, property, profile.weak());
+    }
+    if profile.weak().is_empty() {
+        return check_response_with_strong_fairness(model, property, profile.strong());
+    }
+
+    let automaton = response_buchi_automaton(property)?;
+    let result = check_buchi_with_fairness_profile(model, &automaton, profile)?;
+    normalize_fair_buchi_result(property, result)
+}
+
 /// Verify a single response obligation while bounding only shared action-product
 /// construction. A real finite/cyclic violation in the retained product prefix
 /// remains conclusive; satisfaction requires complete product construction.
@@ -333,6 +365,45 @@ where
     normalize_fair_bounded_buchi_result(property, result)
 }
 
+/// Verify one response obligation under combined fairness while bounding only
+/// product construction after complete model capture. Compatibility profiles
+/// delegate to their historical response paths; mixed profiles inherit M46's
+/// authoritative enablement and proof-honest product cutoff semantics.
+pub fn check_response_with_fairness_profile_and_product_limits<S>(
+    model: &TransitionSystem<S>,
+    property: &ResponseProperty,
+    profile: &FairnessProfile,
+    limits: ExplorationLimits,
+) -> Result<BoundedResponseResult<S>, ResponseError>
+where
+    S: Clone + Eq + Hash,
+{
+    if profile.is_empty() {
+        return check_response_with_product_limits(model, property, limits);
+    }
+    if profile.strong().is_empty() {
+        return check_response_with_weak_fairness_and_product_limits(
+            model,
+            property,
+            profile.weak(),
+            limits,
+        );
+    }
+    if profile.weak().is_empty() {
+        return check_response_with_strong_fairness_and_product_limits(
+            model,
+            property,
+            profile.strong(),
+            limits,
+        );
+    }
+
+    let automaton = response_buchi_automaton(property)?;
+    let result =
+        check_buchi_with_fairness_profile_and_product_limits(model, &automaton, profile, limits)?;
+    normalize_fair_bounded_buchi_result(property, result)
+}
+
 /// Verify a single response obligation under independent model-capture and
 /// product-construction limits. A justified finite/cyclic violation remains
 /// conclusive from a prefix; satisfaction requires both stages to complete.
@@ -391,6 +462,44 @@ where
 
     let automaton = response_buchi_automaton(property)?;
     let result = check_buchi_with_strong_fairness_and_limits(model, &automaton, fairness, limits)?;
+    normalize_fair_analysis_buchi_result(property, result)
+}
+
+/// Verify one response obligation under combined fairness with independent
+/// model/product budgets. Compatibility profiles preserve their existing
+/// adapters exactly; mixed profiles inherit M46's conservative unknown-
+/// enablement handling and exact model-before-product inconclusive precedence.
+pub fn check_response_with_fairness_profile_and_limits<S>(
+    model: &TransitionSystem<S>,
+    property: &ResponseProperty,
+    profile: &FairnessProfile,
+    limits: AnalysisLimits,
+) -> Result<AnalysisResponseResult<S>, ResponseError>
+where
+    S: Clone + Eq + Hash,
+{
+    if profile.is_empty() {
+        return check_response_with_limits(model, property, limits);
+    }
+    if profile.strong().is_empty() {
+        return check_response_with_weak_fairness_and_limits(
+            model,
+            property,
+            profile.weak(),
+            limits,
+        );
+    }
+    if profile.weak().is_empty() {
+        return check_response_with_strong_fairness_and_limits(
+            model,
+            property,
+            profile.strong(),
+            limits,
+        );
+    }
+
+    let automaton = response_buchi_automaton(property)?;
+    let result = check_buchi_with_fairness_profile_and_limits(model, &automaton, profile, limits)?;
     normalize_fair_analysis_buchi_result(property, result)
 }
 
