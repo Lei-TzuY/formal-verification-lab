@@ -46,6 +46,10 @@ fn finite_terminal_model_source() -> &'static str {
     "model \"external-dual-terminal\"\nstate \"idle\"\nstate \"await-a\"\nstate \"ready-b\"\nstate \"await-b\"\ninitial \"idle\"\nedge \"idle\" \"request-a\" \"await-a\"\nedge \"await-a\" \"grant-a\" \"ready-b\"\nedge \"ready-b\" \"request-b\" \"await-b\"\n"
 }
 
+fn legacy_response_model_source() -> &'static str {
+    "model \"legacy-request-grant\"\nstate \"idle\"\nstate \"waiting\"\ninitial \"idle\"\nedge \"idle\" \"request\" \"waiting\"\nedge \"waiting\" \"grant\" \"idle\"\n"
+}
+
 fn multi_file_args(model: &PathBuf, property: &PathBuf) -> Vec<String> {
     vec![
         "temporal".to_owned(),
@@ -178,4 +182,32 @@ fn multi_file_property_parse_and_file_errors_fail_closed() {
 
     let _ = fs::remove_file(model);
     let _ = fs::remove_file(property);
+}
+
+#[test]
+fn multi_file_addition_preserves_historical_temporal_cli_routes() {
+    let fixed = run(&[
+        "temporal",
+        "check",
+        "request-grant",
+        "response(\"request\",\"grant\")",
+    ]);
+    assert!(fixed.status.success(), "{}", stderr(&fixed));
+    let fixed_text = stdout(&fixed);
+    assert!(fixed_text.contains("temporal: SATISFIED"));
+    assert!(fixed_text.contains("backend: RESPONSE"));
+
+    let model = write_temp("legacy", "fvl", legacy_response_model_source());
+    let file = run(&[
+        "temporal",
+        "file",
+        model.to_str().expect("temporary path should be UTF-8"),
+        "response(\"request\",\"grant\")",
+    ]);
+    assert!(file.status.success(), "{}", stderr(&file));
+    let file_text = stdout(&file);
+    assert!(file_text.contains("temporal: SATISFIED"));
+    assert!(file_text.contains("backend: RESPONSE"));
+
+    let _ = fs::remove_file(model);
 }
