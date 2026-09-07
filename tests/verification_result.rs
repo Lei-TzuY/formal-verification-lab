@@ -6,7 +6,11 @@ use formal_verification_lab::{
     VerificationJobOutcome, VerificationJobResultEnvelope, VERIFICATION_JOB_RESULT_SCHEMA_VERSION,
 };
 
-fn step(action: Option<&str>, state: &str, pending: &[bool]) -> TraceStep<MultiObligationState<String>> {
+fn step(
+    action: Option<&str>,
+    state: &str,
+    pending: &[bool],
+) -> TraceStep<MultiObligationState<String>> {
     TraceStep {
         action: action.map(str::to_owned),
         state: MultiObligationState {
@@ -47,9 +51,17 @@ fn unbounded_lasso_preserves_clause_and_exact_trace_order() {
         &result,
     );
 
-    assert_eq!(envelope.schema_version, VERIFICATION_JOB_RESULT_SCHEMA_VERSION);
+    assert_eq!(
+        envelope.schema_version,
+        VERIFICATION_JOB_RESULT_SCHEMA_VERSION
+    );
     assert_eq!(envelope.outcome, VerificationJobOutcome::Violated);
-    let Some(VerificationJobEvidence::Infinite { clause, stem, cycle }) = &envelope.evidence else {
+    let Some(VerificationJobEvidence::Infinite {
+        clause,
+        stem,
+        cycle,
+    }) = &envelope.evidence
+    else {
         panic!("expected lasso evidence");
     };
     assert_eq!(clause, "class-b");
@@ -63,7 +75,9 @@ fn unbounded_lasso_preserves_clause_and_exact_trace_order() {
     assert_eq!(first, second);
     assert!(first.starts_with("{\"schema_version\":1,\"outcome\":\"violated\""));
     assert!(first.contains("\"kind\":\"lasso\",\"clause\":\"class-b\""));
-    assert!(first.contains("\"action\":\"request-b\",\"state\":\"waiting\",\"pending\":[false,true]"));
+    assert!(
+        first.contains("\"action\":\"request-b\",\"state\":\"waiting\",\"pending\":[false,true]")
+    );
 }
 
 #[test]
@@ -159,7 +173,8 @@ fn staged_model_cutoff_preserves_model_before_product_provenance() {
 
 #[test]
 fn json_writer_escapes_quotes_backslashes_controls_and_preserves_utf8() {
-    let envelope = VerificationJobResultEnvelope::error("bad \"quote\" \\ path\nline\t模型\u{0001}");
+    let envelope =
+        VerificationJobResultEnvelope::error("bad \"quote\" \\ path\nline\t模型\u{0001}");
     let json = envelope.to_json();
 
     assert_eq!(

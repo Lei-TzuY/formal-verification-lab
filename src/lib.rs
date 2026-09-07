@@ -56,6 +56,7 @@ pub mod temporal_parse;
 pub mod temporal_report;
 pub mod verification_execution;
 pub mod verification_job;
+pub mod verification_job_run;
 pub mod verification_result;
 
 pub use bounded::{
@@ -210,6 +211,10 @@ pub use verification_execution::{
 pub use verification_job::{
     parse_verification_job, VerificationJob, VerificationJobParseError,
     VerificationJobParseErrorKind,
+};
+pub use verification_job_run::{
+    load_verification_job, run_verification_job_json, LoadedVerificationJob,
+    VerificationJobJsonRun, VerificationJobLoadError,
 };
 pub use verification_result::{
     VerificationJobAccounting, VerificationJobCutoff, VerificationJobCutoffKind,

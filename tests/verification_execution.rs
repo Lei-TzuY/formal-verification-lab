@@ -55,15 +55,14 @@ fn no_options_dispatch_is_exactly_unbounded_backend() {
 fn weak_fair_job_dispatches_through_canonical_profile_backend() {
     let model = model();
     let property = property();
-    let job = parse_verification_job(
-        "model \"m\"\nproperty \"p\"\nweak-fair-action \"grant\"\n",
-    )
-    .unwrap();
+    let job = parse_verification_job("model \"m\"\nproperty \"p\"\nweak-fair-action \"grant\"\n")
+        .unwrap();
     let config = MultiResponseExecutionConfig::from_job(&job).unwrap();
     let fairness = FairnessProfile::new(["grant"], std::iter::empty::<&str>()).unwrap();
 
     let actual = execute_multi_response(&model, &property, &config).unwrap();
-    let expected = check_multi_response_with_fairness_profile(&model, &property, &fairness).unwrap();
+    let expected =
+        check_multi_response_with_fairness_profile(&model, &property, &fairness).unwrap();
 
     assert_eq!(actual, MultiResponseExecutionResult::Unbounded(expected));
 }
@@ -72,19 +71,13 @@ fn weak_fair_job_dispatches_through_canonical_profile_backend() {
 fn product_budget_dispatch_is_exactly_product_bounded_backend() {
     let model = model();
     let property = property();
-    let job = parse_verification_job(
-        "model \"m\"\nproperty \"p\"\nmax-product-transitions 1\n",
-    )
-    .unwrap();
+    let job =
+        parse_verification_job("model \"m\"\nproperty \"p\"\nmax-product-transitions 1\n").unwrap();
     let config = MultiResponseExecutionConfig::from_job(&job).unwrap();
 
     let actual = execute_multi_response(&model, &property, &config).unwrap();
-    let expected = check_multi_response_with_product_limits(
-        &model,
-        &property,
-        job.product_limits(),
-    )
-    .unwrap();
+    let expected =
+        check_multi_response_with_product_limits(&model, &property, job.product_limits()).unwrap();
 
     assert_eq!(
         actual,
@@ -105,13 +98,9 @@ fn staged_fair_job_dispatch_is_exactly_staged_profile_backend() {
     let limits = AnalysisLimits::new(job.model_limits(), job.product_limits());
 
     let actual = execute_multi_response(&model, &property, &config).unwrap();
-    let expected = check_multi_response_with_fairness_profile_and_limits(
-        &model,
-        &property,
-        &fairness,
-        limits,
-    )
-    .unwrap();
+    let expected =
+        check_multi_response_with_fairness_profile_and_limits(&model, &property, &fairness, limits)
+            .unwrap();
 
     assert_eq!(actual, MultiResponseExecutionResult::Staged(expected));
 }

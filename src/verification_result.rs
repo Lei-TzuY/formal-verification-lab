@@ -295,7 +295,12 @@ impl VerificationJobResultEnvelope {
         field_string(&mut out, "outcome", self.outcome.as_str(), false);
         field_optional_string(&mut out, "model", self.model.as_deref(), false);
         field_optional_string(&mut out, "property", self.property.as_deref(), false);
-        field_string_array(&mut out, "weak_fair_actions", &self.weak_fair_actions, false);
+        field_string_array(
+            &mut out,
+            "weak_fair_actions",
+            &self.weak_fair_actions,
+            false,
+        );
         field_string_array(
             &mut out,
             "strong_fair_actions",
@@ -363,7 +368,9 @@ fn cutoff(stage: VerificationJobCutoffStage, reason: InconclusiveReason) -> Veri
     }
 }
 
-fn convert_evidence(counterexample: &MultiResponseCounterexample<String>) -> VerificationJobEvidence {
+fn convert_evidence(
+    counterexample: &MultiResponseCounterexample<String>,
+) -> VerificationJobEvidence {
     match counterexample {
         MultiResponseCounterexample::Finite { clause, trace } => VerificationJobEvidence::Finite {
             clause: clause.clone(),
@@ -436,7 +443,12 @@ fn field_limits(out: &mut String, name: &str, limits: &VerificationJobLimits, fi
 fn field_accounting(out: &mut String, value: &VerificationJobAccounting) {
     out.push_str(",\"accounting\":{");
     optional_usize_field(out, "model_states", value.model_states, true);
-    optional_usize_field(out, "checked_model_states", value.checked_model_states, false);
+    optional_usize_field(
+        out,
+        "checked_model_states",
+        value.checked_model_states,
+        false,
+    );
     optional_usize_field(
         out,
         "explored_model_transitions",

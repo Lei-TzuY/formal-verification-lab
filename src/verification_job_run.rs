@@ -10,7 +10,6 @@ use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-#[derive(Debug)]
 pub struct LoadedVerificationJob {
     pub job: VerificationJob,
     pub model: TransitionSystem<String>,
@@ -104,22 +103,24 @@ pub fn run_verification_job_json(manifest_path: impl AsRef<Path>) -> Verificatio
 
 fn run_verification_job_json_inner(manifest_path: &Path) -> Result<VerificationJobJsonRun, String> {
     let loaded = load_verification_job(manifest_path).map_err(|error| error.to_string())?;
-    let config = MultiResponseExecutionConfig::from_job(&loaded.job)
-        .map_err(|error| error.to_string())?;
+    let config =
+        MultiResponseExecutionConfig::from_job(&loaded.job).map_err(|error| error.to_string())?;
     let result = execute_multi_response(&loaded.model, &loaded.property, &config)
         .map_err(|error| error.to_string())?;
     let weak = config.fairness().weak_actions();
     let strong = config.fairness().strong_actions();
     let model_name = loaded.model.name().to_owned();
     let envelope = match &result {
-        MultiResponseExecutionResult::Unbounded(result) => VerificationJobResultEnvelope::from_unbounded(
-            model_name,
-            weak,
-            strong,
-            config.model_limits(),
-            config.product_limits(),
-            result,
-        ),
+        MultiResponseExecutionResult::Unbounded(result) => {
+            VerificationJobResultEnvelope::from_unbounded(
+                model_name,
+                weak,
+                strong,
+                config.model_limits(),
+                config.product_limits(),
+                result,
+            )
+        }
         MultiResponseExecutionResult::ProductBounded(result) => {
             VerificationJobResultEnvelope::from_product_bounded(
                 model_name,
