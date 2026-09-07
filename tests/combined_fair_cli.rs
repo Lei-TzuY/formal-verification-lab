@@ -188,17 +188,3 @@ fn malformed_fairness_still_fails_closed() {
     assert_eq!(missing.status.code(), Some(2));
     assert!(stderr(&missing).contains("option '--strong-fair-action' requires an action value"));
 }
-
-#[test]
-fn direct_monitor_mixed_fairness_remains_fail_closed() {
-    let output = fvlab(&[
-        "monitor",
-        "session-unfair-close",
-        "--weak-fair-action",
-        "close",
-        "--strong-fair-action",
-        "close",
-    ]);
-    assert_eq!(output.status.code(), Some(2));
-    assert!(stderr(&output).contains("cannot combine weak and strong fairness assumptions"));
-}

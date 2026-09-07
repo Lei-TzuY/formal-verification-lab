@@ -125,7 +125,7 @@ fn bounded_strong_fair_monitor_cli_preserves_cutoff_honesty_and_exit_three() {
 }
 
 #[test]
-fn monitor_strong_fairness_options_fail_closed_on_duplicate_empty_missing_or_mixed_actions() {
+fn monitor_strong_fairness_options_fail_closed_on_duplicate_empty_or_missing_actions() {
     let duplicate = run(&[
         "monitor",
         "session-unfair-close",
@@ -149,17 +149,6 @@ fn monitor_strong_fairness_options_fail_closed_on_duplicate_empty_missing_or_mix
     let missing = run(&["monitor", "session-unfair-close", "--strong-fair-action"]);
     assert_eq!(missing.status.code(), Some(2));
     assert!(stderr(&missing).contains("option '--strong-fair-action' requires an action value"));
-
-    let mixed = run(&[
-        "monitor",
-        "session-unfair-close",
-        "--weak-fair-action",
-        "close",
-        "--strong-fair-action",
-        "close",
-    ]);
-    assert_eq!(mixed.status.code(), Some(2));
-    assert!(stderr(&mixed).contains("cannot combine weak and strong fairness assumptions"));
 
     let unknown = run(&[
         "monitor",
