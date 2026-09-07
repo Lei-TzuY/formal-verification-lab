@@ -1,3 +1,8 @@
+//! Fairness-specific report adapters keep assumptions separate from canonical
+//! verification evidence. M44 extends the established temporal/weak-monitor
+//! pattern to direct strong-fair monitor CLI routing without changing monitor
+//! witness, accounting, or cutoff semantics.
+
 use crate::fairness::WeakFairness;
 use crate::monitor::{AnalysisMonitorResult, BoundedMonitorResult, MonitorResult};
 use crate::monitor_report::{
