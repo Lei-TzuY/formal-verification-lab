@@ -28,11 +28,13 @@ use formal_verification_lab::examples::{
 };
 use formal_verification_lab::fairness::WeakFairness;
 use formal_verification_lab::fairness_report::{
+    render_analysis_fairness_profile_monitor_report,
     render_analysis_fairness_profile_temporal_report, render_analysis_strong_fair_monitor_report,
     render_analysis_strong_fair_temporal_report, render_analysis_weak_fair_monitor_report,
-    render_analysis_weak_fair_temporal_report, render_bounded_fairness_profile_temporal_report,
-    render_bounded_strong_fair_monitor_report, render_bounded_strong_fair_temporal_report,
-    render_bounded_weak_fair_monitor_report, render_bounded_weak_fair_temporal_report,
+    render_analysis_weak_fair_temporal_report, render_bounded_fairness_profile_monitor_report,
+    render_bounded_fairness_profile_temporal_report, render_bounded_strong_fair_monitor_report,
+    render_bounded_strong_fair_temporal_report, render_bounded_weak_fair_monitor_report,
+    render_bounded_weak_fair_temporal_report, render_fairness_profile_monitor_report,
     render_fairness_profile_temporal_report, render_strong_fair_monitor_report,
     render_strong_fair_temporal_report, render_weak_fair_monitor_report,
     render_weak_fair_temporal_report,
@@ -40,6 +42,10 @@ use formal_verification_lab::fairness_report::{
 use formal_verification_lab::monitor::{
     check_monitor, check_monitor_with_limits, check_monitor_with_product_limits, FiniteMonitor,
     MonitorStatus,
+};
+use formal_verification_lab::monitor_combined_fairness::{
+    check_monitor_with_fairness_profile, check_monitor_with_fairness_profile_and_limits,
+    check_monitor_with_fairness_profile_and_product_limits,
 };
 use formal_verification_lab::monitor_examples::{
     invalid_double_open_protocol, open_terminal_protocol, session_monitor, session_protocol,
@@ -558,7 +564,68 @@ where
 {
     let options = parse_temporal_options(option_args)?;
     if !options.fairness.is_empty() && !options.strong_fairness.is_empty() {
-        return Err("cannot combine weak and strong fairness assumptions; choose one fairness strength per analysis".to_owned());
+        if options.has_model_limits {
+            let limits = AnalysisLimits::new(options.model_limits, options.product_limits);
+            let result = check_monitor_with_fairness_profile_and_limits(
+                &model,
+                &monitor,
+                &options.fairness_profile,
+                limits,
+            )
+            .map_err(|error| error.to_string())?;
+            print!(
+                "{}",
+                render_analysis_fairness_profile_monitor_report(
+                    model.name(),
+                    &result,
+                    &options.fairness_profile,
+                )
+            );
+            return Ok(match &result.outcome {
+                AnalysisOutcome::Conclusive(MonitorStatus::Satisfied) => ExitCode::SUCCESS,
+                AnalysisOutcome::Conclusive(MonitorStatus::Violated) => ExitCode::from(8),
+                AnalysisOutcome::Inconclusive(_) => ExitCode::from(3),
+            });
+        }
+
+        if options.has_product_limits {
+            let result = check_monitor_with_fairness_profile_and_product_limits(
+                &model,
+                &monitor,
+                &options.fairness_profile,
+                options.product_limits,
+            )
+            .map_err(|error| error.to_string())?;
+            print!(
+                "{}",
+                render_bounded_fairness_profile_monitor_report(
+                    model.name(),
+                    &result,
+                    &options.fairness_profile,
+                )
+            );
+            return Ok(match &result.outcome {
+                BoundedOutcome::Conclusive(MonitorStatus::Satisfied) => ExitCode::SUCCESS,
+                BoundedOutcome::Conclusive(MonitorStatus::Violated) => ExitCode::from(8),
+                BoundedOutcome::Inconclusive(_) => ExitCode::from(3),
+            });
+        }
+
+        let result =
+            check_monitor_with_fairness_profile(&model, &monitor, &options.fairness_profile)
+                .map_err(|error| error.to_string())?;
+        print!(
+            "{}",
+            render_fairness_profile_monitor_report(
+                model.name(),
+                &result,
+                &options.fairness_profile,
+            )
+        );
+        return Ok(match result.status {
+            MonitorStatus::Satisfied => ExitCode::SUCCESS,
+            MonitorStatus::Violated => ExitCode::from(8),
+        });
     }
 
     if !options.strong_fairness.is_empty() {

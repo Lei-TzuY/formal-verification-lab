@@ -1,7 +1,7 @@
 //! Fairness-specific report adapters keep assumptions separate from canonical
 //! verification evidence. M48 extends the established temporal pattern to a
 //! combined weak/strong fairness profile without changing witness, accounting,
-//! or cutoff semantics.
+//! or cutoff semantics. M50 applies the same reporting contract to finite monitors.
 
 use crate::combined_fairness::FairnessProfile;
 use crate::fairness::WeakFairness;
@@ -203,6 +203,45 @@ pub fn render_analysis_strong_fair_monitor_report<S: Debug, M: Debug>(
 ) -> String {
     let mut output = render_analysis_monitor_report(model_name, result);
     append_fairness(&mut output, "strong", fairness.actions());
+    output
+}
+
+/// Render one unbounded finite-monitor result with both canonical fairness
+/// classes. Overlapping actions appear only in the strong class.
+pub fn render_fairness_profile_monitor_report<S: Debug, M: Debug>(
+    model_name: &str,
+    result: &MonitorResult<S, M>,
+    profile: &FairnessProfile,
+) -> String {
+    let mut output = render_monitor_report(model_name, result);
+    append_fairness(&mut output, "weak", profile.weak_actions());
+    append_fairness(&mut output, "strong", profile.strong_actions());
+    output
+}
+
+/// Render a product-bounded finite-monitor result with both canonical fairness
+/// classes while preserving canonical product-cutoff accounting.
+pub fn render_bounded_fairness_profile_monitor_report<S: Debug, M: Debug>(
+    model_name: &str,
+    result: &BoundedMonitorResult<S, M>,
+    profile: &FairnessProfile,
+) -> String {
+    let mut output = render_bounded_monitor_report(model_name, result);
+    append_fairness(&mut output, "weak", profile.weak_actions());
+    append_fairness(&mut output, "strong", profile.strong_actions());
+    output
+}
+
+/// Render staged model/product finite-monitor analysis with both canonical
+/// fairness classes and unchanged stage-qualified cutoff provenance.
+pub fn render_analysis_fairness_profile_monitor_report<S: Debug, M: Debug>(
+    model_name: &str,
+    result: &AnalysisMonitorResult<S, M>,
+    profile: &FairnessProfile,
+) -> String {
+    let mut output = render_analysis_monitor_report(model_name, result);
+    append_fairness(&mut output, "weak", profile.weak_actions());
+    append_fairness(&mut output, "strong", profile.strong_actions());
     output
 }
 
