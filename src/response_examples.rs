@@ -23,6 +23,31 @@ pub fn unfair_request_grant_protocol() -> Result<TransitionSystem<RequestGrantSt
     request_grant_model("request-grant-unfair", true)
 }
 
+/// A request reaches a real finite terminal before any grant can occur.
+/// Fairness constrains only infinite executions, so the pending obligation must
+/// remain a response violation under weak, strong, or combined fairness.
+pub fn finite_pending_request_grant_protocol(
+) -> Result<TransitionSystem<RequestGrantState>, ModelError> {
+    TransitionSystemBuilder::new(
+        "request-grant-terminal",
+        |state: &RequestGrantState| match state.phase {
+            RequestPhase::Idle => Ok(vec![Transition::new(
+                "request",
+                RequestGrantState {
+                    phase: RequestPhase::Waiting,
+                },
+            )]),
+            RequestPhase::Waiting => Ok(Vec::new()),
+        },
+    )
+    .state_variable("phase", "request/grant protocol phase")
+    .initial_state(RequestGrantState {
+        phase: RequestPhase::Idle,
+    })
+    .safety_invariant("recognized-phase", |_state: &RequestGrantState| true)
+    .build()
+}
+
 fn request_grant_model(
     name: &'static str,
     allow_wait_stutter: bool,
