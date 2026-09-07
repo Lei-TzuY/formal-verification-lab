@@ -251,7 +251,9 @@ impl fmt::Display for MultiResponseTemporalParseError {
             MultiResponseTemporalParseErrorKind::UnknownDirective { directive } => {
                 write!(f, "unsupported directive '{directive}'")
             }
-            MultiResponseTemporalParseErrorKind::ExpectedOpenParen => write!(f, "expected '('") ,
+            MultiResponseTemporalParseErrorKind::ExpectedOpenParen => {
+                write!(f, "expected '('")
+            }
             MultiResponseTemporalParseErrorKind::ExpectedString => {
                 write!(f, "expected a double-quoted string")
             }
