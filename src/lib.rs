@@ -54,6 +54,7 @@ pub mod strong_fairness;
 pub mod temporal;
 pub mod temporal_parse;
 pub mod temporal_report;
+pub mod verification_job;
 
 pub use bounded::{
     AnalysisInconclusiveReason, AnalysisLimits, AnalysisOutcome, AnalysisStage, BoundedOutcome,
@@ -201,3 +202,7 @@ pub use temporal::{
 };
 pub use temporal_parse::{parse_action_temporal, TemporalParseError, TemporalParseErrorKind};
 pub use temporal_report::{render_bounded_temporal_report, render_temporal_report};
+pub use verification_job::{
+    parse_verification_job, VerificationJob, VerificationJobParseError,
+    VerificationJobParseErrorKind,
+};
