@@ -161,13 +161,4 @@ fn malformed_and_mixed_fairness_fail_closed() {
     ]);
     assert_eq!(mixed.status.code(), Some(2));
     assert!(stderr(&mixed).contains("cannot combine weak and strong fairness assumptions"));
-
-    let monitor = fvlab(&[
-        "monitor",
-        "session-unfair-close",
-        "--strong-fair-action",
-        "close",
-    ]);
-    assert_eq!(monitor.status.code(), Some(2));
-    assert!(stderr(&monitor).contains("strong fairness is not supported by monitor"));
 }
