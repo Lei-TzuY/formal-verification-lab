@@ -54,12 +54,7 @@ fn strong_fair_close_filters_only_the_unfair_monitor_progress_lasso() {
 
 #[test]
 fn taken_strong_fair_action_does_not_hide_a_real_progress_cycle() {
-    let output = run(&[
-        "monitor",
-        "session-stuck",
-        "--strong-fair-action",
-        "tick",
-    ]);
+    let output = run(&["monitor", "session-stuck", "--strong-fair-action", "tick"]);
     assert_eq!(output.status.code(), Some(8));
     let text = stdout(&output);
     assert!(text.contains("counterexample: PROGRESS_CYCLE"));
@@ -141,7 +136,12 @@ fn monitor_strong_fairness_options_fail_closed_on_duplicate_empty_missing_or_mix
     assert_eq!(duplicate.status.code(), Some(2));
     assert!(stderr(&duplicate).contains("duplicate strong-fair action 'close'"));
 
-    let empty = run(&["monitor", "session-unfair-close", "--strong-fair-action", ""]);
+    let empty = run(&[
+        "monitor",
+        "session-unfair-close",
+        "--strong-fair-action",
+        "",
+    ]);
     assert_eq!(empty.status.code(), Some(2));
     assert!(stderr(&empty).contains("strong-fair action name must not be empty"));
 
