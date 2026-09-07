@@ -27,6 +27,7 @@ pub mod fairness_report;
 mod graph;
 pub mod model;
 pub mod monitor;
+pub mod monitor_combined_fairness;
 pub mod monitor_examples;
 pub mod monitor_fairness;
 pub mod monitor_report;
@@ -104,6 +105,10 @@ pub use monitor::{
     AnalysisMonitorResult, BoundedMonitorResult, FiniteMonitor, MonitorCounterexample,
     MonitorError, MonitorProductState, MonitorResult, MonitorStatus, ProgressCondition,
     RejectCondition,
+};
+pub use monitor_combined_fairness::{
+    check_monitor_with_fairness_profile, check_monitor_with_fairness_profile_and_limits,
+    check_monitor_with_fairness_profile_and_product_limits,
 };
 pub use monitor_fairness::{
     check_monitor_with_weak_fairness, check_monitor_with_weak_fairness_and_limits,
