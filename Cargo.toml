@@ -5,6 +5,7 @@ edition = "2021"
 description = "Educational explicit-state model checking laboratory"
 license = "MIT"
 publish = false
+default-run = "fvlab"
 
 [lib]
 name = "formal_verification_lab"
