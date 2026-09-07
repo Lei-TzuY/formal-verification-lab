@@ -153,8 +153,11 @@ pub use reduction::{
     ReductionAudit, ReductionAuditError,
 };
 pub use response::{
-    check_response, check_response_with_limits, check_response_with_product_limits,
-    check_response_with_strong_fairness, check_response_with_strong_fairness_and_limits,
+    check_response, check_response_with_fairness_profile,
+    check_response_with_fairness_profile_and_limits,
+    check_response_with_fairness_profile_and_product_limits, check_response_with_limits,
+    check_response_with_product_limits, check_response_with_strong_fairness,
+    check_response_with_strong_fairness_and_limits,
     check_response_with_strong_fairness_and_product_limits, check_response_with_weak_fairness,
     check_response_with_weak_fairness_and_limits,
     check_response_with_weak_fairness_and_product_limits, AnalysisResponseResult,
@@ -169,8 +172,11 @@ pub use safety::{
 pub use safety_report::render_safety_report;
 pub use strong_fairness::{check_buchi_with_strong_fairness, StrongFairness, StrongFairnessError};
 pub use temporal::{
-    check_action_temporal, check_action_temporal_with_limits,
-    check_action_temporal_with_product_limits, check_action_temporal_with_strong_fairness,
+    check_action_temporal, check_action_temporal_with_fairness_profile,
+    check_action_temporal_with_fairness_profile_and_limits,
+    check_action_temporal_with_fairness_profile_and_product_limits,
+    check_action_temporal_with_limits, check_action_temporal_with_product_limits,
+    check_action_temporal_with_strong_fairness,
     check_action_temporal_with_strong_fairness_and_limits,
     check_action_temporal_with_strong_fairness_and_product_limits,
     check_action_temporal_with_weak_fairness, check_action_temporal_with_weak_fairness_and_limits,
