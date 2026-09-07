@@ -1,0 +1,72 @@
+name: M55 construction
+
+on:
+  push:
+    branches:
+      - feature/milestone-55-verification-job-manifest
+
+permissions:
+  contents: write
+
+jobs:
+  patch-main:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: feature/milestone-55-verification-job-manifest
+          fetch-depth: 0
+      - name: Apply exact M55 CLI integration patch
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("src/main.rs")
+          text = path.read_text()
+
+          replacements = [
+              (
+                  'use formal_verification_lab::{parse_declarative_document, parse_declarative_model};\nuse std::env;\nuse std::fs;\nuse std::process::ExitCode;',
+                  'use formal_verification_lab::{\n    parse_declarative_document, parse_declarative_model, parse_verification_job,\n};\nuse std::env;\nuse std::fs;\nuse std::path::Path;\nuse std::process::ExitCode;',
+              ),
+              (
+                  'fn temporal_command(args: &[String]) -> Result<ExitCode, String> {\n    match args {\n        [command, model_path, property_path, option_args @ ..] if command == "multi-file" => {',
+                  'fn temporal_command(args: &[String]) -> Result<ExitCode, String> {\n    match args {\n        [command, manifest_path] if command == "job" => run_verification_job(manifest_path),\n        [command, model_path, property_path, option_args @ ..] if command == "multi-file" => {',
+              ),
+              (
+                  '            "unknown temporal query \'{query}\'; expected request-grant, request-grant-unfair, pulses, pulses-unfair, \'check <model> <expression>\', \'file <path> <expression>\', or \'multi-file <model-path> <property-path>\'"',
+                  '            "unknown temporal query \'{query}\'; expected request-grant, request-grant-unfair, pulses, pulses-unfair, \'check <model> <expression>\', \'file <path> <expression>\', \'multi-file <model-path> <property-path>\', or \'job <manifest-path>\'"',
+              ),
+              (
+                  'fn run_multi_temporal_file(\n    model_path: &str,\n    property_path: &str,\n    option_args: &[String],\n) -> Result<ExitCode, String> {',
+                  '''fn run_verification_job(manifest_path: &str) -> Result<ExitCode, String> {\n    let input = fs::read_to_string(manifest_path)\n        .map_err(|error| format!("failed to read verification job \'{manifest_path}\': {error}"))?;\n    let job = parse_verification_job(&input).map_err(|error| error.to_string())?;\n    let manifest = Path::new(manifest_path);\n    let base = manifest.parent().unwrap_or_else(|| Path::new(""));\n    let model = Path::new(job.model_path());\n    let property = Path::new(job.property_path());\n    let model = if model.is_absolute() {\n        model.to_path_buf()\n    } else {\n        base.join(model)\n    };\n    let property = if property.is_absolute() {\n        property.to_path_buf()\n    } else {\n        base.join(property)\n    };\n    let model = model\n        .to_str()\n        .ok_or_else(|| "resolved model path is not valid UTF-8".to_owned())?;\n    let property = property\n        .to_str()\n        .ok_or_else(|| "resolved property path is not valid UTF-8".to_owned())?;\n    run_multi_temporal_file(model, property, &job.option_args())\n}\n\nfn run_multi_temporal_file(\n    model_path: &str,\n    property_path: &str,\n    option_args: &[String],\n) -> Result<ExitCode, String> {''',
+              ),
+          ]
+
+          for old, new in replacements:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"expected exactly one replacement target, found {count}: {old[:80]!r}")
+              text = text.replace(old, new, 1)
+
+          usage_old = " | temporal multi-file <model-path> <property-path> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | state file"
+          usage_new = " | temporal multi-file <model-path> <property-path> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal job <manifest-path> | state file"
+          count = text.count(usage_old)
+          if count != 1:
+              raise SystemExit(f"expected exactly one usage target, found {count}")
+          text = text.replace(usage_old, usage_new, 1)
+
+          path.write_text(text)
+          PY
+      - name: Commit exact patch
+        run: |
+          if git diff --quiet -- src/main.rs; then
+            echo "No main.rs change produced" >&2
+            exit 1
+          fi
+          git config user.name "LeiZ"
+          git config user.email "52287354+Lei-TzuY@users.noreply.github.com"
+          git add src/main.rs
+          git commit -m "Integrate M55 verification job CLI"
+          git push origin HEAD:feature/milestone-55-verification-job-manifest
