@@ -1,10 +1,12 @@
-use formal_verification_lab::{
-    check_multi_response, check_multi_response_with_fairness_profile,
+use formal_verification_lab::multi_response::{
+    check_multi_response_with_fairness_profile,
     check_multi_response_with_fairness_profile_and_limits,
-    check_multi_response_with_product_limits, execute_multi_response, parse_verification_job,
-    AnalysisLimits, FairnessProfile, Invariant, MultiResponseExecutionConfig,
-    MultiResponseExecutionResult, MultiResponseProperty, ResponseClause, StateVariable, Transition,
-    TransitionSystem,
+};
+use formal_verification_lab::{
+    check_multi_response, check_multi_response_with_product_limits, execute_multi_response,
+    parse_verification_job, AnalysisLimits, FairnessProfile, Invariant,
+    MultiResponseExecutionConfig, MultiResponseExecutionResult, MultiResponseProperty,
+    ResponseClause, StateVariable, Transition, TransitionSystem,
 };
 
 fn model() -> TransitionSystem<usize> {
