@@ -332,7 +332,8 @@ fn canonical_status(outcome: VerificationJobOutcome) -> Option<&'static str> {
     match outcome {
         VerificationJobOutcome::Satisfied => Some("SATISFIED"),
         VerificationJobOutcome::Violated => Some("VIOLATED"),
-        VerificationJobOutcome::Inconclusive | VerificationJobOutcome::Error => None,
+        VerificationJobOutcome::Inconclusive => Some("INCONCLUSIVE"),
+        VerificationJobOutcome::Error => None,
     }
 }
 
