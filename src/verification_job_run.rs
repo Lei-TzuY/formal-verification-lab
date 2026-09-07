@@ -5,9 +5,7 @@ use crate::safety::{check_safety_assertion_with_limits, PropositionSafetySpec, S
 use crate::verification_execution::{
     execute_multi_response, MultiResponseExecutionConfig, MultiResponseExecutionResult,
 };
-use crate::verification_job::{
-    parse_verification_job, VerificationJob, VerificationJobAnalysis,
-};
+use crate::verification_job::{parse_verification_job, VerificationJob, VerificationJobAnalysis};
 use crate::verification_result::{VerificationJobOutcome, VerificationJobResultEnvelope};
 use crate::{
     parse_declarative_document, parse_declarative_model, parse_proposition_expression,
@@ -181,7 +179,8 @@ fn run_safety_job_json(
             property_path.display()
         )
     })?;
-    let expression = parse_proposition_expression(&property_input).map_err(|error| error.to_string())?;
+    let expression =
+        parse_proposition_expression(&property_input).map_err(|error| error.to_string())?;
     let spec = PropositionSafetySpec::always("verification-job-safety", expression)
         .map_err(|error| error.to_string())?;
     let result = check_safety_assertion_with_limits(&document, &spec, job.model_limits())
