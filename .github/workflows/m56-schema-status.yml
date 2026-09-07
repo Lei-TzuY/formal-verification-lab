@@ -1,0 +1,120 @@
+name: M56 schema status correction
+
+on:
+  push:
+    branches:
+      - feature/milestone-56-structured-job-result
+
+permissions:
+  contents: write
+
+jobs:
+  correct:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: feature/milestone-56-structured-job-result
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Add canonical status field and self-remove
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          result = Path('src/verification_result.rs')
+          text = result.read_text()
+          old = '''        field_string(&mut out, "outcome", self.outcome.as_str(), false);
+                  field_optional_string(&mut out, "model", self.model.as_deref(), false);
+          '''
+          new = '''        field_string(&mut out, "outcome", self.outcome.as_str(), false);
+                  field_optional_string(
+                      &mut out,
+                      "status",
+                      canonical_status(self.outcome),
+                      false,
+                  );
+                  field_optional_string(&mut out, "model", self.model.as_deref(), false);
+          '''
+          assert text.count(old) == 1, 'result serializer insertion point drifted'
+          text = text.replace(old, new)
+          marker = '''fn status_outcome(status: MultiResponseStatus) -> VerificationJobOutcome {
+          '''
+          helper = '''fn canonical_status(outcome: VerificationJobOutcome) -> Option<&'static str> {
+              match outcome {
+                  VerificationJobOutcome::Satisfied => Some("SATISFIED"),
+                  VerificationJobOutcome::Violated => Some("VIOLATED"),
+                  VerificationJobOutcome::Inconclusive | VerificationJobOutcome::Error => None,
+              }
+          }
+
+          fn status_outcome(status: MultiResponseStatus) -> VerificationJobOutcome {
+          '''
+          assert text.count(marker) == 1, 'status helper insertion point drifted'
+          text = text.replace(marker, helper)
+          result.write_text(text)
+
+          tests = Path('tests/verification_result.rs')
+          text = tests.read_text()
+          old = '''    assert!(first.starts_with("{\\\"schema_version\\\":1,\\\"outcome\\\":\\\"violated\\\""));
+          '''
+          new = '''    assert!(first.starts_with(
+                  "{\\\"schema_version\\\":1,\\\"outcome\\\":\\\"violated\\\",\\\"status\\\":\\\"VIOLATED\\\""
+              ));
+          '''
+          assert text.count(old) == 1, 'violated status assertion drifted'
+          text = text.replace(old, new)
+          old = '''    assert_eq!(envelope.outcome, VerificationJobOutcome::Inconclusive);
+              let cutoff = envelope.cutoff.expect("cutoff should be present");
+          '''
+          new = '''    assert_eq!(envelope.outcome, VerificationJobOutcome::Inconclusive);
+              assert!(envelope.to_json().contains("\\\"status\\\":null"));
+              let cutoff = envelope.cutoff.expect("cutoff should be present");
+          '''
+          assert text.count(old) == 1, 'inconclusive status assertion drifted'
+          text = text.replace(old, new)
+          old = '''        "{\\\"schema_version\\\":1,\\\"outcome\\\":\\\"error\\\",\\\"model\\\":null,'''
+          new = '''        "{\\\"schema_version\\\":1,\\\"outcome\\\":\\\"error\\\",\\\"status\\\":null,\\\"model\\\":null,'''
+          assert text.count(old) == 1, 'error JSON expectation drifted'
+          text = text.replace(old, new)
+          tests.write_text(text)
+
+          cli = Path('tests/verification_result_cli.rs')
+          text = cli.read_text()
+          old = '''    assert!(json.starts_with("{\\\"schema_version\\\":1,\\\"outcome\\\":\\\"violated\\\""));
+          '''
+          new = '''    assert!(json.starts_with(
+                  "{\\\"schema_version\\\":1,\\\"outcome\\\":\\\"violated\\\",\\\"status\\\":\\\"VIOLATED\\\""
+              ));
+          '''
+          assert text.count(old) == 1, 'CLI violated status assertion drifted'
+          text = text.replace(old, new)
+          old = '''    assert!(json.contains("\\\"outcome\\\":\\\"satisfied\\\""));
+          '''
+          new = '''    assert!(json.contains("\\\"outcome\\\":\\\"satisfied\\\",\\\"status\\\":\\\"SATISFIED\\\""));
+          '''
+          assert text.count(old) == 1, 'CLI satisfied status assertion drifted'
+          text = text.replace(old, new)
+          old = '''    assert!(json.starts_with("{\\\"schema_version\\\":1,\\\"outcome\\\":\\\"error\\\""));
+          '''
+          new = '''    assert!(json.starts_with(
+                  "{\\\"schema_version\\\":1,\\\"outcome\\\":\\\"error\\\",\\\"status\\\":null"
+              ));
+          '''
+          assert text.count(old) == 1, 'CLI error status assertion drifted'
+          text = text.replace(old, new)
+          cli.write_text(text)
+          PY
+
+          cargo fmt --all
+          rm .github/workflows/m56-schema-status.yml
+
+          git config user.name "LeiZ"
+          git config user.email "52287354+Lei-TzuY@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "Add canonical status to structured job results"
+          git push origin HEAD:feature/milestone-56-structured-job-result
