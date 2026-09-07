@@ -145,12 +145,7 @@ where
         return check_buchi_with_limits(model, automaton, limits);
     }
     if profile.strong().is_empty() {
-        return check_buchi_with_weak_fairness_and_limits(
-            model,
-            automaton,
-            profile.weak(),
-            limits,
-        );
+        return check_buchi_with_weak_fairness_and_limits(model, automaton, profile.weak(), limits);
     }
     if profile.weak().is_empty() {
         return check_buchi_with_strong_fairness_and_limits(
