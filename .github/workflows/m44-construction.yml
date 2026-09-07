@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           ref: feature/milestone-44-strong-fair-monitor-cli
-      - name: Apply exact M44 integration patch
+      - name: Apply M44 monitor CLI integration
         shell: python
         run: |
           from pathlib import Path
@@ -24,41 +24,49 @@ jobs:
           main = Path('src/main.rs')
           text = main.read_text()
 
-          old_reports = '''use formal_verification_lab::fairness_report::{
-              render_analysis_strong_fair_temporal_report, render_analysis_weak_fair_monitor_report,
-              render_analysis_weak_fair_temporal_report, render_bounded_strong_fair_temporal_report,
-              render_bounded_weak_fair_monitor_report, render_bounded_weak_fair_temporal_report,
-              render_strong_fair_temporal_report, render_weak_fair_monitor_report,
-              render_weak_fair_temporal_report,
-          };'''
-          new_reports = '''use formal_verification_lab::fairness_report::{
-              render_analysis_strong_fair_monitor_report, render_analysis_strong_fair_temporal_report,
-              render_analysis_weak_fair_monitor_report, render_analysis_weak_fair_temporal_report,
-              render_bounded_strong_fair_monitor_report, render_bounded_strong_fair_temporal_report,
-              render_bounded_weak_fair_monitor_report, render_bounded_weak_fair_temporal_report,
-              render_strong_fair_monitor_report, render_strong_fair_temporal_report,
-              render_weak_fair_monitor_report, render_weak_fair_temporal_report,
-          };'''
+          old_reports = (
+              'use formal_verification_lab::fairness_report::{\n'
+              '    render_analysis_strong_fair_temporal_report, render_analysis_weak_fair_monitor_report,\n'
+              '    render_analysis_weak_fair_temporal_report, render_bounded_strong_fair_temporal_report,\n'
+              '    render_bounded_weak_fair_monitor_report, render_bounded_weak_fair_temporal_report,\n'
+              '    render_strong_fair_temporal_report, render_weak_fair_monitor_report,\n'
+              '    render_weak_fair_temporal_report,\n'
+              '};'
+          )
+          new_reports = (
+              'use formal_verification_lab::fairness_report::{\n'
+              '    render_analysis_strong_fair_monitor_report, render_analysis_strong_fair_temporal_report,\n'
+              '    render_analysis_weak_fair_monitor_report, render_analysis_weak_fair_temporal_report,\n'
+              '    render_bounded_strong_fair_monitor_report, render_bounded_strong_fair_temporal_report,\n'
+              '    render_bounded_weak_fair_monitor_report, render_bounded_weak_fair_temporal_report,\n'
+              '    render_strong_fair_monitor_report, render_strong_fair_temporal_report,\n'
+              '    render_weak_fair_monitor_report, render_weak_fair_temporal_report,\n'
+              '};'
+          )
           assert text.count(old_reports) == 1, 'fairness report import anchor drifted'
           text = text.replace(old_reports, new_reports)
 
-          old_monitor_import = '''use formal_verification_lab::monitor_fairness::{
-              check_monitor_with_weak_fairness, check_monitor_with_weak_fairness_and_limits,
-              check_monitor_with_weak_fairness_and_product_limits,
-          };'''
-          new_monitor_import = old_monitor_import + '''
-          use formal_verification_lab::monitor_strong_fairness::{
-              check_monitor_with_strong_fairness, check_monitor_with_strong_fairness_and_limits,
-              check_monitor_with_strong_fairness_and_product_limits,
-          };'''
+          old_monitor_import = (
+              'use formal_verification_lab::monitor_fairness::{\n'
+              '    check_monitor_with_weak_fairness, check_monitor_with_weak_fairness_and_limits,\n'
+              '    check_monitor_with_weak_fairness_and_product_limits,\n'
+              '};'
+          )
+          new_monitor_import = old_monitor_import + (
+              '\nuse formal_verification_lab::monitor_strong_fairness::{\n'
+              '    check_monitor_with_strong_fairness, check_monitor_with_strong_fairness_and_limits,\n'
+              '    check_monitor_with_strong_fairness_and_product_limits,\n'
+              '};'
+          )
           assert text.count(old_monitor_import) == 1, 'monitor fairness import anchor drifted'
           text = text.replace(old_monitor_import, new_monitor_import)
 
-          old_reject = '''    if !options.strong_fairness.is_empty() {
-              return Err("strong fairness is not supported by monitor; use --weak-fair-action or omit fairness assumptions".to_owned());
-          }
-
-          if !options.fairness.is_empty() {'''
+          old_reject = (
+              '    if !options.strong_fairness.is_empty() {\n'
+              '        return Err("strong fairness is not supported by monitor; use --weak-fair-action or omit fairness assumptions".to_owned());\n'
+              '    }\n\n'
+              '    if !options.fairness.is_empty() {'
+          )
           strong_route = '''    if !options.strong_fairness.is_empty() {
               if options.has_model_limits {
                   let limits = AnalysisLimits::new(options.model_limits, options.product_limits);
@@ -132,186 +140,12 @@ jobs:
           text = text.replace(old_reject, strong_route)
           main.write_text(text)
 
-          strong_cli = Path('tests/strong_fair_cli.rs')
-          cli_text = strong_cli.read_text()
-          old_monitor_reject = '''
-              let monitor = fvlab(&[
-                  "monitor",
-                  "session-unfair-close",
-                  "--strong-fair-action",
-                  "close",
-              ]);
-              assert_eq!(monitor.status.code(), Some(2));
-              assert!(stderr(&monitor).contains("strong fairness is not supported by monitor"));
-          '''
-          assert cli_text.count(old_monitor_reject) == 1, 'old monitor rejection test anchor drifted'
-          cli_text = cli_text.replace(old_monitor_reject, '\n')
-          strong_cli.write_text(cli_text)
-
-          Path('tests/monitor_strong_fairness_cli.rs').write_text(r'''use std::process::{Command, Output};
-
-          fn run(args: &[&str]) -> Output {
-              Command::new(env!("CARGO_BIN_EXE_fvlab"))
-                  .args(args)
-                  .output()
-                  .expect("fvlab binary should execute")
-          }
-
-          fn stdout(output: &Output) -> String {
-              String::from_utf8(output.stdout.clone()).expect("CLI stdout should be UTF-8")
-          }
-
-          fn stderr(output: &Output) -> String {
-              String::from_utf8(output.stderr.clone()).expect("CLI stderr should be UTF-8")
-          }
-
-          #[test]
-          fn strong_fair_close_filters_only_the_unfair_monitor_progress_lasso() {
-              let historical = run(&["monitor", "session-unfair-close"]);
-              assert_eq!(historical.status.code(), Some(8));
-              assert!(stdout(&historical).contains("counterexample: PROGRESS_CYCLE"));
-
-              let fair = run(&[
-                  "monitor",
-                  "session-unfair-close",
-                  "--strong-fair-action",
-                  "close",
-              ]);
-              assert!(fair.status.success(), "{}", stderr(&fair));
-              let fair_text = stdout(&fair);
-              assert!(fair_text.contains("monitor verification: SATISFIED"));
-              assert!(fair_text.contains("counterexample: none (monitor conditions hold)"));
-              assert!(fair_text.contains("strong fairness actions: 1"));
-              assert!(fair_text.contains("strong-fair action: \"close\""));
-              assert!(!fair_text.contains("weak fairness actions:"));
-
-              let unrelated = run(&[
-                  "monitor",
-                  "session-unfair-close",
-                  "--strong-fair-action",
-                  "unrelated",
-              ]);
-              assert_eq!(unrelated.status.code(), Some(8));
-              let unrelated_text = stdout(&unrelated);
-              assert!(unrelated_text.contains("counterexample: PROGRESS_CYCLE"));
-              assert!(unrelated_text.contains("strong-fair action: \"unrelated\""));
-          }
-
-          #[test]
-          fn taken_strong_fair_action_does_not_hide_a_real_progress_cycle() {
-              let output = run(&[
-                  "monitor",
-                  "session-stuck",
-                  "--strong-fair-action",
-                  "tick",
-              ]);
-              assert_eq!(output.status.code(), Some(8));
-              let text = stdout(&output);
-              assert!(text.contains("counterexample: PROGRESS_CYCLE"));
-              assert!(text.contains("--tick-->"));
-              assert!(text.contains("strong-fair action: \"tick\""));
-          }
-
-          #[test]
-          fn strong_fairness_never_excuses_rejecting_or_finite_terminal_monitor_violations() {
-              let rejecting = run(&[
-                  "monitor",
-                  "session-double-open",
-                  "--strong-fair-action",
-                  "close",
-              ]);
-              assert_eq!(rejecting.status.code(), Some(8));
-              let rejecting_text = stdout(&rejecting);
-              assert!(rejecting_text.contains("counterexample: REJECTING_STATE"));
-              assert!(rejecting_text.contains("violated condition: legal-action-order"));
-              assert!(rejecting_text.contains("strong-fair action: \"close\""));
-
-              let terminal = run(&[
-                  "monitor",
-                  "session-open-terminal",
-                  "--strong-fair-action",
-                  "close",
-              ]);
-              assert_eq!(terminal.status.code(), Some(8));
-              let terminal_text = stdout(&terminal);
-              assert!(terminal_text.contains("counterexample: PROGRESS_TERMINAL"));
-              assert!(terminal_text.contains("violated condition: opened-session-eventually-closes"));
-              assert!(terminal_text.contains("strong-fair action: \"close\""));
-          }
-
-          #[test]
-          fn bounded_strong_fair_monitor_cli_preserves_cutoff_honesty_and_exit_three() {
-              let product = run(&[
-                  "monitor",
-                  "session-unfair-close",
-                  "--max-product-transitions",
-                  "3",
-                  "--strong-fair-action",
-                  "close",
-              ]);
-              assert_eq!(product.status.code(), Some(3));
-              let product_text = stdout(&product);
-              assert!(product_text.contains("monitor verification: INCONCLUSIVE"));
-              assert!(product_text.contains("product inconclusive reason:"));
-              assert!(product_text.contains("strong-fair action: \"close\""));
-              assert!(!product_text.contains("counterexample: PROGRESS_CYCLE"));
-
-              let staged = run(&[
-                  "monitor",
-                  "session-unfair-close",
-                  "--strong-fair-action",
-                  "close",
-                  "--max-model-transitions",
-                  "2",
-              ]);
-              assert_eq!(staged.status.code(), Some(3));
-              let staged_text = stdout(&staged);
-              assert!(staged_text.contains("monitor verification: INCONCLUSIVE"));
-              assert!(staged_text.contains("analysis inconclusive stage: model"));
-              assert!(staged_text.contains("strong-fair action: \"close\""));
-              assert!(!staged_text.contains("counterexample: PROGRESS_CYCLE"));
-          }
-
-          #[test]
-          fn monitor_strong_fairness_options_fail_closed_on_duplicate_empty_missing_or_mixed_actions() {
-              let duplicate = run(&[
-                  "monitor",
-                  "session-unfair-close",
-                  "--strong-fair-action",
-                  "close",
-                  "--strong-fair-action",
-                  "close",
-              ]);
-              assert_eq!(duplicate.status.code(), Some(2));
-              assert!(stderr(&duplicate).contains("duplicate strong-fair action 'close'"));
-
-              let empty = run(&["monitor", "session-unfair-close", "--strong-fair-action", ""]);
-              assert_eq!(empty.status.code(), Some(2));
-              assert!(stderr(&empty).contains("strong-fair action name must not be empty"));
-
-              let missing = run(&["monitor", "session-unfair-close", "--strong-fair-action"]);
-              assert_eq!(missing.status.code(), Some(2));
-              assert!(stderr(&missing).contains("option '--strong-fair-action' requires an action value"));
-
-              let mixed = run(&[
-                  "monitor",
-                  "session-unfair-close",
-                  "--weak-fair-action",
-                  "close",
-                  "--strong-fair-action",
-                  "close",
-              ]);
-              assert_eq!(mixed.status.code(), Some(2));
-              assert!(stderr(&mixed).contains("cannot combine weak and strong fairness assumptions"));
-          }
-          ''')
-
-          workflow = Path('.github/workflows/m44-construction.yml')
-          workflow.unlink()
+          Path('.github/workflows/m44-construction.yml').unlink()
       - name: Commit integration slice
         run: |
           git config user.name "LeiZ"
           git config user.email "52287354+Lei-TzuY@users.noreply.github.com"
-          git add src/main.rs tests/strong_fair_cli.rs tests/monitor_strong_fairness_cli.rs .github/workflows/m44-construction.yml
+          cargo fmt --all
+          git add src/main.rs .github/workflows/m44-construction.yml
           git commit -m "Wire strong-fair monitor CLI"
           git push origin HEAD:feature/milestone-44-strong-fair-monitor-cli
