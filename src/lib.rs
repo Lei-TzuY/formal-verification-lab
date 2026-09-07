@@ -55,6 +55,7 @@ pub mod temporal;
 pub mod temporal_parse;
 pub mod temporal_report;
 pub mod verification_job;
+pub mod verification_result;
 
 pub use bounded::{
     AnalysisInconclusiveReason, AnalysisLimits, AnalysisOutcome, AnalysisStage, BoundedOutcome,
@@ -205,4 +206,10 @@ pub use temporal_report::{render_bounded_temporal_report, render_temporal_report
 pub use verification_job::{
     parse_verification_job, VerificationJob, VerificationJobParseError,
     VerificationJobParseErrorKind,
+};
+pub use verification_result::{
+    VerificationJobAccounting, VerificationJobCutoff, VerificationJobCutoffKind,
+    VerificationJobCutoffStage, VerificationJobEvidence, VerificationJobLimits,
+    VerificationJobOutcome, VerificationJobResultEnvelope, VerificationJobTraceStep,
+    VERIFICATION_JOB_RESULT_SCHEMA_VERSION,
 };
