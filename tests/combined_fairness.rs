@@ -5,7 +5,8 @@ use formal_verification_lab::{
     check_buchi, check_buchi_with_fairness_profile, check_buchi_with_strong_fairness,
     check_buchi_with_weak_fairness, AcceptanceSet, BuchiAutomaton, BuchiCounterexample,
     BuchiProductState, BuchiStatus, FairnessProfile, FairnessProfileError, FiniteRunPolicy,
-    Invariant, StateVariable, StrongFairness, TraceStep, Transition, TransitionSystem, WeakFairness,
+    Invariant, StateVariable, StrongFairness, TraceStep, Transition, TransitionSystem,
+    WeakFairness,
 };
 
 const N: usize = 2;
@@ -141,9 +142,7 @@ fn enabled(codes: [u8; EDGE_COUNT], state: usize, code: u8) -> bool {
 fn internal_take(codes: [u8; EDGE_COUNT], mask: usize, code: u8) -> bool {
     (0..N).any(|from| {
         mask & (1 << from) != 0
-            && (0..N).any(|to| {
-                mask & (1 << to) != 0 && codes[from * N + to] == code
-            })
+            && (0..N).any(|to| mask & (1 << to) != 0 && codes[from * N + to] == code)
     })
 }
 
@@ -193,10 +192,14 @@ fn assert_real_combined_fair_cycle(
             .skip(1)
             .filter_map(|step| step.action.as_deref())
             .any(|label| action_code(label) == *code);
-        let disabled = cycle.iter().take(cycle.len() - 1).any(|step| {
-            !enabled(codes, step.state.state, *code)
-        });
-        assert!(taken || disabled, "weak fairness obligation was not witnessed");
+        let disabled = cycle
+            .iter()
+            .take(cycle.len() - 1)
+            .any(|step| !enabled(codes, step.state.state, *code));
+        assert!(
+            taken || disabled,
+            "weak fairness obligation was not witnessed"
+        );
     }
 
     for code in strong_codes {
@@ -364,7 +367,10 @@ fn all_two_node_action_graphs_match_independent_mixed_and_overlap_oracles() {
                 oracle_exists_combined_fair_run(codes, weak_codes, strong_codes);
             let first = check_buchi_with_fairness_profile(&model, &automaton, profile).unwrap();
             let second = check_buchi_with_fairness_profile(&model, &automaton, profile).unwrap();
-            assert_eq!(first, second, "determinism: {label} assignment={assignment}");
+            assert_eq!(
+                first, second,
+                "determinism: {label} assignment={assignment}"
+            );
             assert_eq!(
                 first.status,
                 if expected_violation {
