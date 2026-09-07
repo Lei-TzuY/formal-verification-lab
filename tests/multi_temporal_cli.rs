@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -50,7 +50,7 @@ fn legacy_response_model_source() -> &'static str {
     "model \"legacy-request-grant\"\nstate \"idle\"\nstate \"waiting\"\ninitial \"idle\"\nedge \"idle\" \"request\" \"waiting\"\nedge \"waiting\" \"grant\" \"idle\"\n"
 }
 
-fn multi_file_args(model: &PathBuf, property: &PathBuf) -> Vec<String> {
+fn multi_file_args(model: &Path, property: &Path) -> Vec<String> {
     vec![
         "temporal".to_owned(),
         "multi-file".to_owned(),
