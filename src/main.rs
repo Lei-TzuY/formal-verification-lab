@@ -29,15 +29,17 @@ use formal_verification_lab::examples::{
 use formal_verification_lab::fairness::WeakFairness;
 use formal_verification_lab::fairness_report::{
     render_analysis_fairness_profile_monitor_report,
+    render_analysis_fairness_profile_multi_response_report,
     render_analysis_fairness_profile_temporal_report, render_analysis_strong_fair_monitor_report,
     render_analysis_strong_fair_temporal_report, render_analysis_weak_fair_monitor_report,
     render_analysis_weak_fair_temporal_report, render_bounded_fairness_profile_monitor_report,
+    render_bounded_fairness_profile_multi_response_report,
     render_bounded_fairness_profile_temporal_report, render_bounded_strong_fair_monitor_report,
     render_bounded_strong_fair_temporal_report, render_bounded_weak_fair_monitor_report,
     render_bounded_weak_fair_temporal_report, render_fairness_profile_monitor_report,
-    render_fairness_profile_temporal_report, render_strong_fair_monitor_report,
-    render_strong_fair_temporal_report, render_weak_fair_monitor_report,
-    render_weak_fair_temporal_report,
+    render_fairness_profile_multi_response_report, render_fairness_profile_temporal_report,
+    render_strong_fair_monitor_report, render_strong_fair_temporal_report,
+    render_weak_fair_monitor_report, render_weak_fair_temporal_report,
 };
 use formal_verification_lab::monitor::{
     check_monitor, check_monitor_with_limits, check_monitor_with_product_limits, FiniteMonitor,
@@ -63,12 +65,14 @@ use formal_verification_lab::monitor_strong_fairness::{
     check_monitor_with_strong_fairness_and_product_limits,
 };
 use formal_verification_lab::multi_response::{
-    check_multi_response, check_multi_response_with_limits,
-    check_multi_response_with_product_limits, MultiResponseProperty, MultiResponseStatus,
-    ResponseClause,
+    check_multi_response, check_multi_response_with_fairness_profile,
+    check_multi_response_with_fairness_profile_and_limits,
+    check_multi_response_with_fairness_profile_and_product_limits,
+    check_multi_response_with_limits, check_multi_response_with_product_limits,
+    MultiResponseProperty, MultiResponseStatus, ResponseClause,
 };
 use formal_verification_lab::multi_response_examples::{
-    dual_response_protocol, unfair_dual_response_protocol,
+    dual_response_protocol, finite_pending_dual_response_protocol, unfair_dual_response_protocol,
 };
 use formal_verification_lab::multi_response_report::{
     render_analysis_multi_response_report, render_bounded_multi_response_report,
@@ -397,8 +401,13 @@ fn response_command(args: &[String]) -> Result<ExitCode, String> {
             dual_response_property()?,
             option_args,
         ),
+        "dual-grant-terminal-b" => run_multi_response(
+            finite_pending_dual_response_protocol().map_err(|error| error.to_string())?,
+            dual_response_property()?,
+            option_args,
+        ),
         _ => Err(format!(
-            "unknown response query '{query}'; expected request-grant, request-grant-unfair, dual-grant, or dual-grant-unfair-b"
+            "unknown response query '{query}'; expected request-grant, request-grant-unfair, dual-grant, dual-grant-unfair-b, or dual-grant-terminal-b"
         )),
     }
 }
@@ -481,6 +490,78 @@ fn run_multi_response<S>(
 where
     S: Clone + Eq + std::hash::Hash + std::fmt::Debug,
 {
+    let has_fairness = option_args
+        .iter()
+        .any(|arg| arg == "--weak-fair-action" || arg == "--strong-fair-action");
+    if has_fairness {
+        let options = parse_temporal_options(option_args)?;
+        if options.has_model_limits {
+            let limits = AnalysisLimits::new(options.model_limits, options.product_limits);
+            let result = check_multi_response_with_fairness_profile_and_limits(
+                &model,
+                &property,
+                &options.fairness_profile,
+                limits,
+            )
+            .map_err(|error| error.to_string())?;
+            print!(
+                "{}",
+                render_analysis_fairness_profile_multi_response_report(
+                    model.name(),
+                    &result,
+                    &options.fairness_profile,
+                )
+            );
+            return Ok(match &result.outcome {
+                AnalysisOutcome::Conclusive(MultiResponseStatus::Satisfied) => ExitCode::SUCCESS,
+                AnalysisOutcome::Conclusive(MultiResponseStatus::Violated) => ExitCode::from(7),
+                AnalysisOutcome::Inconclusive(_) => ExitCode::from(3),
+            });
+        }
+
+        if options.has_product_limits {
+            let result = check_multi_response_with_fairness_profile_and_product_limits(
+                &model,
+                &property,
+                &options.fairness_profile,
+                options.product_limits,
+            )
+            .map_err(|error| error.to_string())?;
+            print!(
+                "{}",
+                render_bounded_fairness_profile_multi_response_report(
+                    model.name(),
+                    &result,
+                    &options.fairness_profile,
+                )
+            );
+            return Ok(match &result.outcome {
+                BoundedOutcome::Conclusive(MultiResponseStatus::Satisfied) => ExitCode::SUCCESS,
+                BoundedOutcome::Conclusive(MultiResponseStatus::Violated) => ExitCode::from(7),
+                BoundedOutcome::Inconclusive(_) => ExitCode::from(3),
+            });
+        }
+
+        let result = check_multi_response_with_fairness_profile(
+            &model,
+            &property,
+            &options.fairness_profile,
+        )
+        .map_err(|error| error.to_string())?;
+        print!(
+            "{}",
+            render_fairness_profile_multi_response_report(
+                model.name(),
+                &result,
+                &options.fairness_profile,
+            )
+        );
+        return Ok(match result.status {
+            MultiResponseStatus::Satisfied => ExitCode::SUCCESS,
+            MultiResponseStatus::Violated => ExitCode::from(7),
+        });
+    }
+
     if option_args.is_empty() {
         let result = check_multi_response(&model, &property).map_err(|error| error.to_string())?;
         print!("{}", render_multi_response_report(model.name(), &result));
@@ -1582,7 +1663,7 @@ fn status_exit_code(status: VerificationStatus) -> ExitCode {
 }
 
 fn usage() -> String {
-    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | eventually <counter-three|counter-four|traffic-never> | respond <request-grant|request-grant-unfair|dual-grant|dual-grant-unfair-b> [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | monitor <session-ok|session-double-open|session-stuck|session-unfair-close|session-open-terminal> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | buchi <pulses|pulses-unfair|finite-ignore|finite-strict> [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal <request-grant|request-grant-unfair|pulses|pulses-unfair> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal check <request-grant|request-grant-unfair|pulses|pulses-unfair> <expression> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal file <path> <expression> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | state file <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition file <path> <reachable|all-eventually> <proposition> [--max-states N] [--max-transitions N] [--max-depth N] | proposition expr <path> <reachable|all-eventually> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition always <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N]]"
+    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | eventually <counter-three|counter-four|traffic-never> | respond <request-grant|request-grant-unfair> [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | respond <dual-grant|dual-grant-unfair-b|dual-grant-terminal-b> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | monitor <session-ok|session-double-open|session-stuck|session-unfair-close|session-open-terminal> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | buchi <pulses|pulses-unfair|finite-ignore|finite-strict> [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal <request-grant|request-grant-unfair|pulses|pulses-unfair> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal check <request-grant|request-grant-unfair|pulses|pulses-unfair> <expression> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal file <path> <expression> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | state file <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition file <path> <reachable|all-eventually> <proposition> [--max-states N] [--max-transitions N] [--max-depth N] | proposition expr <path> <reachable|all-eventually> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition always <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N]]"
         .to_owned()
 }
 
