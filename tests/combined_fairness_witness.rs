@@ -37,10 +37,17 @@ fn combined_fair_lasso_uses_shortest_stem_to_exact_cycle_entry() {
         panic!("expected acceptance-avoiding lasso");
     };
 
-    assert_eq!(stem.len(), 2, "state 1 is exactly one edge from the initial state");
+    assert_eq!(
+        stem.len(),
+        2,
+        "state 1 is exactly one edge from the initial state"
+    );
     assert_eq!(stem.last().unwrap().state, cycle.first().unwrap().state);
     assert_eq!(cycle.first().unwrap().state, cycle.last().unwrap().state);
-    assert!(cycle.len() >= 3, "the mixed witness must execute both obligations");
+    assert!(
+        cycle.len() >= 3,
+        "the mixed witness must execute both obligations"
+    );
 
     let actions = cycle
         .iter()
