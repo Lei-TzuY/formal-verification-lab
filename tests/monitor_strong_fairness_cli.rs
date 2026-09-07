@@ -160,4 +160,17 @@ fn monitor_strong_fairness_options_fail_closed_on_duplicate_empty_missing_or_mix
     ]);
     assert_eq!(mixed.status.code(), Some(2));
     assert!(stderr(&mixed).contains("cannot combine weak and strong fairness assumptions"));
+
+    let unknown = run(&[
+        "monitor",
+        "session-unfair-close",
+        "--unknown-monitor-option",
+        "x",
+    ]);
+    assert_eq!(unknown.status.code(), Some(2));
+    let unknown_text = stderr(&unknown);
+    assert!(unknown_text.contains("unknown option '--unknown-monitor-option'"));
+    assert!(unknown_text.contains(
+        "monitor <session-ok|session-double-open|session-stuck|session-unfair-close|session-open-terminal> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]..."
+    ));
 }
