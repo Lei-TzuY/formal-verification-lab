@@ -35,10 +35,8 @@ fn stderr(output: &Output) -> String {
 
 fn fixture_dir(kind: &str) -> PathBuf {
     let id = NEXT_DIR.fetch_add(1, Ordering::Relaxed);
-    let root = std::env::temp_dir().join(format!(
-        "fvlab-m58-cli-{kind}-{}-{id}",
-        std::process::id()
-    ));
+    let root =
+        std::env::temp_dir().join(format!("fvlab-m58-cli-{kind}-{}-{id}", std::process::id()));
     fs::create_dir_all(&root).unwrap();
     root
 }
@@ -158,7 +156,11 @@ fn expectation_binary_matches_all_m57_job_classes_and_preserves_direct_envelopes
         let manifest = root.join(format!("{name}.fvj"));
         let direct = run_job_json(&manifest);
         assert_eq!(direct.status.code(), *direct_exit, "job {name}");
-        assert!(stderr(&direct).is_empty(), "job {name}: {}", stderr(&direct));
+        assert!(
+            stderr(&direct).is_empty(),
+            "job {name}: {}",
+            stderr(&direct)
+        );
         let direct_json = stdout(&direct).trim_end().to_owned();
         let entry = format!(
             "{{\"manifest\":\"{name}.fvj\",\"expected\":\"{expected_outcome}\",\"observed\":\"{observed}\",\"matched\":true,\"result\":{direct_json}}}"
@@ -228,7 +230,10 @@ fn expectation_binary_retains_every_mismatch_in_order_and_exits_thirteen() {
             .find(&marker)
             .unwrap_or_else(|| panic!("missing mismatch entry for {name}"));
         if let Some(previous) = previous_position {
-            assert!(previous < position, "mismatch order must follow suite input");
+            assert!(
+                previous < position,
+                "mismatch order must follow suite input"
+            );
         }
         previous_position = Some(position);
     }
@@ -247,9 +252,9 @@ fn expectation_binary_fails_closed_before_jobs_when_an_expectation_is_missing() 
     assert_eq!(output.status.code(), Some(2));
     assert!(stderr(&output).is_empty());
     let json = stdout(&output);
-    assert!(json.starts_with(
-        "{\"schema_version\":1,\"outcome\":\"error\",\"suite\":null,\"jobs\":[]"
-    ));
+    assert!(
+        json.starts_with("{\"schema_version\":1,\"outcome\":\"error\",\"suite\":null,\"jobs\":[]")
+    );
     assert!(json.contains("expectation check requires every verification suite job"));
     assert!(!json.contains("\"model\":\"satisfied\""));
 
@@ -280,7 +285,8 @@ fn expectation_flag_is_explicit_and_raw_m57_behavior_remains_unchanged() {
     let checked = run_suite(&expectation_args(&suite));
     assert_eq!(checked.status.code(), Some(13));
     assert!(stderr(&checked).is_empty());
-    assert!(stdout(&checked).contains("\"expected\":\"satisfied\",\"observed\":\"violated\",\"matched\":false"));
+    assert!(stdout(&checked)
+        .contains("\"expected\":\"satisfied\",\"observed\":\"violated\",\"matched\":false"));
 
     let _ = fs::remove_dir_all(root);
 }
@@ -302,9 +308,8 @@ fn expectation_binary_rejects_malformed_cli_usage_without_running_a_suite() {
     ]);
     assert_eq!(missing_format.status.code(), Some(2));
     assert!(stdout(&missing_format).is_empty());
-    assert!(stderr(&missing_format).contains(
-        "usage: fvlab-suite <suite-manifest> [--check-expectations] --format json"
-    ));
+    assert!(stderr(&missing_format)
+        .contains("usage: fvlab-suite <suite-manifest> [--check-expectations] --format json"));
 
     let wrong_order = run_suite(&[
         suite.to_string_lossy().into_owned(),
