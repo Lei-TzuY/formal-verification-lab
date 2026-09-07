@@ -144,7 +144,9 @@ fn mixed_profile_preserves_product_and_model_cutoff_provenance() {
     assert_eq!(product.status.code(), Some(3));
     let product_report = stdout(&product);
     assert!(product_report.contains("temporal: INCONCLUSIVE"));
-    assert!(product_report.contains("product inconclusive reason: transition limit reached (max 2)"));
+    assert!(
+        product_report.contains("product inconclusive reason: transition limit reached (max 2)")
+    );
     assert!(product_report.contains("weak-fair action: \"unrelated\""));
     assert!(product_report.contains("strong-fair action: \"grant\""));
 
