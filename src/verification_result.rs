@@ -293,6 +293,7 @@ impl VerificationJobResultEnvelope {
         out.push('{');
         field_u64(&mut out, "schema_version", self.schema_version as u64, true);
         field_string(&mut out, "outcome", self.outcome.as_str(), false);
+        field_optional_string(&mut out, "status", canonical_status(self.outcome), false);
         field_optional_string(&mut out, "model", self.model.as_deref(), false);
         field_optional_string(&mut out, "property", self.property.as_deref(), false);
         field_string_array(
@@ -324,6 +325,14 @@ impl VerificationJobResultEnvelope {
         write_optional_string(&mut out, self.error.as_deref());
         out.push('}');
         out
+    }
+}
+
+fn canonical_status(outcome: VerificationJobOutcome) -> Option<&'static str> {
+    match outcome {
+        VerificationJobOutcome::Satisfied => Some("SATISFIED"),
+        VerificationJobOutcome::Violated => Some("VIOLATED"),
+        VerificationJobOutcome::Inconclusive | VerificationJobOutcome::Error => None,
     }
 }
 

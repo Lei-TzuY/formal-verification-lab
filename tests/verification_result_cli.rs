@@ -74,7 +74,9 @@ fn json_job_reports_lasso_violation_with_canonical_clause_evidence() {
     assert_eq!(stdout(&first), stdout(&second));
     assert!(stderr(&first).is_empty());
     let json = stdout(&first);
-    assert!(json.starts_with("{\"schema_version\":1,\"outcome\":\"violated\""));
+    assert!(
+        json.starts_with("{\"schema_version\":1,\"outcome\":\"violated\",\"status\":\"VIOLATED\"")
+    );
     assert!(json.contains("\"model\":\"job-dual-unfair\""));
     assert!(json.contains("\"kind\":\"lasso\",\"clause\":\"class-b\""));
     assert!(json.contains("\"action\":\"wait-b\""));
@@ -94,7 +96,7 @@ fn json_job_reports_applied_mixed_fairness_and_satisfaction() {
     let output = run(&json_args(&manifest));
     assert!(output.status.success(), "{}", stderr(&output));
     let json = stdout(&output);
-    assert!(json.contains("\"outcome\":\"satisfied\""));
+    assert!(json.contains("\"outcome\":\"satisfied\",\"status\":\"SATISFIED\""));
     assert!(json.contains("\"weak_fair_actions\":[\"grant-b\"]"));
     assert!(json.contains("\"strong_fair_actions\":[\"unrelated\"]"));
     assert!(json.contains("\"evidence\":null"));
@@ -160,7 +162,7 @@ fn json_job_malformed_input_is_structured_error_with_exit_two() {
     assert_eq!(output.status.code(), Some(2));
     assert!(stderr(&output).is_empty());
     let json = stdout(&output);
-    assert!(json.starts_with("{\"schema_version\":1,\"outcome\":\"error\""));
+    assert!(json.starts_with("{\"schema_version\":1,\"outcome\":\"error\",\"status\":null"));
     assert!(json.contains("duplicate singleton directive 'max-product-states'"));
     assert!(json.ends_with("}\n"));
 

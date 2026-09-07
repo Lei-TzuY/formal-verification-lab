@@ -73,7 +73,9 @@ fn unbounded_lasso_preserves_clause_and_exact_trace_order() {
     let first = envelope.to_json();
     let second = envelope.to_json();
     assert_eq!(first, second);
-    assert!(first.starts_with("{\"schema_version\":1,\"outcome\":\"violated\""));
+    assert!(
+        first.starts_with("{\"schema_version\":1,\"outcome\":\"violated\",\"status\":\"VIOLATED\"")
+    );
     assert!(first.contains("\"kind\":\"lasso\",\"clause\":\"class-b\""));
     assert!(
         first.contains("\"action\":\"request-b\",\"state\":\"waiting\",\"pending\":[false,true]")
@@ -112,6 +114,7 @@ fn product_cutoff_is_stage_qualified_and_accounted() {
     );
 
     assert_eq!(envelope.outcome, VerificationJobOutcome::Inconclusive);
+    assert!(envelope.to_json().contains("\"status\":null"));
     let cutoff = envelope.cutoff.expect("cutoff should be present");
     assert_eq!(cutoff.stage, VerificationJobCutoffStage::Product);
     assert_eq!(cutoff.kind, VerificationJobCutoffKind::TransitionLimit);
@@ -179,6 +182,6 @@ fn json_writer_escapes_quotes_backslashes_controls_and_preserves_utf8() {
 
     assert_eq!(
         json,
-        "{\"schema_version\":1,\"outcome\":\"error\",\"model\":null,\"property\":null,\"weak_fair_actions\":[],\"strong_fair_actions\":[],\"model_limits\":{\"max_states\":null,\"max_transitions\":null,\"max_depth\":null},\"product_limits\":{\"max_states\":null,\"max_transitions\":null,\"max_depth\":null},\"accounting\":{\"model_states\":null,\"checked_model_states\":null,\"explored_model_transitions\":null,\"retained_model_transitions\":null,\"max_model_depth_reached\":null,\"product_states\":null,\"checked_product_states\":null,\"explored_product_transitions\":null,\"retained_product_transitions\":null,\"max_product_depth_reached\":null},\"cutoff\":null,\"evidence\":null,\"error\":\"bad \\\"quote\\\" \\\\ path\\nline\\t模型\\u0001\"}"
+        "{\"schema_version\":1,\"outcome\":\"error\",\"status\":null,\"model\":null,\"property\":null,\"weak_fair_actions\":[],\"strong_fair_actions\":[],\"model_limits\":{\"max_states\":null,\"max_transitions\":null,\"max_depth\":null},\"product_limits\":{\"max_states\":null,\"max_transitions\":null,\"max_depth\":null},\"accounting\":{\"model_states\":null,\"checked_model_states\":null,\"explored_model_transitions\":null,\"retained_model_transitions\":null,\"max_model_depth_reached\":null,\"product_states\":null,\"checked_product_states\":null,\"explored_product_transitions\":null,\"retained_product_transitions\":null,\"max_product_depth_reached\":null},\"cutoff\":null,\"evidence\":null,\"error\":\"bad \\\"quote\\\" \\\\ path\\nline\\t模型\\u0001\"}"
     );
 }
