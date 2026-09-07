@@ -548,7 +548,7 @@ fn run_monitor<S, M>(
 ) -> Result<ExitCode, String>
 where
     S: Clone + Eq + std::hash::Hash + std::fmt::Debug,
-    M: Clone + Eq + std::hash::Hash + std::fmt::Debug,
+    M: Clone + Eq + std::hash::Hash + std::fmt::Debug + 'static,
 {
     let options = parse_temporal_options(option_args)?;
 
