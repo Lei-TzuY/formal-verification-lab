@@ -1074,9 +1074,8 @@ where
     match &spec.kind {
         ActionTemporalKind::Response { trigger, response } => {
             let property = response_property(spec, trigger, response)?;
-            let result = crate::response::check_response_with_fairness_profile(
-                model, &property, profile,
-            )?;
+            let result =
+                crate::response::check_response_with_fairness_profile(model, &property, profile)?;
             temporal_result_from_response(result)
         }
         ActionTemporalKind::AllInfinitelyOften { actions } => {
@@ -1183,9 +1182,10 @@ where
         }
         ActionTemporalKind::AllInfinitelyOften { actions } => {
             let automaton = recurring_automaton(spec, actions)?;
-            let result = crate::bounded_combined_fairness::check_buchi_with_fairness_profile_and_limits(
-                model, &automaton, profile, limits,
-            )?;
+            let result =
+                crate::bounded_combined_fairness::check_buchi_with_fairness_profile_and_limits(
+                    model, &automaton, profile, limits,
+                )?;
             analysis_temporal_result_from_buchi(result)
         }
     }
