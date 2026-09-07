@@ -1,8 +1,9 @@
 use formal_verification_lab::multi_response::{
     check_multi_response, check_multi_response_with_fairness_profile,
     check_multi_response_with_fairness_profile_and_limits,
-    check_multi_response_with_fairness_profile_and_product_limits, check_multi_response_with_limits,
-    check_multi_response_with_product_limits, check_multi_response_with_strong_fairness,
+    check_multi_response_with_fairness_profile_and_product_limits,
+    check_multi_response_with_limits, check_multi_response_with_product_limits,
+    check_multi_response_with_strong_fairness,
     check_multi_response_with_strong_fairness_and_limits,
     check_multi_response_with_strong_fairness_and_product_limits,
     check_multi_response_with_weak_fairness, check_multi_response_with_weak_fairness_and_limits,
@@ -195,13 +196,8 @@ fn compatibility_profiles_delegate_exactly_staged() {
     assert_eq!(
         check_multi_response_with_fairness_profile_and_limits(&model, &property, &weak, limits)
             .unwrap(),
-        check_multi_response_with_weak_fairness_and_limits(
-            &model,
-            &property,
-            weak.weak(),
-            limits,
-        )
-        .unwrap()
+        check_multi_response_with_weak_fairness_and_limits(&model, &property, weak.weak(), limits,)
+            .unwrap()
     );
 
     let strong = strong_only_profile();
@@ -228,8 +224,8 @@ fn genuinely_mixed_profile_filters_both_independent_unfair_lassos() {
     let strong =
         check_multi_response_with_fairness_profile(&model, &property, &strong_only_profile())
             .unwrap();
-    let mixed = check_multi_response_with_fairness_profile(&model, &property, &mixed_profile())
-        .unwrap();
+    let mixed =
+        check_multi_response_with_fairness_profile(&model, &property, &mixed_profile()).unwrap();
 
     assert_eq!(weak.status, MultiResponseStatus::Violated);
     assert_eq!(strong.status, MultiResponseStatus::Violated);
@@ -281,8 +277,8 @@ fn retained_mixed_fair_lasso_preserves_clause_and_pending_vector() {
     )
     .unwrap();
     let profile = FairnessProfile::new(["grant-a-shadow"], ["grant-b"]).unwrap();
-    let result = check_multi_response_with_fairness_profile(&model, &dual_property(), &profile)
-        .unwrap();
+    let result =
+        check_multi_response_with_fairness_profile(&model, &dual_property(), &profile).unwrap();
 
     assert_eq!(result.status, MultiResponseStatus::Violated);
     let Some(MultiResponseCounterexample::Infinite {
@@ -327,10 +323,7 @@ fn product_cutoff_before_witness_is_inconclusive_but_retained_terminal_wins() {
         vec![0usize],
         |state| {
             Ok(match state {
-                0 => vec![
-                    Transition::new("request-a", 1),
-                    Transition::new("other", 2),
-                ],
+                0 => vec![Transition::new("request-a", 1), Transition::new("other", 2)],
                 1 => Vec::new(),
                 _ => vec![Transition::new("other", 2)],
             })
@@ -378,7 +371,8 @@ fn staged_cutoff_preserves_model_provenance_and_generous_limits_match_unbounded(
         })
     );
 
-    let unbounded = check_multi_response_with_fairness_profile(&model, &property, &profile).unwrap();
+    let unbounded =
+        check_multi_response_with_fairness_profile(&model, &property, &profile).unwrap();
     let staged = check_multi_response_with_fairness_profile_and_limits(
         &model,
         &property,
@@ -391,7 +385,10 @@ fn staged_cutoff_preserves_model_provenance_and_generous_limits_match_unbounded(
         AnalysisOutcome::Conclusive(unbounded.status)
     );
     assert_eq!(staged.model_states, unbounded.model_states);
-    assert_eq!(staged.explored_model_transitions, unbounded.model_transitions);
+    assert_eq!(
+        staged.explored_model_transitions,
+        unbounded.model_transitions
+    );
     assert_eq!(staged.product_states, unbounded.product_states);
     assert_eq!(
         staged.retained_product_transitions,
