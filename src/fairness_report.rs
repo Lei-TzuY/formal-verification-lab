@@ -2,7 +2,8 @@
 //! verification evidence. M48 extends the established temporal pattern to a
 //! combined weak/strong fairness profile without changing witness, accounting,
 //! or cutoff semantics. M50 applies the same reporting contract to finite monitors,
-//! and M51 applies it to the external multi-response command surface.
+//! M51 applies it to the external multi-response command surface, and M52 applies
+//! it to direct single-response verification.
 
 use crate::combined_fairness::FairnessProfile;
 use crate::fairness::WeakFairness;
@@ -16,6 +17,10 @@ use crate::multi_response::{
 use crate::multi_response_report::{
     render_analysis_multi_response_report, render_bounded_multi_response_report,
     render_multi_response_report,
+};
+use crate::response::{AnalysisResponseResult, BoundedResponseResult, ResponseResult};
+use crate::response_report::{
+    render_analysis_response_report, render_bounded_response_report, render_response_report,
 };
 use crate::strong_fairness::StrongFairness;
 use crate::temporal::{AnalysisTemporalResult, BoundedTemporalResult, TemporalResult};
@@ -176,6 +181,47 @@ pub fn render_analysis_fairness_profile_multi_response_report<S: Debug>(
     profile: &FairnessProfile,
 ) -> String {
     let mut output = render_analysis_multi_response_report(model_name, result);
+    append_fairness(&mut output, "weak", profile.weak_actions());
+    append_fairness(&mut output, "strong", profile.strong_actions());
+    output
+}
+
+/// Render one direct single-response result with both canonical fairness
+/// classes. The underlying response report remains the sole owner of property
+/// status, accounting, and finite/lasso evidence.
+pub fn render_fairness_profile_response_report<S: Debug>(
+    model_name: &str,
+    result: &ResponseResult<S>,
+    profile: &FairnessProfile,
+) -> String {
+    let mut output = render_response_report(model_name, result);
+    append_fairness(&mut output, "weak", profile.weak_actions());
+    append_fairness(&mut output, "strong", profile.strong_actions());
+    output
+}
+
+/// Render direct single-response product-bounded verification with both
+/// canonical fairness classes while preserving canonical cutoff accounting.
+pub fn render_bounded_fairness_profile_response_report<S: Debug>(
+    model_name: &str,
+    result: &BoundedResponseResult<S>,
+    profile: &FairnessProfile,
+) -> String {
+    let mut output = render_bounded_response_report(model_name, result);
+    append_fairness(&mut output, "weak", profile.weak_actions());
+    append_fairness(&mut output, "strong", profile.strong_actions());
+    output
+}
+
+/// Render staged direct single-response verification with both canonical
+/// fairness classes. Model-before-product cutoff provenance remains owned by
+/// the canonical staged response renderer.
+pub fn render_analysis_fairness_profile_response_report<S: Debug>(
+    model_name: &str,
+    result: &AnalysisResponseResult<S>,
+    profile: &FairnessProfile,
+) -> String {
+    let mut output = render_analysis_response_report(model_name, result);
     append_fairness(&mut output, "weak", profile.weak_actions());
     append_fairness(&mut output, "strong", profile.strong_actions());
     output
