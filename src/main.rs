@@ -10,6 +10,7 @@ use formal_verification_lab::buchi_report::{
     render_analysis_buchi_report, render_bounded_buchi_report, render_buchi_report,
 };
 use formal_verification_lab::checker::{check_with_limits, ExplorationLimits, VerificationStatus};
+use formal_verification_lab::combined_fairness::FairnessProfile;
 use formal_verification_lab::eventuality::{
     check_eventuality, EventualityProperty, EventualityStatus,
 };
@@ -27,12 +28,14 @@ use formal_verification_lab::examples::{
 };
 use formal_verification_lab::fairness::WeakFairness;
 use formal_verification_lab::fairness_report::{
-    render_analysis_strong_fair_monitor_report, render_analysis_strong_fair_temporal_report,
-    render_analysis_weak_fair_monitor_report, render_analysis_weak_fair_temporal_report,
+    render_analysis_fairness_profile_temporal_report, render_analysis_strong_fair_monitor_report,
+    render_analysis_strong_fair_temporal_report, render_analysis_weak_fair_monitor_report,
+    render_analysis_weak_fair_temporal_report, render_bounded_fairness_profile_temporal_report,
     render_bounded_strong_fair_monitor_report, render_bounded_strong_fair_temporal_report,
     render_bounded_weak_fair_monitor_report, render_bounded_weak_fair_temporal_report,
-    render_strong_fair_monitor_report, render_strong_fair_temporal_report,
-    render_weak_fair_monitor_report, render_weak_fair_temporal_report,
+    render_fairness_profile_temporal_report, render_strong_fair_monitor_report,
+    render_strong_fair_temporal_report, render_weak_fair_monitor_report,
+    render_weak_fair_temporal_report,
 };
 use formal_verification_lab::monitor::{
     check_monitor, check_monitor_with_limits, check_monitor_with_product_limits, FiniteMonitor,
@@ -103,8 +106,11 @@ use formal_verification_lab::safety::{
 use formal_verification_lab::safety_report::{render_bounded_safety_report, render_safety_report};
 use formal_verification_lab::strong_fairness::StrongFairness;
 use formal_verification_lab::temporal::{
-    check_action_temporal, check_action_temporal_with_limits,
-    check_action_temporal_with_product_limits, check_action_temporal_with_strong_fairness,
+    check_action_temporal, check_action_temporal_with_fairness_profile,
+    check_action_temporal_with_fairness_profile_and_limits,
+    check_action_temporal_with_fairness_profile_and_product_limits,
+    check_action_temporal_with_limits, check_action_temporal_with_product_limits,
+    check_action_temporal_with_strong_fairness,
     check_action_temporal_with_strong_fairness_and_limits,
     check_action_temporal_with_strong_fairness_and_product_limits,
     check_action_temporal_with_weak_fairness, check_action_temporal_with_weak_fairness_and_limits,
@@ -551,6 +557,9 @@ where
     M: Clone + Eq + std::hash::Hash + std::fmt::Debug + 'static,
 {
     let options = parse_temporal_options(option_args)?;
+    if !options.fairness.is_empty() && !options.strong_fairness.is_empty() {
+        return Err("cannot combine weak and strong fairness assumptions; choose one fairness strength per analysis".to_owned());
+    }
 
     if !options.strong_fairness.is_empty() {
         if options.has_model_limits {
@@ -877,6 +886,71 @@ where
     S: Clone + Eq + std::hash::Hash + std::fmt::Debug,
 {
     let options = parse_temporal_options(option_args)?;
+
+    if !options.fairness.is_empty() && !options.strong_fairness.is_empty() {
+        if options.has_model_limits {
+            let limits = AnalysisLimits::new(options.model_limits, options.product_limits);
+            let result = check_action_temporal_with_fairness_profile_and_limits(
+                &model,
+                &spec,
+                &options.fairness_profile,
+                limits,
+            )
+            .map_err(|error| error.to_string())?;
+            print!(
+                "{}",
+                render_analysis_fairness_profile_temporal_report(
+                    model.name(),
+                    &result,
+                    &options.fairness_profile,
+                )
+            );
+            return Ok(match &result.outcome {
+                AnalysisOutcome::Conclusive(TemporalStatus::Satisfied) => ExitCode::SUCCESS,
+                AnalysisOutcome::Conclusive(TemporalStatus::Violated) => ExitCode::from(10),
+                AnalysisOutcome::Inconclusive(_) => ExitCode::from(3),
+            });
+        }
+
+        if options.has_product_limits {
+            let result = check_action_temporal_with_fairness_profile_and_product_limits(
+                &model,
+                &spec,
+                &options.fairness_profile,
+                options.product_limits,
+            )
+            .map_err(|error| error.to_string())?;
+            print!(
+                "{}",
+                render_bounded_fairness_profile_temporal_report(
+                    model.name(),
+                    &result,
+                    &options.fairness_profile,
+                )
+            );
+            return Ok(match &result.outcome {
+                BoundedOutcome::Conclusive(TemporalStatus::Satisfied) => ExitCode::SUCCESS,
+                BoundedOutcome::Conclusive(TemporalStatus::Violated) => ExitCode::from(10),
+                BoundedOutcome::Inconclusive(_) => ExitCode::from(3),
+            });
+        }
+
+        let result =
+            check_action_temporal_with_fairness_profile(&model, &spec, &options.fairness_profile)
+                .map_err(|error| error.to_string())?;
+        print!(
+            "{}",
+            render_fairness_profile_temporal_report(
+                model.name(),
+                &result,
+                &options.fairness_profile,
+            )
+        );
+        return Ok(match result.status {
+            TemporalStatus::Satisfied => ExitCode::SUCCESS,
+            TemporalStatus::Violated => ExitCode::from(10),
+        });
+    }
 
     if !options.strong_fairness.is_empty() {
         if options.has_model_limits {
@@ -1244,6 +1318,7 @@ fn contains_model_limit_flag(args: &[String]) -> bool {
 struct TemporalCliOptions {
     fairness: WeakFairness,
     strong_fairness: StrongFairness,
+    fairness_profile: FairnessProfile,
     model_limits: ExplorationLimits,
     product_limits: ExplorationLimits,
     has_model_limits: bool,
@@ -1322,13 +1397,16 @@ fn parse_temporal_options(args: &[String]) -> Result<TemporalCliOptions, String>
     let fairness = WeakFairness::new(fairness_actions).map_err(|error| error.to_string())?;
     let strong_fairness =
         StrongFairness::new(strong_fairness_actions).map_err(|error| error.to_string())?;
-    if !fairness.is_empty() && !strong_fairness.is_empty() {
-        return Err("cannot combine weak and strong fairness assumptions; choose one fairness strength per analysis".to_owned());
-    }
+    let fairness_profile = FairnessProfile::new(
+        fairness.actions().iter().cloned(),
+        strong_fairness.actions().iter().cloned(),
+    )
+    .map_err(|error| error.to_string())?;
 
     Ok(TemporalCliOptions {
         fairness,
         strong_fairness,
+        fairness_profile,
         model_limits,
         product_limits,
         has_model_limits,

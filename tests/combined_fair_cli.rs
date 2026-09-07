@@ -22,7 +22,7 @@ fn declarative_request_grant_path() -> std::path::PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("clock should be after Unix epoch")
         .as_nanos();
-    let path = std::env::temp_dir().join(format!("fvlab-strong-fair-cli-{nonce}.fvl"));
+    let path = std::env::temp_dir().join(format!("fvlab-combined-fair-cli-{nonce}.fvl"));
     fs::write(
         &path,
         "model \"request-grant-file\"\n\
@@ -38,50 +38,76 @@ fn declarative_request_grant_path() -> std::path::PathBuf {
 }
 
 #[test]
-fn fixed_temporal_route_reports_explicit_strong_fairness() {
-    let baseline = fvlab(&["temporal", "request-grant-unfair"]);
-    assert_eq!(baseline.status.code(), Some(10));
-
-    let fair = fvlab(&[
-        "temporal",
-        "request-grant-unfair",
-        "--strong-fair-action",
-        "grant",
-    ]);
-    assert!(fair.status.success(), "{}", stderr(&fair));
-    let report = stdout(&fair);
-    assert!(report.contains("temporal: SATISFIED"));
-    assert!(report.contains("strong fairness actions: 1"));
-    assert!(report.contains("strong-fair action: \"grant\""));
-    assert!(!report.contains("weak fairness actions:"));
-}
-
-#[test]
-fn unrelated_strong_fairness_preserves_real_violation() {
+fn fixed_temporal_route_accepts_distinct_mixed_profile() {
     let output = fvlab(&[
         "temporal",
         "request-grant-unfair",
-        "--strong-fair-action",
+        "--weak-fair-action",
         "unrelated",
+        "--strong-fair-action",
+        "grant",
+    ]);
+    assert!(output.status.success(), "{}", stderr(&output));
+    let report = stdout(&output);
+    assert!(report.contains("temporal: SATISFIED"));
+    assert!(report.contains("weak fairness actions: 1"));
+    assert!(report.contains("weak-fair action: \"unrelated\""));
+    assert!(report.contains("strong fairness actions: 1"));
+    assert!(report.contains("strong-fair action: \"grant\""));
+}
+
+#[test]
+fn overlap_is_canonicalized_to_the_strong_class() {
+    let output = fvlab(&[
+        "temporal",
+        "request-grant-unfair",
+        "--weak-fair-action",
+        "grant",
+        "--strong-fair-action",
+        "grant",
+    ]);
+    assert!(output.status.success(), "{}", stderr(&output));
+    let report = stdout(&output);
+    assert!(report.contains("temporal: SATISFIED"));
+    assert!(report.contains("weak fairness actions: 0"));
+    assert!(!report.contains("weak-fair action: \"grant\""));
+    assert!(report.contains("strong fairness actions: 1"));
+    assert!(report.contains("strong-fair action: \"grant\""));
+}
+
+#[test]
+fn unrelated_mixed_profile_preserves_a_real_violation() {
+    let output = fvlab(&[
+        "temporal",
+        "request-grant-unfair",
+        "--weak-fair-action",
+        "weak-unrelated",
+        "--strong-fair-action",
+        "strong-unrelated",
     ]);
     assert_eq!(output.status.code(), Some(10));
     let report = stdout(&output);
     assert!(report.contains("temporal: VIOLATED"));
-    assert!(report.contains("strong-fair action: \"unrelated\""));
+    assert!(report.contains("weak-fair action: \"weak-unrelated\""));
+    assert!(report.contains("strong-fair action: \"strong-unrelated\""));
 }
 
 #[test]
-fn textual_and_declarative_routes_share_strong_fair_backend() {
+fn textual_and_declarative_routes_share_mixed_profile_dispatch() {
     let textual = fvlab(&[
         "temporal",
         "check",
         "request-grant-unfair",
         "response(\"request\",\"grant\")",
+        "--weak-fair-action",
+        "unrelated",
         "--strong-fair-action",
         "grant",
     ]);
     assert!(textual.status.success(), "{}", stderr(&textual));
-    assert!(stdout(&textual).contains("strong-fair action: \"grant\""));
+    let textual_report = stdout(&textual);
+    assert!(textual_report.contains("weak-fair action: \"unrelated\""));
+    assert!(textual_report.contains("strong-fair action: \"grant\""));
 
     let path = declarative_request_grant_path();
     let path_string = path.to_string_lossy().into_owned();
@@ -90,21 +116,26 @@ fn textual_and_declarative_routes_share_strong_fair_backend() {
         "file",
         &path_string,
         "response(\"request\",\"grant\")",
+        "--weak-fair-action",
+        "unrelated",
         "--strong-fair-action",
         "grant",
     ]);
     let _ = fs::remove_file(path);
     assert!(file.status.success(), "{}", stderr(&file));
-    let report = stdout(&file);
-    assert!(report.contains("model: request-grant-file"));
-    assert!(report.contains("strong-fair action: \"grant\""));
+    let file_report = stdout(&file);
+    assert!(file_report.contains("model: request-grant-file"));
+    assert!(file_report.contains("weak-fair action: \"unrelated\""));
+    assert!(file_report.contains("strong-fair action: \"grant\""));
 }
 
 #[test]
-fn product_and_model_cutoffs_remain_inconclusive_with_provenance() {
+fn mixed_profile_preserves_product_and_model_cutoff_provenance() {
     let product = fvlab(&[
         "temporal",
         "request-grant-unfair",
+        "--weak-fair-action",
+        "unrelated",
         "--strong-fair-action",
         "grant",
         "--max-product-transitions",
@@ -113,14 +144,17 @@ fn product_and_model_cutoffs_remain_inconclusive_with_provenance() {
     assert_eq!(product.status.code(), Some(3));
     let product_report = stdout(&product);
     assert!(product_report.contains("temporal: INCONCLUSIVE"));
-    assert!(product_report.contains("strong-fair action: \"grant\""));
     assert!(
         product_report.contains("product inconclusive reason: transition limit reached (max 2)")
     );
+    assert!(product_report.contains("weak-fair action: \"unrelated\""));
+    assert!(product_report.contains("strong-fair action: \"grant\""));
 
     let model = fvlab(&[
         "temporal",
         "request-grant-unfair",
+        "--weak-fair-action",
+        "unrelated",
         "--strong-fair-action",
         "grant",
         "--max-model-transitions",
@@ -131,23 +165,40 @@ fn product_and_model_cutoffs_remain_inconclusive_with_provenance() {
     assert!(model_report.contains("temporal: INCONCLUSIVE"));
     assert!(model_report.contains("analysis inconclusive stage: model"));
     assert!(model_report.contains("analysis inconclusive reason: transition limit reached (max 1)"));
+    assert!(model_report.contains("weak-fair action: \"unrelated\""));
     assert!(model_report.contains("strong-fair action: \"grant\""));
 }
 
 #[test]
-fn malformed_strong_fairness_fails_closed() {
+fn malformed_fairness_still_fails_closed() {
     let duplicate = fvlab(&[
         "temporal",
         "request-grant-unfair",
-        "--strong-fair-action",
+        "--weak-fair-action",
+        "grant",
+        "--weak-fair-action",
         "grant",
         "--strong-fair-action",
-        "grant",
+        "other",
     ]);
     assert_eq!(duplicate.status.code(), Some(2));
-    assert!(stderr(&duplicate).contains("duplicate strong-fair action 'grant'"));
+    assert!(stderr(&duplicate).contains("duplicate weak-fair action 'grant'"));
 
     let missing = fvlab(&["temporal", "request-grant-unfair", "--strong-fair-action"]);
     assert_eq!(missing.status.code(), Some(2));
     assert!(stderr(&missing).contains("option '--strong-fair-action' requires an action value"));
+}
+
+#[test]
+fn direct_monitor_mixed_fairness_remains_fail_closed() {
+    let output = fvlab(&[
+        "monitor",
+        "session-unfair-close",
+        "--weak-fair-action",
+        "close",
+        "--strong-fair-action",
+        "close",
+    ]);
+    assert_eq!(output.status.code(), Some(2));
+    assert!(stderr(&output).contains("cannot combine weak and strong fairness assumptions"));
 }

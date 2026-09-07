@@ -1,8 +1,9 @@
 //! Fairness-specific report adapters keep assumptions separate from canonical
-//! verification evidence. M44 extends the established temporal/weak-monitor
-//! pattern to direct strong-fair monitor CLI routing without changing monitor
-//! witness, accounting, or cutoff semantics.
+//! verification evidence. M48 extends the established temporal pattern to a
+//! combined weak/strong fairness profile without changing witness, accounting,
+//! or cutoff semantics.
 
+use crate::combined_fairness::FairnessProfile;
 use crate::fairness::WeakFairness;
 use crate::monitor::{AnalysisMonitorResult, BoundedMonitorResult, MonitorResult};
 use crate::monitor_report::{
@@ -88,6 +89,48 @@ pub fn render_analysis_strong_fair_temporal_report<S: Debug>(
 ) -> String {
     let mut output = render_analysis_temporal_report(model_name, result);
     append_fairness(&mut output, "strong", fairness.actions());
+    output
+}
+
+/// Render one unbounded temporal result together with the canonical weak and
+/// strong classes in a combined fairness profile. Overlapping actions appear
+/// only in the strong class because `FairnessProfile` canonicalizes them before
+/// verification and reporting.
+pub fn render_fairness_profile_temporal_report<S: Debug>(
+    model_name: &str,
+    result: &TemporalResult<S>,
+    profile: &FairnessProfile,
+) -> String {
+    let mut output = render_temporal_report(model_name, result);
+    append_fairness(&mut output, "weak", profile.weak_actions());
+    append_fairness(&mut output, "strong", profile.strong_actions());
+    output
+}
+
+/// Render a product-bounded temporal result with both canonical fairness
+/// classes while leaving product cutoff accounting in the canonical renderer.
+pub fn render_bounded_fairness_profile_temporal_report<S: Debug>(
+    model_name: &str,
+    result: &BoundedTemporalResult<S>,
+    profile: &FairnessProfile,
+) -> String {
+    let mut output = render_bounded_temporal_report(model_name, result);
+    append_fairness(&mut output, "weak", profile.weak_actions());
+    append_fairness(&mut output, "strong", profile.strong_actions());
+    output
+}
+
+/// Render staged model/product temporal analysis with both canonical fairness
+/// classes. Stage-qualified inconclusive provenance remains single-sourced in
+/// the canonical temporal report.
+pub fn render_analysis_fairness_profile_temporal_report<S: Debug>(
+    model_name: &str,
+    result: &AnalysisTemporalResult<S>,
+    profile: &FairnessProfile,
+) -> String {
+    let mut output = render_analysis_temporal_report(model_name, result);
+    append_fairness(&mut output, "weak", profile.weak_actions());
+    append_fairness(&mut output, "strong", profile.strong_actions());
     output
 }
 
