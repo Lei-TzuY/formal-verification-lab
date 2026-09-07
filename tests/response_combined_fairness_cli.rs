@@ -193,17 +193,12 @@ fn response_fairness_validation_and_historical_no_option_path_are_explicit() {
     assert!(!historical_text.contains("weak fairness actions:"));
     assert!(!historical_text.contains("strong fairness actions:"));
 
-    let usage = run(&[
-        "respond",
-        "request-grant-unfair",
-        "--unknown-option",
-        "1",
-    ]);
+    let usage = run(&["respond", "request-grant-unfair", "--unknown-option", "1"]);
     assert_eq!(usage.status.code(), Some(2));
     let usage_text = stderr(&usage);
-    assert!(usage_text.contains(
-        "respond <request-grant|request-grant-unfair|request-grant-terminal>"
-    ));
+    assert!(
+        usage_text.contains("respond <request-grant|request-grant-unfair|request-grant-terminal>")
+    );
     assert!(usage_text.contains("[--weak-fair-action ACTION]..."));
     assert!(usage_text.contains("[--strong-fair-action ACTION]..."));
 }
