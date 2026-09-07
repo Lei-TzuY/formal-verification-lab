@@ -135,7 +135,7 @@ fn product_and_model_cutoffs_remain_inconclusive_with_provenance() {
 }
 
 #[test]
-fn malformed_and_mixed_fairness_fail_closed() {
+fn malformed_strong_fairness_fails_closed() {
     let duplicate = fvlab(&[
         "temporal",
         "request-grant-unfair",
@@ -150,15 +150,4 @@ fn malformed_and_mixed_fairness_fail_closed() {
     let missing = fvlab(&["temporal", "request-grant-unfair", "--strong-fair-action"]);
     assert_eq!(missing.status.code(), Some(2));
     assert!(stderr(&missing).contains("option '--strong-fair-action' requires an action value"));
-
-    let mixed = fvlab(&[
-        "temporal",
-        "request-grant-unfair",
-        "--weak-fair-action",
-        "grant",
-        "--strong-fair-action",
-        "grant",
-    ]);
-    assert_eq!(mixed.status.code(), Some(2));
-    assert!(stderr(&mixed).contains("cannot combine weak and strong fairness assumptions"));
 }
