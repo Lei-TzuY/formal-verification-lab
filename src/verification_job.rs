@@ -326,13 +326,14 @@ pub fn parse_verification_job(input: &str) -> Result<VerificationJob, Verificati
                     VerificationJobParseError::new(line_number, leading + position + 1, kind)
                 })?;
                 finish_line(&mut parser, line_number, leading)?;
-                declared_analysis = Some(VerificationJobAnalysis::parse(&value).ok_or_else(|| {
-                    VerificationJobParseError::new(
-                        line_number,
-                        leading + value_start + 1,
-                        VerificationJobParseErrorKind::InvalidAnalysis { analysis: value },
-                    )
-                })?);
+                declared_analysis =
+                    Some(VerificationJobAnalysis::parse(&value).ok_or_else(|| {
+                        VerificationJobParseError::new(
+                            line_number,
+                            leading + value_start + 1,
+                            VerificationJobParseErrorKind::InvalidAnalysis { analysis: value },
+                        )
+                    })?);
             }
             MODEL | PROPERTY => {
                 require_singleton(
