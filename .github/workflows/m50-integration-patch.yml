@@ -20,7 +20,9 @@ jobs:
         with:
           components: rustfmt
       - name: Apply integration patch
-        run: python3 .github/m50_apply.py
+        run: |
+          python3 .github/m50_apply.py
+          python3 .github/m50_fix_obsolete_test.py
       - name: Format and test
         run: |
           cargo fmt --all
@@ -30,8 +32,8 @@ jobs:
           set -euo pipefail
           git config user.name "LeiZ"
           git config user.email "52287354+Lei-TzuY@users.noreply.github.com"
-          git add README.md src/main.rs src/fairness_report.rs tests/monitor_strong_fairness_cli.rs tests/monitor_combined_fairness_cli.rs
-          git rm .github/m50_apply.py .github/workflows/m50-integration-patch.yml
+          git add README.md src/main.rs src/fairness_report.rs tests/monitor_strong_fairness_cli.rs tests/monitor_combined_fairness_cli.rs tests/combined_fair_cli.rs
+          git rm .github/m50_apply.py .github/m50_fix_obsolete_test.py .github/workflows/m50-integration-patch.yml
           git diff --cached --check
           git commit -m "Complete Milestone 50 CLI and roadmap integration"
           git push origin HEAD:feature/milestone-50-combined-fair-monitor
