@@ -5,6 +5,7 @@
 //! the CLI so it can be reused by tests and future front ends.
 
 pub mod bounded;
+pub mod bounded_combined_fairness;
 pub mod bounded_fairness;
 mod bounded_report;
 pub mod bounded_strong_fairness;
@@ -54,6 +55,10 @@ pub mod temporal_report;
 
 pub use bounded::{
     AnalysisInconclusiveReason, AnalysisLimits, AnalysisOutcome, AnalysisStage, BoundedOutcome,
+};
+pub use bounded_combined_fairness::{
+    check_buchi_with_fairness_profile_and_limits,
+    check_buchi_with_fairness_profile_and_product_limits,
 };
 pub use bounded_fairness::{
     check_buchi_with_weak_fairness_and_limits, check_buchi_with_weak_fairness_and_product_limits,
