@@ -159,13 +159,25 @@ fn suite_binary_differentially_preserves_every_m57_job_class() {
     assert!(stderr(&suite_output).is_empty());
     let suite_json = stdout(&suite_output);
 
-    let expected_exit_codes = [Some(2), Some(0), Some(7), Some(7), Some(3), Some(3), Some(0)];
+    let expected_exit_codes = [
+        Some(2),
+        Some(0),
+        Some(7),
+        Some(7),
+        Some(3),
+        Some(3),
+        Some(0),
+    ];
     let mut previous_position = None;
     for (name, expected_exit) in names.into_iter().zip(expected_exit_codes) {
         let manifest = root.join(format!("{name}.fvj"));
         let direct = run_job_json(&manifest);
         assert_eq!(direct.status.code(), expected_exit, "job {name}");
-        assert!(stderr(&direct).is_empty(), "job {name}: {}", stderr(&direct));
+        assert!(
+            stderr(&direct).is_empty(),
+            "job {name}: {}",
+            stderr(&direct)
+        );
         let direct_json = stdout(&direct).trim_end().to_owned();
         let expected_entry = format!("{{\"manifest\":\"{name}.fvj\",\"result\":{direct_json}}}");
         assert!(
@@ -177,7 +189,10 @@ fn suite_binary_differentially_preserves_every_m57_job_class() {
             .find(&format!("\"manifest\":\"{name}.fvj\""))
             .expect("suite result should retain every manifest");
         if let Some(previous) = previous_position {
-            assert!(previous < position, "suite entry order must be deterministic");
+            assert!(
+                previous < position,
+                "suite entry order must be deterministic"
+            );
         }
         previous_position = Some(position);
     }
