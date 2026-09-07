@@ -344,7 +344,9 @@ fn run_verification_suite_expectations_json_inner(
     let envelope = VerificationRegressionSuiteResultEnvelope::from_suite(&suite, jobs);
     let exit_code = match envelope.outcome {
         VerificationRegressionSuiteOutcome::Matched => 0,
-        VerificationRegressionSuiteOutcome::Mismatched => VERIFICATION_REGRESSION_MISMATCH_EXIT_CODE,
+        VerificationRegressionSuiteOutcome::Mismatched => {
+            VERIFICATION_REGRESSION_MISMATCH_EXIT_CODE
+        }
         VerificationRegressionSuiteOutcome::Error => 2,
     };
     Ok(VerificationRegressionSuiteJsonRun {
@@ -390,7 +392,10 @@ fn expectation_matches(
         ) | (
             VerificationExpectedOutcome::Inconclusive,
             VerificationJobOutcome::Inconclusive
-        ) | (VerificationExpectedOutcome::Error, VerificationJobOutcome::Error)
+        ) | (
+            VerificationExpectedOutcome::Error,
+            VerificationJobOutcome::Error
+        )
     )
 }
 
