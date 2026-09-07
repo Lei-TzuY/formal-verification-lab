@@ -7,13 +7,13 @@ use formal_verification_lab::{
     check_buchi_with_fairness_profile_and_product_limits, check_response,
     check_response_with_fairness_profile, check_response_with_fairness_profile_and_limits,
     check_response_with_fairness_profile_and_product_limits, check_response_with_strong_fairness,
-    check_response_with_weak_fairness, parse_action_temporal, parse_declarative_model, AcceptanceSet,
-    ActionAtom, ActionTemporalSpec, AnalysisInconclusiveReason, AnalysisLimits, AnalysisOutcome,
-    AnalysisStage, BoundedOutcome, BuchiAutomaton, BuchiCounterexample, BuchiProductState,
-    BuchiStatus, ExplorationLimits, FairnessProfile, FiniteRunPolicy, InconclusiveReason, Invariant,
-    ResponseCounterexample, ResponseProperty, ResponseStatus, StateVariable, StrongFairness,
-    TemporalBackend, TemporalCounterexample, TemporalObligation, TemporalStatus, TraceStep,
-    Transition, TransitionSystem, WeakFairness,
+    check_response_with_weak_fairness, parse_action_temporal, parse_declarative_model,
+    AcceptanceSet, ActionAtom, ActionTemporalSpec, AnalysisInconclusiveReason, AnalysisLimits,
+    AnalysisOutcome, AnalysisStage, BoundedOutcome, BuchiAutomaton, BuchiCounterexample,
+    BuchiProductState, BuchiStatus, ExplorationLimits, FairnessProfile, FiniteRunPolicy,
+    InconclusiveReason, Invariant, ResponseCounterexample, ResponseProperty, ResponseStatus,
+    StateVariable, StrongFairness, TemporalBackend, TemporalCounterexample, TemporalObligation,
+    TemporalStatus, TraceStep, Transition, TransitionSystem, WeakFairness,
 };
 use std::fs;
 use std::path::PathBuf;
@@ -163,7 +163,9 @@ fn buchi_status_as_temporal(status: BuchiStatus) -> TemporalStatus {
     }
 }
 
-fn strip_buchi_trace<S: Clone, A>(trace: &[TraceStep<BuchiProductState<S, A>>]) -> Vec<TraceStep<S>> {
+fn strip_buchi_trace<S: Clone, A>(
+    trace: &[TraceStep<BuchiProductState<S, A>>],
+) -> Vec<TraceStep<S>> {
     trace
         .iter()
         .map(|step| TraceStep {
@@ -351,7 +353,10 @@ fn staged_response_keeps_model_cutoff_provenance_and_generous_limits_equal_unbou
     );
     assert_eq!(staged.model_states, unbounded.model_states);
     assert_eq!(staged.product_states, unbounded.product_states);
-    assert_eq!(staged.retained_product_transitions, unbounded.product_transitions);
+    assert_eq!(
+        staged.retained_product_transitions,
+        unbounded.product_transitions
+    );
     assert_eq!(staged.counterexample, unbounded.counterexample);
 }
 
@@ -390,17 +395,20 @@ fn mixed_temporal_response_and_recurring_specs_match_direct_combined_buchi_resul
     let direct_response =
         check_buchi_with_fairness_profile(&model, &response_automaton(), &profile).unwrap();
     assert_eq!(response.backend, TemporalBackend::Response);
-    assert_eq!(response.status, buchi_status_as_temporal(direct_response.status));
+    assert_eq!(
+        response.status,
+        buchi_status_as_temporal(direct_response.status)
+    );
     assert_eq!(response.model_states, direct_response.model_states);
     assert_eq!(response.product_states, direct_response.product_states);
-    assert_eq!(response.counterexample.is_some(), direct_response.counterexample.is_some());
+    assert_eq!(
+        response.counterexample.is_some(),
+        direct_response.counterexample.is_some()
+    );
 
-    let recurring = check_action_temporal_with_fairness_profile(
-        &model,
-        &recurring_grant_spec(),
-        &profile,
-    )
-    .unwrap();
+    let recurring =
+        check_action_temporal_with_fairness_profile(&model, &recurring_grant_spec(), &profile)
+            .unwrap();
     let direct_recurring =
         check_buchi_with_fairness_profile(&model, &recurring_grant_automaton(), &profile).unwrap();
     assert_eq!(recurring.backend, TemporalBackend::Buchi);
@@ -410,7 +418,10 @@ fn mixed_temporal_response_and_recurring_specs_match_direct_combined_buchi_resul
     );
     assert_eq!(recurring.model_states, direct_recurring.model_states);
     assert_eq!(recurring.product_states, direct_recurring.product_states);
-    assert_eq!(recurring.counterexample.is_some(), direct_recurring.counterexample.is_some());
+    assert_eq!(
+        recurring.counterexample.is_some(),
+        direct_recurring.counterexample.is_some()
+    );
 }
 
 #[test]
@@ -431,12 +442,9 @@ fn mixed_temporal_violations_keep_frontend_obligation_identity_and_real_closed_c
     assert_eq!(obligation, TemporalObligation::Response);
     assert_eq!(cycle.first().unwrap().state, cycle.last().unwrap().state);
 
-    let recurring = check_action_temporal_with_fairness_profile(
-        &model,
-        &recurring_grant_spec(),
-        &profile,
-    )
-    .unwrap();
+    let recurring =
+        check_action_temporal_with_fairness_profile(&model, &recurring_grant_spec(), &profile)
+            .unwrap();
     assert_eq!(recurring.backend, TemporalBackend::Buchi);
     assert_eq!(recurring.status, TemporalStatus::Violated);
     let Some(TemporalCounterexample::Infinite {
@@ -478,7 +486,10 @@ fn mixed_temporal_product_and_staged_cutoffs_match_direct_m46_outcomes() {
         wrapped_product.outcome.inconclusive_reason(),
         direct_product.outcome.inconclusive_reason()
     );
-    assert_eq!(wrapped_product.product_states, direct_product.product_states);
+    assert_eq!(
+        wrapped_product.product_states,
+        direct_product.product_states
+    );
     assert_eq!(
         wrapped_product.explored_product_transitions,
         direct_product.explored_product_transitions
@@ -494,7 +505,10 @@ fn mixed_temporal_product_and_staged_cutoffs_match_direct_m46_outcomes() {
         wrapped_staged.outcome.inconclusive_reason(),
         direct_staged.outcome.inconclusive_reason()
     );
-    assert_eq!(wrapped_staged.model_completion, direct_staged.model_completion);
+    assert_eq!(
+        wrapped_staged.model_completion,
+        direct_staged.model_completion
+    );
     assert_eq!(
         wrapped_staged.product_completion,
         direct_staged.product_completion
