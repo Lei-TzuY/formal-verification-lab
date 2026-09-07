@@ -108,8 +108,9 @@ use formal_verification_lab::strong_fairness::StrongFairness;
 use formal_verification_lab::temporal::{
     check_action_temporal, check_action_temporal_with_fairness_profile,
     check_action_temporal_with_fairness_profile_and_limits,
-    check_action_temporal_with_fairness_profile_and_product_limits, check_action_temporal_with_limits,
-    check_action_temporal_with_product_limits, check_action_temporal_with_strong_fairness,
+    check_action_temporal_with_fairness_profile_and_product_limits,
+    check_action_temporal_with_limits, check_action_temporal_with_product_limits,
+    check_action_temporal_with_strong_fairness,
     check_action_temporal_with_strong_fairness_and_limits,
     check_action_temporal_with_strong_fairness_and_product_limits,
     check_action_temporal_with_weak_fairness, check_action_temporal_with_weak_fairness_and_limits,
@@ -934,12 +935,9 @@ where
             });
         }
 
-        let result = check_action_temporal_with_fairness_profile(
-            &model,
-            &spec,
-            &options.fairness_profile,
-        )
-        .map_err(|error| error.to_string())?;
+        let result =
+            check_action_temporal_with_fairness_profile(&model, &spec, &options.fairness_profile)
+                .map_err(|error| error.to_string())?;
         print!(
             "{}",
             render_fairness_profile_temporal_report(
@@ -1391,7 +1389,8 @@ fn parse_temporal_options(args: &[String]) -> Result<TemporalCliOptions, String>
                     _ => unreachable!("temporal limit flag matched above"),
                 }
             }
-            _ => return Err(format!("unknown option '{flag}'\n{}", usage())),
+            _ => return Err(format!("unknown option '{flag}'\
+{}", usage())),
         }
         index += 2;
     }
@@ -1437,7 +1436,8 @@ fn parse_analysis_limits(args: &[String]) -> Result<AnalysisLimits, String> {
             "--max-product-states" => set_limit(&mut product.max_states, parsed, flag)?,
             "--max-product-transitions" => set_limit(&mut product.max_transitions, parsed, flag)?,
             "--max-product-depth" => set_limit(&mut product.max_depth, parsed, flag)?,
-            _ => return Err(format!("unknown option '{flag}'\n{}", usage())),
+            _ => return Err(format!("unknown option '{flag}'\
+{}", usage())),
         }
 
         index += 2;
@@ -1471,7 +1471,8 @@ fn parse_named_limits(
         } else if flag == depth_flag {
             set_limit(&mut limits.max_depth, parsed, flag)?;
         } else {
-            return Err(format!("unknown option '{flag}'\n{}", usage()));
+            return Err(format!("unknown option '{flag}'\
+{}", usage()));
         }
 
         index += 2;
@@ -1522,5 +1523,10 @@ fn usage() -> String {
 }
 
 fn print_examples() {
-    println!("counter\nmutex-bug\ntraffic-light\npeterson\npeterson-bug\ncommuting-counters");
+    println!("counter\
+mutex-bug\
+traffic-light\
+peterson\
+peterson-bug\
+commuting-counters");
 }
