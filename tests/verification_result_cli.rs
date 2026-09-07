@@ -132,7 +132,9 @@ fn json_job_preserves_product_and_model_cutoff_stage() {
     );
     let product = run(&json_args(&product_manifest));
     assert_eq!(product.status.code(), Some(3));
-    assert!(stdout(&product).contains("\"cutoff\":{\"stage\":\"product\""));
+    let product_json = stdout(&product);
+    assert!(product_json.contains("\"outcome\":\"inconclusive\",\"status\":\"INCONCLUSIVE\""));
+    assert!(product_json.contains("\"cutoff\":{\"stage\":\"product\""));
 
     let model_root = fixture_dir("model-cutoff");
     let model_manifest = write_fixture(
@@ -142,7 +144,9 @@ fn json_job_preserves_product_and_model_cutoff_stage() {
     );
     let model = run(&json_args(&model_manifest));
     assert_eq!(model.status.code(), Some(3));
-    assert!(stdout(&model).contains("\"cutoff\":{\"stage\":\"model\""));
+    let model_json = stdout(&model);
+    assert!(model_json.contains("\"outcome\":\"inconclusive\",\"status\":\"INCONCLUSIVE\""));
+    assert!(model_json.contains("\"cutoff\":{\"stage\":\"model\""));
 
     let _ = fs::remove_dir_all(product_root);
     let _ = fs::remove_dir_all(model_root);
