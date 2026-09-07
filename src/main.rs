@@ -137,12 +137,12 @@ use formal_verification_lab::temporal_parse::parse_action_temporal;
 use formal_verification_lab::temporal_report::{
     render_analysis_temporal_report, render_bounded_temporal_report, render_temporal_report,
 };
-use formal_verification_lab::{
-    parse_declarative_document, parse_declarative_model, parse_verification_job,
+use formal_verification_lab::verification_job_run::{
+    load_verification_job, run_verification_job_json,
 };
+use formal_verification_lab::{parse_declarative_document, parse_declarative_model};
 use std::env;
 use std::fs;
-use std::path::Path;
 use std::process::ExitCode;
 
 fn main() -> ExitCode {
@@ -1008,6 +1008,16 @@ where
 
 fn temporal_command(args: &[String]) -> Result<ExitCode, String> {
     match args {
+        [command, manifest_path, flag, format]
+            if command == "job" && flag == "--format" && format == "json" =>
+        {
+            run_verification_job_json_cli(manifest_path)
+        }
+        [command, manifest_path, flag, format]
+            if command == "job" && flag == "--format" =>
+        {
+            Err(format!("unsupported verification job format '{format}'; expected json"))
+        }
         [command, manifest_path] if command == "job" => run_verification_job(manifest_path),
         [command, model_path, property_path, option_args @ ..] if command == "multi-file" => {
             run_multi_temporal_file(model_path, property_path, option_args)
@@ -1039,37 +1049,21 @@ fn temporal_command(args: &[String]) -> Result<ExitCode, String> {
             option_args,
         ),
         [query, ..] => Err(format!(
-            "unknown temporal query '{query}'; expected request-grant, request-grant-unfair, pulses, pulses-unfair, 'check <model> <expression>', 'file <path> <expression>', 'multi-file <model-path> <property-path>', or 'job <manifest-path>'"
+            "unknown temporal query '{query}'; expected request-grant, request-grant-unfair, pulses, pulses-unfair, 'check <model> <expression>', 'file <path> <expression>', 'multi-file <model-path> <property-path>', or 'job <manifest-path> [--format json]'"
         )),
         _ => Err(usage()),
     }
 }
 
 fn run_verification_job(manifest_path: &str) -> Result<ExitCode, String> {
-    let input = fs::read_to_string(manifest_path)
-        .map_err(|error| format!("failed to read verification job '{manifest_path}': {error}"))?;
-    let job = parse_verification_job(&input).map_err(|error| error.to_string())?;
-    let manifest = Path::new(manifest_path);
-    let base = manifest.parent().unwrap_or_else(|| Path::new(""));
-    let model = Path::new(job.model_path());
-    let property = Path::new(job.property_path());
-    let model = if model.is_absolute() {
-        model.to_path_buf()
-    } else {
-        base.join(model)
-    };
-    let property = if property.is_absolute() {
-        property.to_path_buf()
-    } else {
-        base.join(property)
-    };
-    let model = model
-        .to_str()
-        .ok_or_else(|| "resolved model path is not valid UTF-8".to_owned())?;
-    let property = property
-        .to_str()
-        .ok_or_else(|| "resolved property path is not valid UTF-8".to_owned())?;
-    run_multi_temporal_file(model, property, &job.option_args())
+    let loaded = load_verification_job(manifest_path).map_err(|error| error.to_string())?;
+    run_multi_response(loaded.model, loaded.property, &loaded.job.option_args())
+}
+
+fn run_verification_job_json_cli(manifest_path: &str) -> Result<ExitCode, String> {
+    let run = run_verification_job_json(manifest_path);
+    println!("{}", run.to_json());
+    Ok(ExitCode::from(run.exit_code))
 }
 
 fn run_multi_temporal_file(

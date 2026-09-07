@@ -1,0 +1,609 @@
+use crate::bounded::{AnalysisOutcome, AnalysisStage, BoundedOutcome};
+use crate::checker::{ExplorationLimits, InconclusiveReason, TraceStep};
+use crate::multi_response::{
+    AnalysisMultiResponseResult, BoundedMultiResponseResult, MultiObligationState,
+    MultiResponseCounterexample, MultiResponseResult, MultiResponseStatus,
+};
+
+pub const VERIFICATION_JOB_RESULT_SCHEMA_VERSION: u32 = 1;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VerificationJobOutcome {
+    Satisfied,
+    Violated,
+    Inconclusive,
+    Error,
+}
+
+impl VerificationJobOutcome {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Satisfied => "satisfied",
+            Self::Violated => "violated",
+            Self::Inconclusive => "inconclusive",
+            Self::Error => "error",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerificationJobLimits {
+    pub max_states: Option<usize>,
+    pub max_transitions: Option<usize>,
+    pub max_depth: Option<usize>,
+}
+
+impl From<ExplorationLimits> for VerificationJobLimits {
+    fn from(value: ExplorationLimits) -> Self {
+        Self {
+            max_states: value.max_states,
+            max_transitions: value.max_transitions,
+            max_depth: value.max_depth,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerificationJobAccounting {
+    pub model_states: Option<usize>,
+    pub checked_model_states: Option<usize>,
+    pub explored_model_transitions: Option<usize>,
+    pub retained_model_transitions: Option<usize>,
+    pub max_model_depth_reached: Option<usize>,
+    pub product_states: Option<usize>,
+    pub checked_product_states: Option<usize>,
+    pub explored_product_transitions: Option<usize>,
+    pub retained_product_transitions: Option<usize>,
+    pub max_product_depth_reached: Option<usize>,
+}
+
+impl VerificationJobAccounting {
+    fn empty() -> Self {
+        Self {
+            model_states: None,
+            checked_model_states: None,
+            explored_model_transitions: None,
+            retained_model_transitions: None,
+            max_model_depth_reached: None,
+            product_states: None,
+            checked_product_states: None,
+            explored_product_transitions: None,
+            retained_product_transitions: None,
+            max_product_depth_reached: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VerificationJobCutoffStage {
+    Model,
+    Product,
+}
+
+impl VerificationJobCutoffStage {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Model => "model",
+            Self::Product => "product",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VerificationJobCutoffKind {
+    StateLimit,
+    TransitionLimit,
+    DepthLimit,
+}
+
+impl VerificationJobCutoffKind {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::StateLimit => "state_limit",
+            Self::TransitionLimit => "transition_limit",
+            Self::DepthLimit => "depth_limit",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct VerificationJobCutoff {
+    pub stage: VerificationJobCutoffStage,
+    pub kind: VerificationJobCutoffKind,
+    pub limit: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerificationJobTraceStep {
+    pub action: Option<String>,
+    pub state: String,
+    pub pending: Vec<bool>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum VerificationJobEvidence {
+    Finite {
+        clause: String,
+        trace: Vec<VerificationJobTraceStep>,
+    },
+    Infinite {
+        clause: String,
+        stem: Vec<VerificationJobTraceStep>,
+        cycle: Vec<VerificationJobTraceStep>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerificationJobResultEnvelope {
+    pub schema_version: u32,
+    pub outcome: VerificationJobOutcome,
+    pub model: Option<String>,
+    pub property: Option<String>,
+    pub weak_fair_actions: Vec<String>,
+    pub strong_fair_actions: Vec<String>,
+    pub model_limits: VerificationJobLimits,
+    pub product_limits: VerificationJobLimits,
+    pub accounting: VerificationJobAccounting,
+    pub cutoff: Option<VerificationJobCutoff>,
+    pub evidence: Option<VerificationJobEvidence>,
+    pub error: Option<String>,
+}
+
+impl VerificationJobResultEnvelope {
+    pub fn from_unbounded(
+        model: impl Into<String>,
+        weak_fair_actions: &[String],
+        strong_fair_actions: &[String],
+        model_limits: ExplorationLimits,
+        product_limits: ExplorationLimits,
+        result: &MultiResponseResult<String>,
+    ) -> Self {
+        Self {
+            schema_version: VERIFICATION_JOB_RESULT_SCHEMA_VERSION,
+            outcome: status_outcome(result.status),
+            model: Some(model.into()),
+            property: Some(result.property.clone()),
+            weak_fair_actions: weak_fair_actions.to_vec(),
+            strong_fair_actions: strong_fair_actions.to_vec(),
+            model_limits: model_limits.into(),
+            product_limits: product_limits.into(),
+            accounting: VerificationJobAccounting {
+                model_states: Some(result.model_states),
+                checked_model_states: None,
+                explored_model_transitions: Some(result.model_transitions),
+                retained_model_transitions: Some(result.model_transitions),
+                max_model_depth_reached: None,
+                product_states: Some(result.product_states),
+                checked_product_states: None,
+                explored_product_transitions: Some(result.product_transitions),
+                retained_product_transitions: Some(result.product_transitions),
+                max_product_depth_reached: None,
+            },
+            cutoff: None,
+            evidence: result.counterexample.as_ref().map(convert_evidence),
+            error: None,
+        }
+    }
+
+    pub fn from_product_bounded(
+        model: impl Into<String>,
+        weak_fair_actions: &[String],
+        strong_fair_actions: &[String],
+        model_limits: ExplorationLimits,
+        product_limits: ExplorationLimits,
+        result: &BoundedMultiResponseResult<String>,
+    ) -> Self {
+        Self {
+            schema_version: VERIFICATION_JOB_RESULT_SCHEMA_VERSION,
+            outcome: bounded_outcome(&result.outcome),
+            model: Some(model.into()),
+            property: Some(result.property.clone()),
+            weak_fair_actions: weak_fair_actions.to_vec(),
+            strong_fair_actions: strong_fair_actions.to_vec(),
+            model_limits: model_limits.into(),
+            product_limits: product_limits.into(),
+            accounting: VerificationJobAccounting {
+                model_states: Some(result.model_states),
+                checked_model_states: None,
+                explored_model_transitions: Some(result.model_transitions),
+                retained_model_transitions: Some(result.model_transitions),
+                max_model_depth_reached: None,
+                product_states: Some(result.product_states),
+                checked_product_states: Some(result.checked_product_states),
+                explored_product_transitions: Some(result.explored_product_transitions),
+                retained_product_transitions: Some(result.retained_product_transitions),
+                max_product_depth_reached: result.max_product_depth_reached,
+            },
+            cutoff: result
+                .outcome
+                .inconclusive_reason()
+                .map(|reason| cutoff(VerificationJobCutoffStage::Product, reason)),
+            evidence: result.counterexample.as_ref().map(convert_evidence),
+            error: None,
+        }
+    }
+
+    pub fn from_staged(
+        model: impl Into<String>,
+        weak_fair_actions: &[String],
+        strong_fair_actions: &[String],
+        model_limits: ExplorationLimits,
+        product_limits: ExplorationLimits,
+        result: &AnalysisMultiResponseResult<String>,
+    ) -> Self {
+        let cutoff = result.outcome.inconclusive_reason().map(|reason| {
+            cutoff(
+                match reason.stage {
+                    AnalysisStage::Model => VerificationJobCutoffStage::Model,
+                    AnalysisStage::Product => VerificationJobCutoffStage::Product,
+                },
+                reason.reason,
+            )
+        });
+        Self {
+            schema_version: VERIFICATION_JOB_RESULT_SCHEMA_VERSION,
+            outcome: analysis_outcome(&result.outcome),
+            model: Some(model.into()),
+            property: Some(result.property.clone()),
+            weak_fair_actions: weak_fair_actions.to_vec(),
+            strong_fair_actions: strong_fair_actions.to_vec(),
+            model_limits: model_limits.into(),
+            product_limits: product_limits.into(),
+            accounting: VerificationJobAccounting {
+                model_states: Some(result.model_states),
+                checked_model_states: Some(result.checked_model_states),
+                explored_model_transitions: Some(result.explored_model_transitions),
+                retained_model_transitions: Some(result.retained_model_transitions),
+                max_model_depth_reached: result.max_model_depth_reached,
+                product_states: Some(result.product_states),
+                checked_product_states: Some(result.checked_product_states),
+                explored_product_transitions: Some(result.explored_product_transitions),
+                retained_product_transitions: Some(result.retained_product_transitions),
+                max_product_depth_reached: result.max_product_depth_reached,
+            },
+            cutoff,
+            evidence: result.counterexample.as_ref().map(convert_evidence),
+            error: None,
+        }
+    }
+
+    pub fn error(message: impl Into<String>) -> Self {
+        Self {
+            schema_version: VERIFICATION_JOB_RESULT_SCHEMA_VERSION,
+            outcome: VerificationJobOutcome::Error,
+            model: None,
+            property: None,
+            weak_fair_actions: Vec::new(),
+            strong_fair_actions: Vec::new(),
+            model_limits: ExplorationLimits::unbounded().into(),
+            product_limits: ExplorationLimits::unbounded().into(),
+            accounting: VerificationJobAccounting::empty(),
+            cutoff: None,
+            evidence: None,
+            error: Some(message.into()),
+        }
+    }
+
+    /// Deterministic compact JSON for machine consumers.
+    ///
+    /// Object field order is schema-defined below. Strings are escaped in one
+    /// centralized writer so callers never construct JSON with ad-hoc quoting.
+    pub fn to_json(&self) -> String {
+        let mut out = String::new();
+        out.push('{');
+        field_u64(&mut out, "schema_version", self.schema_version as u64, true);
+        field_string(&mut out, "outcome", self.outcome.as_str(), false);
+        field_optional_string(&mut out, "status", canonical_status(self.outcome), false);
+        field_optional_string(&mut out, "model", self.model.as_deref(), false);
+        field_optional_string(&mut out, "property", self.property.as_deref(), false);
+        field_string_array(
+            &mut out,
+            "weak_fair_actions",
+            &self.weak_fair_actions,
+            false,
+        );
+        field_string_array(
+            &mut out,
+            "strong_fair_actions",
+            &self.strong_fair_actions,
+            false,
+        );
+        field_limits(&mut out, "model_limits", &self.model_limits, false);
+        field_limits(&mut out, "product_limits", &self.product_limits, false);
+        field_accounting(&mut out, &self.accounting);
+        out.push_str(",\"cutoff\":");
+        match self.cutoff {
+            Some(value) => write_cutoff(&mut out, value),
+            None => out.push_str("null"),
+        }
+        out.push_str(",\"evidence\":");
+        match &self.evidence {
+            Some(value) => write_evidence(&mut out, value),
+            None => out.push_str("null"),
+        }
+        out.push_str(",\"error\":");
+        write_optional_string(&mut out, self.error.as_deref());
+        out.push('}');
+        out
+    }
+}
+
+fn canonical_status(outcome: VerificationJobOutcome) -> Option<&'static str> {
+    match outcome {
+        VerificationJobOutcome::Satisfied => Some("SATISFIED"),
+        VerificationJobOutcome::Violated => Some("VIOLATED"),
+        VerificationJobOutcome::Inconclusive => Some("INCONCLUSIVE"),
+        VerificationJobOutcome::Error => None,
+    }
+}
+
+fn status_outcome(status: MultiResponseStatus) -> VerificationJobOutcome {
+    match status {
+        MultiResponseStatus::Satisfied => VerificationJobOutcome::Satisfied,
+        MultiResponseStatus::Violated => VerificationJobOutcome::Violated,
+    }
+}
+
+fn bounded_outcome(outcome: &BoundedOutcome<MultiResponseStatus>) -> VerificationJobOutcome {
+    match outcome {
+        BoundedOutcome::Conclusive(status) => status_outcome(*status),
+        BoundedOutcome::Inconclusive(_) => VerificationJobOutcome::Inconclusive,
+    }
+}
+
+fn analysis_outcome(outcome: &AnalysisOutcome<MultiResponseStatus>) -> VerificationJobOutcome {
+    match outcome {
+        AnalysisOutcome::Conclusive(status) => status_outcome(*status),
+        AnalysisOutcome::Inconclusive(_) => VerificationJobOutcome::Inconclusive,
+    }
+}
+
+fn cutoff(stage: VerificationJobCutoffStage, reason: InconclusiveReason) -> VerificationJobCutoff {
+    match reason {
+        InconclusiveReason::StateLimitReached { limit } => VerificationJobCutoff {
+            stage,
+            kind: VerificationJobCutoffKind::StateLimit,
+            limit,
+        },
+        InconclusiveReason::TransitionLimitReached { limit } => VerificationJobCutoff {
+            stage,
+            kind: VerificationJobCutoffKind::TransitionLimit,
+            limit,
+        },
+        InconclusiveReason::DepthLimitReached { limit } => VerificationJobCutoff {
+            stage,
+            kind: VerificationJobCutoffKind::DepthLimit,
+            limit,
+        },
+    }
+}
+
+fn convert_evidence(
+    counterexample: &MultiResponseCounterexample<String>,
+) -> VerificationJobEvidence {
+    match counterexample {
+        MultiResponseCounterexample::Finite { clause, trace } => VerificationJobEvidence::Finite {
+            clause: clause.clone(),
+            trace: trace.iter().map(convert_step).collect(),
+        },
+        MultiResponseCounterexample::Infinite {
+            clause,
+            stem,
+            cycle,
+        } => VerificationJobEvidence::Infinite {
+            clause: clause.clone(),
+            stem: stem.iter().map(convert_step).collect(),
+            cycle: cycle.iter().map(convert_step).collect(),
+        },
+    }
+}
+
+fn convert_step(step: &TraceStep<MultiObligationState<String>>) -> VerificationJobTraceStep {
+    VerificationJobTraceStep {
+        action: step.action.clone(),
+        state: step.state.state.clone(),
+        pending: step.state.pending.clone(),
+    }
+}
+
+fn field_name(out: &mut String, name: &str, first: bool) {
+    if !first {
+        out.push(',');
+    }
+    write_json_string(out, name);
+    out.push(':');
+}
+
+fn field_u64(out: &mut String, name: &str, value: u64, first: bool) {
+    field_name(out, name, first);
+    out.push_str(&value.to_string());
+}
+
+fn field_string(out: &mut String, name: &str, value: &str, first: bool) {
+    field_name(out, name, first);
+    write_json_string(out, value);
+}
+
+fn field_optional_string(out: &mut String, name: &str, value: Option<&str>, first: bool) {
+    field_name(out, name, first);
+    write_optional_string(out, value);
+}
+
+fn field_string_array(out: &mut String, name: &str, values: &[String], first: bool) {
+    field_name(out, name, first);
+    out.push('[');
+    for (index, value) in values.iter().enumerate() {
+        if index != 0 {
+            out.push(',');
+        }
+        write_json_string(out, value);
+    }
+    out.push(']');
+}
+
+fn field_limits(out: &mut String, name: &str, limits: &VerificationJobLimits, first: bool) {
+    field_name(out, name, first);
+    out.push('{');
+    optional_usize_field(out, "max_states", limits.max_states, true);
+    optional_usize_field(out, "max_transitions", limits.max_transitions, false);
+    optional_usize_field(out, "max_depth", limits.max_depth, false);
+    out.push('}');
+}
+
+fn field_accounting(out: &mut String, value: &VerificationJobAccounting) {
+    out.push_str(",\"accounting\":{");
+    optional_usize_field(out, "model_states", value.model_states, true);
+    optional_usize_field(
+        out,
+        "checked_model_states",
+        value.checked_model_states,
+        false,
+    );
+    optional_usize_field(
+        out,
+        "explored_model_transitions",
+        value.explored_model_transitions,
+        false,
+    );
+    optional_usize_field(
+        out,
+        "retained_model_transitions",
+        value.retained_model_transitions,
+        false,
+    );
+    optional_usize_field(
+        out,
+        "max_model_depth_reached",
+        value.max_model_depth_reached,
+        false,
+    );
+    optional_usize_field(out, "product_states", value.product_states, false);
+    optional_usize_field(
+        out,
+        "checked_product_states",
+        value.checked_product_states,
+        false,
+    );
+    optional_usize_field(
+        out,
+        "explored_product_transitions",
+        value.explored_product_transitions,
+        false,
+    );
+    optional_usize_field(
+        out,
+        "retained_product_transitions",
+        value.retained_product_transitions,
+        false,
+    );
+    optional_usize_field(
+        out,
+        "max_product_depth_reached",
+        value.max_product_depth_reached,
+        false,
+    );
+    out.push('}');
+}
+
+fn optional_usize_field(out: &mut String, name: &str, value: Option<usize>, first: bool) {
+    field_name(out, name, first);
+    match value {
+        Some(value) => out.push_str(&value.to_string()),
+        None => out.push_str("null"),
+    }
+}
+
+fn write_optional_string(out: &mut String, value: Option<&str>) {
+    match value {
+        Some(value) => write_json_string(out, value),
+        None => out.push_str("null"),
+    }
+}
+
+fn write_cutoff(out: &mut String, value: VerificationJobCutoff) {
+    out.push('{');
+    field_string(out, "stage", value.stage.as_str(), true);
+    field_string(out, "kind", value.kind.as_str(), false);
+    field_u64(out, "limit", value.limit as u64, false);
+    out.push('}');
+}
+
+fn write_evidence(out: &mut String, value: &VerificationJobEvidence) {
+    match value {
+        VerificationJobEvidence::Finite { clause, trace } => {
+            out.push('{');
+            field_string(out, "kind", "finite", true);
+            field_string(out, "clause", clause, false);
+            out.push_str(",\"trace\":");
+            write_trace(out, trace);
+            out.push('}');
+        }
+        VerificationJobEvidence::Infinite {
+            clause,
+            stem,
+            cycle,
+        } => {
+            out.push('{');
+            field_string(out, "kind", "lasso", true);
+            field_string(out, "clause", clause, false);
+            out.push_str(",\"stem\":");
+            write_trace(out, stem);
+            out.push_str(",\"cycle\":");
+            write_trace(out, cycle);
+            out.push('}');
+        }
+    }
+}
+
+fn write_trace(out: &mut String, trace: &[VerificationJobTraceStep]) {
+    out.push('[');
+    for (index, step) in trace.iter().enumerate() {
+        if index != 0 {
+            out.push(',');
+        }
+        out.push('{');
+        field_name(out, "action", true);
+        write_optional_string(out, step.action.as_deref());
+        field_string(out, "state", &step.state, false);
+        out.push_str(",\"pending\":[");
+        for (pending_index, pending) in step.pending.iter().enumerate() {
+            if pending_index != 0 {
+                out.push(',');
+            }
+            out.push_str(if *pending { "true" } else { "false" });
+        }
+        out.push_str("]}");
+    }
+    out.push(']');
+}
+
+fn write_json_string(out: &mut String, value: &str) {
+    out.push('"');
+    for ch in value.chars() {
+        match ch {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            '\u{08}' => out.push_str("\\b"),
+            '\u{0c}' => out.push_str("\\f"),
+            ch if ch <= '\u{1f}' => {
+                let code = ch as u32;
+                out.push_str("\\u00");
+                out.push(hex_digit((code >> 4) as u8));
+                out.push(hex_digit((code & 0x0f) as u8));
+            }
+            _ => out.push(ch),
+        }
+    }
+    out.push('"');
+}
+
+fn hex_digit(value: u8) -> char {
+    match value {
+        0..=9 => (b'0' + value) as char,
+        10..=15 => (b'a' + (value - 10)) as char,
+        _ => unreachable!("hex nibble is always in range"),
+    }
+}
