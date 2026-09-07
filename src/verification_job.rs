@@ -2,6 +2,7 @@ use crate::checker::ExplorationLimits;
 use std::collections::HashSet;
 use std::fmt;
 
+const ANALYSIS: &str = "analysis";
 const MODEL: &str = "model";
 const PROPERTY: &str = "property";
 const WEAK_FAIR_ACTION: &str = "weak-fair-action";
@@ -13,8 +14,32 @@ const MAX_PRODUCT_STATES: &str = "max-product-states";
 const MAX_PRODUCT_TRANSITIONS: &str = "max-product-transitions";
 const MAX_PRODUCT_DEPTH: &str = "max-product-depth";
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VerificationJobAnalysis {
+    MultiResponse,
+    Safety,
+}
+
+impl VerificationJobAnalysis {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::MultiResponse => "multi-response",
+            Self::Safety => "safety",
+        }
+    }
+
+    fn parse(value: &str) -> Option<Self> {
+        match value {
+            "multi-response" => Some(Self::MultiResponse),
+            "safety" => Some(Self::Safety),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VerificationJob {
+    declared_analysis: Option<VerificationJobAnalysis>,
     model_path: String,
     property_path: String,
     weak_fair_actions: Vec<String>,
@@ -24,6 +49,20 @@ pub struct VerificationJob {
 }
 
 impl VerificationJob {
+    /// The effective analysis family. Historical manifests without an
+    /// `analysis` directive remain multi-response jobs.
+    pub fn analysis(&self) -> VerificationJobAnalysis {
+        self.declared_analysis
+            .unwrap_or(VerificationJobAnalysis::MultiResponse)
+    }
+
+    /// Return the explicitly declared family, if any. This is intentionally
+    /// separate from `analysis()` so canonical rendering can preserve the
+    /// historical manifest surface byte-for-byte apart from normal quoting.
+    pub fn declared_analysis(&self) -> Option<VerificationJobAnalysis> {
+        self.declared_analysis
+    }
+
     pub fn model_path(&self) -> &str {
         &self.model_path
     }
@@ -49,8 +88,8 @@ impl VerificationJob {
     }
 
     /// Compile the manifest's execution assumptions and resource budgets to the
-    /// existing M54 CLI option surface. Semantic validation of fairness sets and
-    /// the execution behavior of the limits remain owned by that canonical path.
+    /// historical M54 multi-response CLI option surface. Heterogeneous runners
+    /// must validate family compatibility before using these arguments.
     pub fn option_args(&self) -> Vec<String> {
         let mut args = Vec::new();
         for action in &self.weak_fair_actions {
@@ -91,10 +130,14 @@ impl VerificationJob {
     }
 
     pub fn canonical_document(&self) -> String {
-        let mut lines = vec![
+        let mut lines = Vec::new();
+        if let Some(analysis) = self.declared_analysis {
+            lines.push(format!("analysis {}", quote(analysis.as_str())));
+        }
+        lines.extend([
             format!("model {}", quote(&self.model_path)),
             format!("property {}", quote(&self.property_path)),
-        ];
+        ]);
         lines.extend(
             self.weak_fair_actions
                 .iter()
@@ -164,6 +207,7 @@ pub enum VerificationJobParseErrorKind {
     UnterminatedString,
     InvalidEscape { escape: String },
     EmptyPath { directive: String },
+    InvalidAnalysis { analysis: String },
     ExpectedNumber,
     InvalidNumber { value: String },
     TrailingInput,
@@ -220,6 +264,10 @@ impl fmt::Display for VerificationJobParseError {
             VerificationJobParseErrorKind::EmptyPath { directive } => {
                 write!(f, "'{directive}' path must not be empty")
             }
+            VerificationJobParseErrorKind::InvalidAnalysis { analysis } => write!(
+                f,
+                "unsupported verification analysis '{analysis}'; expected multi-response or safety"
+            ),
             VerificationJobParseErrorKind::ExpectedNumber => {
                 write!(f, "expected a non-negative decimal integer")
             }
@@ -242,6 +290,7 @@ impl fmt::Display for VerificationJobParseError {
 impl std::error::Error for VerificationJobParseError {}
 
 pub fn parse_verification_job(input: &str) -> Result<VerificationJob, VerificationJobParseError> {
+    let mut declared_analysis = None;
     let mut model_path = None;
     let mut property_path = None;
     let mut weak_fair_actions = Vec::new();
@@ -265,6 +314,26 @@ pub fn parse_verification_job(input: &str) -> Result<VerificationJob, Verificati
         parser.skip_whitespace();
 
         match directive.as_str() {
+            ANALYSIS => {
+                require_singleton(
+                    &mut seen_singletons,
+                    &directive,
+                    line_number,
+                    leading + directive_start + 1,
+                )?;
+                let value_start = parser.position;
+                let value = parser.parse_string().map_err(|(position, kind)| {
+                    VerificationJobParseError::new(line_number, leading + position + 1, kind)
+                })?;
+                finish_line(&mut parser, line_number, leading)?;
+                declared_analysis = Some(VerificationJobAnalysis::parse(&value).ok_or_else(|| {
+                    VerificationJobParseError::new(
+                        line_number,
+                        leading + value_start + 1,
+                        VerificationJobParseErrorKind::InvalidAnalysis { analysis: value },
+                    )
+                })?);
+            }
             MODEL | PROPERTY => {
                 require_singleton(
                     &mut seen_singletons,
@@ -358,6 +427,7 @@ pub fn parse_verification_job(input: &str) -> Result<VerificationJob, Verificati
     })?;
 
     Ok(VerificationJob {
+        declared_analysis,
         model_path,
         property_path,
         weak_fair_actions,
