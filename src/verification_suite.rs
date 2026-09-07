@@ -58,17 +58,14 @@ impl VerificationSuite {
     pub fn canonical_document(&self) -> String {
         let mut lines = vec![format!("suite {}", quote(&self.name))];
         lines.extend(
-            self.job_paths
-                .iter()
-                .zip(&self.expected_outcomes)
-                .map(|(path, expected)| match expected {
-                    Some(expected) => format!(
-                        "job {} expect {}",
-                        quote(path),
-                        quote(expected.as_str())
-                    ),
+            self.job_paths.iter().zip(&self.expected_outcomes).map(
+                |(path, expected)| match expected {
+                    Some(expected) => {
+                        format!("job {} expect {}", quote(path), quote(expected.as_str()))
+                    }
                     None => format!("job {}", quote(path)),
-                }),
+                },
+            ),
         );
         lines.join("\n")
     }
