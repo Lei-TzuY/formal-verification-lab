@@ -129,9 +129,7 @@ fn monitor_status(status: BuchiStatus) -> MonitorStatus {
 
 fn monitor_outcome(outcome: &AnalysisOutcome<BuchiStatus>) -> AnalysisOutcome<MonitorStatus> {
     match outcome {
-        AnalysisOutcome::Conclusive(status) => {
-            AnalysisOutcome::Conclusive(monitor_status(*status))
-        }
+        AnalysisOutcome::Conclusive(status) => AnalysisOutcome::Conclusive(monitor_status(*status)),
         AnalysisOutcome::Inconclusive(reason) => AnalysisOutcome::Inconclusive(*reason),
     }
 }
@@ -234,7 +232,10 @@ fn all_two_node_staged_budgets_match_direct_combined_fair_buchi() {
                     monitor_result.product_completion, buchi_result.product_completion,
                     "{context}"
                 );
-                assert_eq!(monitor_result.model_states, buchi_result.model_states, "{context}");
+                assert_eq!(
+                    monitor_result.model_states, buchi_result.model_states,
+                    "{context}"
+                );
                 assert_eq!(
                     monitor_result.checked_model_states, buchi_result.checked_model_states,
                     "{context}"
@@ -250,8 +251,7 @@ fn all_two_node_staged_budgets_match_direct_combined_fair_buchi() {
                     "{context}"
                 );
                 assert_eq!(
-                    monitor_result.max_model_depth_reached,
-                    buchi_result.max_model_depth_reached,
+                    monitor_result.max_model_depth_reached, buchi_result.max_model_depth_reached,
                     "{context}"
                 );
                 assert_eq!(
