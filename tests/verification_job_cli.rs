@@ -24,10 +24,7 @@ fn stderr(output: &Output) -> String {
 
 fn fixture_dir(kind: &str) -> PathBuf {
     let id = NEXT_DIR.fetch_add(1, Ordering::Relaxed);
-    let root = std::env::temp_dir().join(format!(
-        "fvlab-m55-{kind}-{}-{id}",
-        std::process::id()
-    ));
+    let root = std::env::temp_dir().join(format!("fvlab-m55-{kind}-{}-{id}", std::process::id()));
     fs::create_dir_all(&root).expect("fixture directory should be creatable");
     root
 }
@@ -44,7 +41,11 @@ fn property_source() -> &'static str {
     "response(\"class-a\",\"request-a\",\"grant-a\")\nresponse(\"class-b\",\"request-b\",\"grant-b\")\n"
 }
 
-fn write_fixture(root: &Path, model_source: &str, manifest_tail: &str) -> (PathBuf, PathBuf, PathBuf) {
+fn write_fixture(
+    root: &Path,
+    model_source: &str,
+    manifest_tail: &str,
+) -> (PathBuf, PathBuf, PathBuf) {
     let assets = root.join("portable");
     fs::create_dir_all(&assets).expect("portable directory should be creatable");
     let model = assets.join("model.fvl");
@@ -54,9 +55,7 @@ fn write_fixture(root: &Path, model_source: &str, manifest_tail: &str) -> (PathB
     fs::write(&property, property_source()).expect("property fixture should be writable");
     fs::write(
         &manifest,
-        format!(
-            "model \"model.fvl\"\nproperty \"property.fvt\"\n{manifest_tail}"
-        ),
+        format!("model \"model.fvl\"\nproperty \"property.fvt\"\n{manifest_tail}"),
     )
     .expect("manifest fixture should be writable");
     (model, property, manifest)
@@ -159,11 +158,7 @@ fn job_product_and_model_cutoffs_preserve_exact_provenance() {
     );
     let model_job = run(&job_args(&manifest), None);
     let model_explicit = run(
-        &explicit_args(
-            &model,
-            &property,
-            &["--max-model-transitions", "2"],
-        ),
+        &explicit_args(&model, &property, &["--max-model-transitions", "2"]),
         None,
     );
     assert_eq!(model_job.status.code(), Some(3));
@@ -214,7 +209,9 @@ fn job_manifest_and_referenced_file_failures_are_exit_two() {
     .unwrap();
     let malformed_output = run(&job_args(&malformed), None);
     assert_eq!(malformed_output.status.code(), Some(2));
-    assert!(stderr(&malformed_output).contains("duplicate singleton directive 'max-product-states'"));
+    assert!(
+        stderr(&malformed_output).contains("duplicate singleton directive 'max-product-states'")
+    );
 
     let missing = root.join("missing.fvj");
     fs::write(

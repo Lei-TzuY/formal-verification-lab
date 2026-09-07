@@ -71,11 +71,7 @@ impl VerificationJob {
             "--max-model-transitions",
             self.model_limits.max_transitions,
         );
-        push_limit(
-            &mut args,
-            "--max-model-depth",
-            self.model_limits.max_depth,
-        );
+        push_limit(&mut args, "--max-model-depth", self.model_limits.max_depth);
         push_limit(
             &mut args,
             "--max-product-states",
@@ -126,11 +122,7 @@ impl VerificationJob {
             MAX_PRODUCT_TRANSITIONS,
             self.product_limits.max_transitions,
         );
-        push_limit_line(
-            &mut lines,
-            MAX_PRODUCT_DEPTH,
-            self.product_limits.max_depth,
-        );
+        push_limit_line(&mut lines, MAX_PRODUCT_DEPTH, self.product_limits.max_depth);
         lines.join("\n")
     }
 }
@@ -310,8 +302,12 @@ pub fn parse_verification_job(input: &str) -> Result<VerificationJob, Verificati
                     strong_fair_actions.push(value);
                 }
             }
-            MAX_MODEL_STATES | MAX_MODEL_TRANSITIONS | MAX_MODEL_DEPTH | MAX_PRODUCT_STATES
-            | MAX_PRODUCT_TRANSITIONS | MAX_PRODUCT_DEPTH => {
+            MAX_MODEL_STATES
+            | MAX_MODEL_TRANSITIONS
+            | MAX_MODEL_DEPTH
+            | MAX_PRODUCT_STATES
+            | MAX_PRODUCT_TRANSITIONS
+            | MAX_PRODUCT_DEPTH => {
                 require_singleton(
                     &mut seen_singletons,
                     &directive,
@@ -503,7 +499,10 @@ impl<'a> LineParser<'a> {
 
     fn parse_number(&mut self) -> Result<usize, ParseError> {
         let start = self.position;
-        while self.current_byte().is_some_and(|byte| byte.is_ascii_digit()) {
+        while self
+            .current_byte()
+            .is_some_and(|byte| byte.is_ascii_digit())
+        {
             self.position += 1;
         }
         if self.position == start {

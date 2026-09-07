@@ -1,6 +1,4 @@
-use formal_verification_lab::{
-    parse_verification_job, VerificationJobParseErrorKind,
-};
+use formal_verification_lab::{parse_verification_job, VerificationJobParseErrorKind};
 
 #[test]
 fn minimal_manifest_parses_and_renders_canonically() {
@@ -116,10 +114,8 @@ fn missing_required_and_duplicate_singleton_directives_fail_closed() {
 
 #[test]
 fn unsupported_directives_and_trailing_input_are_rejected() {
-    let unsupported = parse_verification_job(
-        "model \"m.fvl\"\nproperty \"p.fvt\"\ntimeout 100\n",
-    )
-    .unwrap_err();
+    let unsupported =
+        parse_verification_job("model \"m.fvl\"\nproperty \"p.fvt\"\ntimeout 100\n").unwrap_err();
     assert_eq!(unsupported.line(), 3);
     assert_eq!(unsupported.column(), 1);
     assert_eq!(
@@ -129,22 +125,25 @@ fn unsupported_directives_and_trailing_input_are_rejected() {
         }
     );
 
-    let trailing = parse_verification_job(
-        "model \"m.fvl\" extra\nproperty \"p.fvt\"\n",
-    )
-    .unwrap_err();
+    let trailing =
+        parse_verification_job("model \"m.fvl\" extra\nproperty \"p.fvt\"\n").unwrap_err();
     assert_eq!(trailing.line(), 1);
-    assert_eq!(trailing.kind(), &VerificationJobParseErrorKind::TrailingInput);
+    assert_eq!(
+        trailing.kind(),
+        &VerificationJobParseErrorKind::TrailingInput
+    );
 }
 
 #[test]
 fn malformed_numbers_fail_at_the_value_without_saturating_or_guessing() {
-    let missing = parse_verification_job(
-        "model \"m.fvl\"\nproperty \"p.fvt\"\nmax-model-depth nope\n",
-    )
-    .unwrap_err();
+    let missing =
+        parse_verification_job("model \"m.fvl\"\nproperty \"p.fvt\"\nmax-model-depth nope\n")
+            .unwrap_err();
     assert_eq!(missing.line(), 3);
-    assert_eq!(missing.kind(), &VerificationJobParseErrorKind::ExpectedNumber);
+    assert_eq!(
+        missing.kind(),
+        &VerificationJobParseErrorKind::ExpectedNumber
+    );
 
     let overflow = parse_verification_job(&format!(
         "model \"m.fvl\"\nproperty \"p.fvt\"\nmax-product-states {}0\n",
