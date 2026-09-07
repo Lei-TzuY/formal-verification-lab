@@ -25,6 +25,35 @@ pub fn unfair_dual_response_protocol() -> Result<TransitionSystem<DualResponseSt
     dual_response_model("dual-response-unfair-b", true)
 }
 
+/// A finite maximal execution terminates after requesting class B without a
+/// response. Fairness constrains only infinite executions, so this remains a
+/// real pending-terminal violation under weak, strong, or combined fairness.
+pub fn finite_pending_dual_response_protocol(
+) -> Result<TransitionSystem<DualResponseState>, ModelError> {
+    TransitionSystemBuilder::new(
+        "dual-response-finite-pending-b",
+        |state: &DualResponseState| {
+            Ok(match state.phase {
+                DualResponsePhase::Idle => vec![Transition::new(
+                    "request-b",
+                    DualResponseState {
+                        phase: DualResponsePhase::AwaitB,
+                    },
+                )],
+                DualResponsePhase::AwaitA
+                | DualResponsePhase::ReadyB
+                | DualResponsePhase::AwaitB => Vec::new(),
+            })
+        },
+    )
+    .state_variable("phase", "dual response protocol phase")
+    .initial_state(DualResponseState {
+        phase: DualResponsePhase::Idle,
+    })
+    .safety_invariant("recognized-phase", |_state: &DualResponseState| true)
+    .build()
+}
+
 fn dual_response_model(
     name: &'static str,
     allow_b_stutter: bool,
