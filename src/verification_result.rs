@@ -317,11 +317,12 @@ impl VerificationJobResultEnvelope {
                 .outcome
                 .inconclusive_reason()
                 .map(|reason| cutoff(VerificationJobCutoffStage::Model, reason)),
-            evidence: result.counterexample.as_ref().map(|trace| {
-                VerificationJobEvidence::Safety {
+            evidence: result
+                .counterexample
+                .as_ref()
+                .map(|trace| VerificationJobEvidence::Safety {
                     trace: trace.iter().map(convert_safety_step).collect(),
-                }
-            }),
+                }),
             error: None,
         }
     }
