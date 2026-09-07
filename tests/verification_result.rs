@@ -114,7 +114,9 @@ fn product_cutoff_is_stage_qualified_and_accounted() {
     );
 
     assert_eq!(envelope.outcome, VerificationJobOutcome::Inconclusive);
-    assert!(envelope.to_json().contains("\"status\":null"));
+    assert!(envelope
+        .to_json()
+        .contains("\"outcome\":\"inconclusive\",\"status\":\"INCONCLUSIVE\""));
     let cutoff = envelope.cutoff.expect("cutoff should be present");
     assert_eq!(cutoff.stage, VerificationJobCutoffStage::Product);
     assert_eq!(cutoff.kind, VerificationJobCutoffKind::TransitionLimit);
@@ -164,6 +166,9 @@ fn staged_model_cutoff_preserves_model_before_product_provenance() {
         &result,
     );
 
+    assert!(envelope
+        .to_json()
+        .contains("\"outcome\":\"inconclusive\",\"status\":\"INCONCLUSIVE\""));
     let cutoff = envelope.cutoff.expect("model cutoff should be present");
     assert_eq!(cutoff.stage, VerificationJobCutoffStage::Model);
     assert_eq!(cutoff.kind, VerificationJobCutoffKind::DepthLimit);
