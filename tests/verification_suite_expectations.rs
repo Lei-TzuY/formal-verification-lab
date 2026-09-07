@@ -11,10 +11,7 @@ static NEXT_DIR: AtomicUsize = AtomicUsize::new(0);
 
 fn fixture_dir(kind: &str) -> PathBuf {
     let id = NEXT_DIR.fetch_add(1, Ordering::Relaxed);
-    let root = std::env::temp_dir().join(format!(
-        "fvlab-m58-{kind}-{}-{id}",
-        std::process::id()
-    ));
+    let root = std::env::temp_dir().join(format!("fvlab-m58-{kind}-{}-{id}", std::process::id()));
     fs::create_dir_all(&root).unwrap();
     root
 }
@@ -72,10 +69,8 @@ fn expectation_syntax_is_optional_and_canonical_without_changing_old_documents()
 
 #[test]
 fn expectation_parser_rejects_unknown_outcomes_fail_closed() {
-    let error = parse_verification_suite(
-        "suite \"bad\"\njob \"a.fvj\" expect \"sometimes\"\n",
-    )
-    .unwrap_err();
+    let error = parse_verification_suite("suite \"bad\"\njob \"a.fvj\" expect \"sometimes\"\n")
+        .unwrap_err();
     assert!(matches!(
         error.kind(),
         VerificationSuiteParseErrorKind::InvalidExpectedOutcome { outcome }
@@ -88,15 +83,14 @@ fn expectation_check_requires_every_job_to_declare_an_expectation() {
     let root = fixture_dir("missing-expectation");
     write_job(&root, "satisfied", satisfied_model_source(), "");
     let suite_path = root.join("suite.fvs");
-    fs::write(
-        &suite_path,
-        "suite \"missing\"\njob \"satisfied.fvj\"\n",
-    )
-    .unwrap();
+    fs::write(&suite_path, "suite \"missing\"\njob \"satisfied.fvj\"\n").unwrap();
 
     let run = run_verification_suite_expectations_json(&suite_path);
     assert_eq!(run.exit_code, 2);
-    assert_eq!(run.envelope.outcome, VerificationRegressionSuiteOutcome::Error);
+    assert_eq!(
+        run.envelope.outcome,
+        VerificationRegressionSuiteOutcome::Error
+    );
     assert!(run.envelope.jobs.is_empty());
     assert!(run
         .to_json()
@@ -134,7 +128,10 @@ job \"malformed.fvj\" expect \"error\"\n",
 
     let run = run_verification_suite_expectations_json(&suite_path);
     assert_eq!(run.exit_code, 0);
-    assert_eq!(run.envelope.outcome, VerificationRegressionSuiteOutcome::Matched);
+    assert_eq!(
+        run.envelope.outcome,
+        VerificationRegressionSuiteOutcome::Matched
+    );
     assert_eq!(run.envelope.jobs.len(), 5);
     assert!(run.envelope.jobs.iter().all(|entry| entry.matched));
 
@@ -146,15 +143,27 @@ job \"malformed.fvj\" expect \"error\"\n",
         assert_eq!(entry.result, expected.envelope);
         assert_eq!(entry.observed, expected.envelope.outcome);
     }
-    assert_eq!(run.envelope.jobs[0].observed, VerificationJobOutcome::Satisfied);
-    assert_eq!(run.envelope.jobs[1].observed, VerificationJobOutcome::Violated);
-    assert_eq!(run.envelope.jobs[2].observed, VerificationJobOutcome::Violated);
+    assert_eq!(
+        run.envelope.jobs[0].observed,
+        VerificationJobOutcome::Satisfied
+    );
+    assert_eq!(
+        run.envelope.jobs[1].observed,
+        VerificationJobOutcome::Violated
+    );
+    assert_eq!(
+        run.envelope.jobs[2].observed,
+        VerificationJobOutcome::Violated
+    );
     assert_eq!(
         run.envelope.jobs[3].observed,
         VerificationJobOutcome::Inconclusive
     );
     assert_eq!(run.envelope.jobs[4].observed, VerificationJobOutcome::Error);
-    assert_eq!(run.to_json(), run_verification_suite_expectations_json(&suite_path).to_json());
+    assert_eq!(
+        run.to_json(),
+        run_verification_suite_expectations_json(&suite_path).to_json()
+    );
 
     let _ = fs::remove_dir_all(root);
 }
@@ -187,12 +196,18 @@ job \"violated.fvj\" expect \"satisfied\"\n",
         run.envelope.jobs[0].expected,
         VerificationExpectedOutcome::Violated
     );
-    assert_eq!(run.envelope.jobs[0].observed, VerificationJobOutcome::Satisfied);
+    assert_eq!(
+        run.envelope.jobs[0].observed,
+        VerificationJobOutcome::Satisfied
+    );
     assert_eq!(
         run.envelope.jobs[1].expected,
         VerificationExpectedOutcome::Satisfied
     );
-    assert_eq!(run.envelope.jobs[1].observed, VerificationJobOutcome::Violated);
+    assert_eq!(
+        run.envelope.jobs[1].observed,
+        VerificationJobOutcome::Violated
+    );
 
     let _ = fs::remove_dir_all(root);
 }
@@ -211,7 +226,10 @@ fn raw_m57_suite_execution_ignores_expectations_and_keeps_observed_exit_policy()
     let raw = run_verification_suite_json(&suite_path);
     assert_eq!(raw.exit_code, 7);
     assert_eq!(raw.envelope.jobs.len(), 1);
-    assert_eq!(raw.envelope.jobs[0].result.outcome, VerificationJobOutcome::Violated);
+    assert_eq!(
+        raw.envelope.jobs[0].result.outcome,
+        VerificationJobOutcome::Violated
+    );
     assert!(!raw.to_json().contains("expected"));
     assert!(!raw.to_json().contains("matched"));
 
