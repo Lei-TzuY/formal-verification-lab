@@ -297,9 +297,8 @@ fn built_binaries_preserve_all_five_direct_envelopes_in_raw_and_expectation_suit
         .collect::<Vec<_>>();
 
     assert!(direct[4].1.starts_with(
-        "{\"schema_version\":2,\"analysis\":\"action-temporal\",\"outcome\":\"satisfied\""
+        "{\"schema_version\":2,\"analysis\":\"action-temporal\",\"backend\":\"response\",\"outcome\":\"satisfied\""
     ));
-    assert!(direct[4].1.contains("\"backend\":\"response\""));
 
     let raw = run_suite_binary(&suite, false);
     assert_eq!(raw.status.code(), Some(7));
