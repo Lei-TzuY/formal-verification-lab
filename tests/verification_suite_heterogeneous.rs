@@ -1,7 +1,8 @@
 use formal_verification_lab::{
-    run_verification_job_json, run_verification_suite_expectations_json, run_verification_suite_json,
-    VerificationJobOutcome, VerificationRegressionSuiteOutcome, VerificationSuiteOutcome,
-    VERIFICATION_JOB_RESULT_SCHEMA_VERSION, VERIFICATION_JOB_SAFETY_RESULT_SCHEMA_VERSION,
+    run_verification_job_json, run_verification_suite_expectations_json,
+    run_verification_suite_json, VerificationJobOutcome, VerificationRegressionSuiteOutcome,
+    VerificationSuiteOutcome, VERIFICATION_JOB_RESULT_SCHEMA_VERSION,
+    VERIFICATION_JOB_SAFETY_RESULT_SCHEMA_VERSION,
 };
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -54,9 +55,7 @@ fn write_safety_job(root: &Path, name: &str, model: &str, tail: &str) -> PathBuf
     let manifest = root.join(format!("{name}.fvj"));
     fs::write(
         &manifest,
-        format!(
-            "analysis \"safety\"\nmodel \"{name}.fvl\"\nproperty \"{name}.fvp\"\n{tail}"
-        ),
+        format!("analysis \"safety\"\nmodel \"{name}.fvl\"\nproperty \"{name}.fvp\"\n{tail}"),
     )
     .unwrap();
     manifest
@@ -253,9 +252,8 @@ fn built_binaries_preserve_heterogeneous_direct_job_envelopes_inside_suites() {
     assert_eq!(safety_direct.status.code(), Some(12));
     assert!(stderr(&safety_direct).is_empty());
     let safety_json = stdout(&safety_direct).trim_end().to_owned();
-    assert!(safety_json.starts_with(
-        "{\"schema_version\":2,\"analysis\":\"safety\",\"outcome\":\"violated\""
-    ));
+    assert!(safety_json
+        .starts_with("{\"schema_version\":2,\"analysis\":\"safety\",\"outcome\":\"violated\""));
     assert!(safety_json.contains("\"kind\":\"safety\""));
     assert!(!safety_json.contains("\"pending\""));
 
