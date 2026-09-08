@@ -180,14 +180,8 @@ fn raw_three_family_suite_preserves_direct_envelopes_and_aggregate_precedence() 
         VerificationJobOutcome::Inconclusive
     );
     assert_eq!(run.envelope.jobs[2].result.accounting.product_states, None);
-    assert!(run.envelope.jobs[2]
-        .result
-        .weak_fair_actions
-        .is_empty());
-    assert!(run.envelope.jobs[2]
-        .result
-        .strong_fair_actions
-        .is_empty());
+    assert!(run.envelope.jobs[2].result.weak_fair_actions.is_empty());
+    assert!(run.envelope.jobs[2].result.strong_fair_actions.is_empty());
 
     assert_eq!(
         run.to_json(),
@@ -287,9 +281,8 @@ fn built_binaries_preserve_all_three_direct_job_envelopes_inside_suites() {
     assert!(exact_state_json.starts_with(
         "{\"schema_version\":2,\"analysis\":\"exact-state\",\"outcome\":\"inconclusive\""
     ));
-    assert!(exact_state_json.contains(
-        "\"cutoff\":{\"stage\":\"model\",\"kind\":\"transition_limit\",\"limit\":0}"
-    ));
+    assert!(exact_state_json
+        .contains("\"cutoff\":{\"stage\":\"model\",\"kind\":\"transition_limit\",\"limit\":0}"));
     assert!(exact_state_json.contains("\"product_states\":null"));
     assert!(!exact_state_json.contains("\"pending\""));
 
