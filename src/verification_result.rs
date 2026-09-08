@@ -1,5 +1,6 @@
 use crate::bounded::{AnalysisOutcome, AnalysisStage, BoundedOutcome};
 use crate::checker::{ExplorationLimits, InconclusiveReason, TraceStep};
+use crate::exact_state::{BoundedExactStateResult, ExactStateEvidence, ExactStateStatus};
 use crate::multi_response::{
     AnalysisMultiResponseResult, BoundedMultiResponseResult, MultiObligationState,
     MultiResponseCounterexample, MultiResponseResult, MultiResponseStatus,
@@ -7,7 +8,11 @@ use crate::multi_response::{
 use crate::safety::{BoundedSafetyResult, SafetyStatus};
 
 pub const VERIFICATION_JOB_RESULT_SCHEMA_VERSION: u32 = 1;
-pub const VERIFICATION_JOB_SAFETY_RESULT_SCHEMA_VERSION: u32 = 2;
+pub const VERIFICATION_JOB_HETEROGENEOUS_RESULT_SCHEMA_VERSION: u32 = 2;
+pub const VERIFICATION_JOB_SAFETY_RESULT_SCHEMA_VERSION: u32 =
+    VERIFICATION_JOB_HETEROGENEOUS_RESULT_SCHEMA_VERSION;
+pub const VERIFICATION_JOB_EXACT_STATE_RESULT_SCHEMA_VERSION: u32 =
+    VERIFICATION_JOB_HETEROGENEOUS_RESULT_SCHEMA_VERSION;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VerificationJobOutcome {
@@ -123,10 +128,12 @@ pub struct VerificationJobTraceStep {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct VerificationJobSafetyTraceStep {
+pub struct VerificationJobStateTraceStep {
     pub action: Option<String>,
     pub state: String,
 }
+
+pub type VerificationJobSafetyTraceStep = VerificationJobStateTraceStep;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum VerificationJobEvidence {
@@ -140,7 +147,17 @@ pub enum VerificationJobEvidence {
         cycle: Vec<VerificationJobTraceStep>,
     },
     Safety {
-        trace: Vec<VerificationJobSafetyTraceStep>,
+        trace: Vec<VerificationJobStateTraceStep>,
+    },
+    ExactStateReachability {
+        trace: Vec<VerificationJobStateTraceStep>,
+    },
+    ExactStateEventualityFinite {
+        trace: Vec<VerificationJobStateTraceStep>,
+    },
+    ExactStateEventualityInfinite {
+        stem: Vec<VerificationJobStateTraceStep>,
+        cycle: Vec<VerificationJobStateTraceStep>,
     },
 }
 
@@ -247,7 +264,7 @@ impl VerificationJobResultEnvelope {
         product_limits: ExplorationLimits,
         result: &AnalysisMultiResponseResult<String>,
     ) -> Self {
-        let cutoff = result.outcome.inconclusive_reason().map(|reason| {
+        let result_cutoff = result.outcome.inconclusive_reason().map(|reason| {
             cutoff(
                 match reason.stage {
                     AnalysisStage::Model => VerificationJobCutoffStage::Model,
@@ -278,7 +295,7 @@ impl VerificationJobResultEnvelope {
                 retained_product_transitions: Some(result.retained_product_transitions),
                 max_product_depth_reached: result.max_product_depth_reached,
             },
-            cutoff,
+            cutoff: result_cutoff,
             evidence: result.counterexample.as_ref().map(convert_evidence),
             error: None,
         }
@@ -301,18 +318,12 @@ impl VerificationJobResultEnvelope {
             strong_fair_actions: Vec::new(),
             model_limits: model_limits.into(),
             product_limits: ExplorationLimits::unbounded().into(),
-            accounting: VerificationJobAccounting {
-                model_states: Some(result.discovered_states),
-                checked_model_states: Some(result.checked_states),
-                explored_model_transitions: Some(result.explored_transitions),
-                retained_model_transitions: Some(result.explored_transitions),
-                max_model_depth_reached: result.max_depth_reached,
-                product_states: None,
-                checked_product_states: None,
-                explored_product_transitions: None,
-                retained_product_transitions: None,
-                max_product_depth_reached: None,
-            },
+            accounting: model_only_accounting(
+                result.discovered_states,
+                result.checked_states,
+                result.explored_transitions,
+                result.max_depth_reached,
+            ),
             cutoff: result
                 .outcome
                 .inconclusive_reason()
@@ -321,8 +332,42 @@ impl VerificationJobResultEnvelope {
                 .counterexample
                 .as_ref()
                 .map(|trace| VerificationJobEvidence::Safety {
-                    trace: trace.iter().map(convert_safety_step).collect(),
+                    trace: trace.iter().map(convert_state_step).collect(),
                 }),
+            error: None,
+        }
+    }
+
+    /// Schema-v2 envelope for the existing bounded exact-state frontend.
+    /// Exact-state jobs use model-space budgets only and preserve the backend's
+    /// positive reachability witness or finite/lasso eventuality counterexample.
+    pub fn from_exact_state(
+        model: impl Into<String>,
+        property: impl Into<String>,
+        model_limits: ExplorationLimits,
+        result: &BoundedExactStateResult,
+    ) -> Self {
+        Self {
+            schema_version: VERIFICATION_JOB_EXACT_STATE_RESULT_SCHEMA_VERSION,
+            analysis: Some("exact-state".to_owned()),
+            outcome: exact_state_outcome(&result.outcome),
+            model: Some(model.into()),
+            property: Some(property.into()),
+            weak_fair_actions: Vec::new(),
+            strong_fair_actions: Vec::new(),
+            model_limits: model_limits.into(),
+            product_limits: ExplorationLimits::unbounded().into(),
+            accounting: model_only_accounting(
+                result.discovered_states,
+                result.checked_states,
+                result.explored_transitions,
+                result.max_depth_reached,
+            ),
+            cutoff: result
+                .outcome
+                .inconclusive_reason()
+                .map(|reason| cutoff(VerificationJobCutoffStage::Model, reason)),
+            evidence: result.evidence.as_ref().map(convert_exact_state_evidence),
             error: None,
         }
     }
@@ -349,6 +394,13 @@ impl VerificationJobResultEnvelope {
         let mut envelope = Self::error(message);
         envelope.schema_version = VERIFICATION_JOB_SAFETY_RESULT_SCHEMA_VERSION;
         envelope.analysis = Some("safety".to_owned());
+        envelope
+    }
+
+    pub fn exact_state_error(message: impl Into<String>) -> Self {
+        let mut envelope = Self::error(message);
+        envelope.schema_version = VERIFICATION_JOB_EXACT_STATE_RESULT_SCHEMA_VERSION;
+        envelope.analysis = Some("exact-state".to_owned());
         envelope
     }
 
@@ -405,6 +457,26 @@ impl VerificationJobResultEnvelope {
     }
 }
 
+fn model_only_accounting(
+    discovered_states: usize,
+    checked_states: usize,
+    explored_transitions: usize,
+    max_depth_reached: Option<usize>,
+) -> VerificationJobAccounting {
+    VerificationJobAccounting {
+        model_states: Some(discovered_states),
+        checked_model_states: Some(checked_states),
+        explored_model_transitions: Some(explored_transitions),
+        retained_model_transitions: Some(explored_transitions),
+        max_model_depth_reached: max_depth_reached,
+        product_states: None,
+        checked_product_states: None,
+        explored_product_transitions: None,
+        retained_product_transitions: None,
+        max_product_depth_reached: None,
+    }
+}
+
 fn canonical_status(
     outcome: VerificationJobOutcome,
     analysis: Option<&str>,
@@ -450,6 +522,14 @@ fn safety_outcome(outcome: &BoundedOutcome<SafetyStatus>) -> VerificationJobOutc
     match outcome {
         BoundedOutcome::Conclusive(SafetyStatus::Safe) => VerificationJobOutcome::Satisfied,
         BoundedOutcome::Conclusive(SafetyStatus::Violated) => VerificationJobOutcome::Violated,
+        BoundedOutcome::Inconclusive(_) => VerificationJobOutcome::Inconclusive,
+    }
+}
+
+fn exact_state_outcome(outcome: &BoundedOutcome<ExactStateStatus>) -> VerificationJobOutcome {
+    match outcome {
+        BoundedOutcome::Conclusive(ExactStateStatus::Satisfied) => VerificationJobOutcome::Satisfied,
+        BoundedOutcome::Conclusive(ExactStateStatus::Violated) => VerificationJobOutcome::Violated,
         BoundedOutcome::Inconclusive(_) => VerificationJobOutcome::Inconclusive,
     }
 }
@@ -502,10 +582,31 @@ fn convert_step(step: &TraceStep<MultiObligationState<String>>) -> VerificationJ
     }
 }
 
-fn convert_safety_step(step: &TraceStep<String>) -> VerificationJobSafetyTraceStep {
-    VerificationJobSafetyTraceStep {
+fn convert_state_step(step: &TraceStep<String>) -> VerificationJobStateTraceStep {
+    VerificationJobStateTraceStep {
         action: step.action.clone(),
         state: step.state.clone(),
+    }
+}
+
+fn convert_exact_state_evidence(evidence: &ExactStateEvidence) -> VerificationJobEvidence {
+    match evidence {
+        ExactStateEvidence::ReachabilityWitness { trace } => {
+            VerificationJobEvidence::ExactStateReachability {
+                trace: trace.iter().map(convert_state_step).collect(),
+            }
+        }
+        ExactStateEvidence::EventualityFiniteCounterexample { trace } => {
+            VerificationJobEvidence::ExactStateEventualityFinite {
+                trace: trace.iter().map(convert_state_step).collect(),
+            }
+        }
+        ExactStateEvidence::EventualityInfiniteCounterexample { stem, cycle } => {
+            VerificationJobEvidence::ExactStateEventualityInfinite {
+                stem: stem.iter().map(convert_state_step).collect(),
+                cycle: cycle.iter().map(convert_state_step).collect(),
+            }
+        }
     }
 }
 
@@ -659,7 +760,30 @@ fn write_evidence(out: &mut String, value: &VerificationJobEvidence) {
             out.push('{');
             field_string(out, "kind", "safety", true);
             out.push_str(",\"trace\":");
-            write_safety_trace(out, trace);
+            write_state_trace(out, trace);
+            out.push('}');
+        }
+        VerificationJobEvidence::ExactStateReachability { trace } => {
+            out.push('{');
+            field_string(out, "kind", "reachability_witness", true);
+            out.push_str(",\"trace\":");
+            write_state_trace(out, trace);
+            out.push('}');
+        }
+        VerificationJobEvidence::ExactStateEventualityFinite { trace } => {
+            out.push('{');
+            field_string(out, "kind", "eventuality_finite", true);
+            out.push_str(",\"trace\":");
+            write_state_trace(out, trace);
+            out.push('}');
+        }
+        VerificationJobEvidence::ExactStateEventualityInfinite { stem, cycle } => {
+            out.push('{');
+            field_string(out, "kind", "eventuality_lasso", true);
+            out.push_str(",\"stem\":");
+            write_state_trace(out, stem);
+            out.push_str(",\"cycle\":");
+            write_state_trace(out, cycle);
             out.push('}');
         }
     }
@@ -687,7 +811,7 @@ fn write_trace(out: &mut String, trace: &[VerificationJobTraceStep]) {
     out.push(']');
 }
 
-fn write_safety_trace(out: &mut String, trace: &[VerificationJobSafetyTraceStep]) {
+fn write_state_trace(out: &mut String, trace: &[VerificationJobStateTraceStep]) {
     out.push('[');
     for (index, step) in trace.iter().enumerate() {
         if index != 0 {
