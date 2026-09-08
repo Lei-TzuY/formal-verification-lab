@@ -19,6 +19,7 @@ pub enum VerificationJobAnalysis {
     MultiResponse,
     Safety,
     ExactState,
+    PropositionExpression,
 }
 
 impl VerificationJobAnalysis {
@@ -27,6 +28,7 @@ impl VerificationJobAnalysis {
             Self::MultiResponse => "multi-response",
             Self::Safety => "safety",
             Self::ExactState => "exact-state",
+            Self::PropositionExpression => "proposition-expression",
         }
     }
 
@@ -35,6 +37,7 @@ impl VerificationJobAnalysis {
             "multi-response" => Some(Self::MultiResponse),
             "safety" => Some(Self::Safety),
             "exact-state" => Some(Self::ExactState),
+            "proposition-expression" => Some(Self::PropositionExpression),
             _ => None,
         }
     }
@@ -269,7 +272,7 @@ impl fmt::Display for VerificationJobParseError {
             }
             VerificationJobParseErrorKind::InvalidAnalysis { analysis } => write!(
                 f,
-                "unsupported verification analysis '{analysis}'; expected multi-response, safety, or exact-state"
+                "unsupported verification analysis '{analysis}'; expected multi-response, safety, exact-state, or proposition-expression"
             ),
             VerificationJobParseErrorKind::ExpectedNumber => {
                 write!(f, "expected a non-negative decimal integer")
