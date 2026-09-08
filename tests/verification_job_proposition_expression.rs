@@ -200,7 +200,7 @@ fn reachable_boolean_job_matches_direct_m24_backend_and_preserves_shortest_witne
     );
     assert_evidence_matches(&run.envelope.evidence, &direct.evidence);
 
-    let Some(VerificationJobEvidence::ExactStateReachability { trace }) = run.envelope.evidence
+    let Some(VerificationJobEvidence::ExactStateReachability { trace }) = &run.envelope.evidence
     else {
         panic!("expected reachability witness");
     };
