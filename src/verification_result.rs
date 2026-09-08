@@ -4,8 +4,10 @@ use crate::multi_response::{
     AnalysisMultiResponseResult, BoundedMultiResponseResult, MultiObligationState,
     MultiResponseCounterexample, MultiResponseResult, MultiResponseStatus,
 };
+use crate::safety::{BoundedSafetyResult, SafetyStatus};
 
 pub const VERIFICATION_JOB_RESULT_SCHEMA_VERSION: u32 = 1;
+pub const VERIFICATION_JOB_SAFETY_RESULT_SCHEMA_VERSION: u32 = 2;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VerificationJobOutcome {
@@ -121,6 +123,12 @@ pub struct VerificationJobTraceStep {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerificationJobSafetyTraceStep {
+    pub action: Option<String>,
+    pub state: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum VerificationJobEvidence {
     Finite {
         clause: String,
@@ -131,11 +139,17 @@ pub enum VerificationJobEvidence {
         stem: Vec<VerificationJobTraceStep>,
         cycle: Vec<VerificationJobTraceStep>,
     },
+    Safety {
+        trace: Vec<VerificationJobSafetyTraceStep>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VerificationJobResultEnvelope {
     pub schema_version: u32,
+    /// Present only for heterogeneous schema revisions. Historical M56
+    /// multi-response envelopes intentionally omit this field from JSON.
+    pub analysis: Option<String>,
     pub outcome: VerificationJobOutcome,
     pub model: Option<String>,
     pub property: Option<String>,
@@ -160,6 +174,7 @@ impl VerificationJobResultEnvelope {
     ) -> Self {
         Self {
             schema_version: VERIFICATION_JOB_RESULT_SCHEMA_VERSION,
+            analysis: None,
             outcome: status_outcome(result.status),
             model: Some(model.into()),
             property: Some(result.property.clone()),
@@ -195,6 +210,7 @@ impl VerificationJobResultEnvelope {
     ) -> Self {
         Self {
             schema_version: VERIFICATION_JOB_RESULT_SCHEMA_VERSION,
+            analysis: None,
             outcome: bounded_outcome(&result.outcome),
             model: Some(model.into()),
             property: Some(result.property.clone()),
@@ -242,6 +258,7 @@ impl VerificationJobResultEnvelope {
         });
         Self {
             schema_version: VERIFICATION_JOB_RESULT_SCHEMA_VERSION,
+            analysis: None,
             outcome: analysis_outcome(&result.outcome),
             model: Some(model.into()),
             property: Some(result.property.clone()),
@@ -267,9 +284,53 @@ impl VerificationJobResultEnvelope {
         }
     }
 
+    /// Schema-v2 envelope for declarative Boolean safety jobs. Safety uses only
+    /// model-space budgets and never manufactures product accounting.
+    pub fn from_safety(
+        model: impl Into<String>,
+        model_limits: ExplorationLimits,
+        result: &BoundedSafetyResult,
+    ) -> Self {
+        Self {
+            schema_version: VERIFICATION_JOB_SAFETY_RESULT_SCHEMA_VERSION,
+            analysis: Some("safety".to_owned()),
+            outcome: safety_outcome(&result.outcome),
+            model: Some(model.into()),
+            property: Some(result.expression.clone()),
+            weak_fair_actions: Vec::new(),
+            strong_fair_actions: Vec::new(),
+            model_limits: model_limits.into(),
+            product_limits: ExplorationLimits::unbounded().into(),
+            accounting: VerificationJobAccounting {
+                model_states: Some(result.discovered_states),
+                checked_model_states: Some(result.checked_states),
+                explored_model_transitions: Some(result.explored_transitions),
+                retained_model_transitions: Some(result.explored_transitions),
+                max_model_depth_reached: result.max_depth_reached,
+                product_states: None,
+                checked_product_states: None,
+                explored_product_transitions: None,
+                retained_product_transitions: None,
+                max_product_depth_reached: None,
+            },
+            cutoff: result
+                .outcome
+                .inconclusive_reason()
+                .map(|reason| cutoff(VerificationJobCutoffStage::Model, reason)),
+            evidence: result
+                .counterexample
+                .as_ref()
+                .map(|trace| VerificationJobEvidence::Safety {
+                    trace: trace.iter().map(convert_safety_step).collect(),
+                }),
+            error: None,
+        }
+    }
+
     pub fn error(message: impl Into<String>) -> Self {
         Self {
             schema_version: VERIFICATION_JOB_RESULT_SCHEMA_VERSION,
+            analysis: None,
             outcome: VerificationJobOutcome::Error,
             model: None,
             property: None,
@@ -284,16 +345,32 @@ impl VerificationJobResultEnvelope {
         }
     }
 
+    pub fn safety_error(message: impl Into<String>) -> Self {
+        let mut envelope = Self::error(message);
+        envelope.schema_version = VERIFICATION_JOB_SAFETY_RESULT_SCHEMA_VERSION;
+        envelope.analysis = Some("safety".to_owned());
+        envelope
+    }
+
     /// Deterministic compact JSON for machine consumers.
     ///
-    /// Object field order is schema-defined below. Strings are escaped in one
-    /// centralized writer so callers never construct JSON with ad-hoc quoting.
+    /// M56 schema-v1 field order is preserved exactly when `analysis` is absent.
+    /// Heterogeneous schema-v2 envelopes insert `analysis` immediately after the
+    /// schema version and use family-specific evidence below.
     pub fn to_json(&self) -> String {
         let mut out = String::new();
         out.push('{');
         field_u64(&mut out, "schema_version", self.schema_version as u64, true);
+        if let Some(analysis) = self.analysis.as_deref() {
+            field_string(&mut out, "analysis", analysis, false);
+        }
         field_string(&mut out, "outcome", self.outcome.as_str(), false);
-        field_optional_string(&mut out, "status", canonical_status(self.outcome), false);
+        field_optional_string(
+            &mut out,
+            "status",
+            canonical_status(self.outcome, self.analysis.as_deref()),
+            false,
+        );
         field_optional_string(&mut out, "model", self.model.as_deref(), false);
         field_optional_string(&mut out, "property", self.property.as_deref(), false);
         field_string_array(
@@ -328,7 +405,18 @@ impl VerificationJobResultEnvelope {
     }
 }
 
-fn canonical_status(outcome: VerificationJobOutcome) -> Option<&'static str> {
+fn canonical_status(
+    outcome: VerificationJobOutcome,
+    analysis: Option<&str>,
+) -> Option<&'static str> {
+    if analysis == Some("safety") {
+        return match outcome {
+            VerificationJobOutcome::Satisfied => Some("SAFE"),
+            VerificationJobOutcome::Violated => Some("VIOLATED"),
+            VerificationJobOutcome::Inconclusive => Some("INCONCLUSIVE"),
+            VerificationJobOutcome::Error => None,
+        };
+    }
     match outcome {
         VerificationJobOutcome::Satisfied => Some("SATISFIED"),
         VerificationJobOutcome::Violated => Some("VIOLATED"),
@@ -355,6 +443,14 @@ fn analysis_outcome(outcome: &AnalysisOutcome<MultiResponseStatus>) -> Verificat
     match outcome {
         AnalysisOutcome::Conclusive(status) => status_outcome(*status),
         AnalysisOutcome::Inconclusive(_) => VerificationJobOutcome::Inconclusive,
+    }
+}
+
+fn safety_outcome(outcome: &BoundedOutcome<SafetyStatus>) -> VerificationJobOutcome {
+    match outcome {
+        BoundedOutcome::Conclusive(SafetyStatus::Safe) => VerificationJobOutcome::Satisfied,
+        BoundedOutcome::Conclusive(SafetyStatus::Violated) => VerificationJobOutcome::Violated,
+        BoundedOutcome::Inconclusive(_) => VerificationJobOutcome::Inconclusive,
     }
 }
 
@@ -403,6 +499,13 @@ fn convert_step(step: &TraceStep<MultiObligationState<String>>) -> VerificationJ
         action: step.action.clone(),
         state: step.state.state.clone(),
         pending: step.state.pending.clone(),
+    }
+}
+
+fn convert_safety_step(step: &TraceStep<String>) -> VerificationJobSafetyTraceStep {
+    VerificationJobSafetyTraceStep {
+        action: step.action.clone(),
+        state: step.state.clone(),
     }
 }
 
@@ -552,6 +655,13 @@ fn write_evidence(out: &mut String, value: &VerificationJobEvidence) {
             write_trace(out, cycle);
             out.push('}');
         }
+        VerificationJobEvidence::Safety { trace } => {
+            out.push('{');
+            field_string(out, "kind", "safety", true);
+            out.push_str(",\"trace\":");
+            write_safety_trace(out, trace);
+            out.push('}');
+        }
     }
 }
 
@@ -573,6 +683,21 @@ fn write_trace(out: &mut String, trace: &[VerificationJobTraceStep]) {
             out.push_str(if *pending { "true" } else { "false" });
         }
         out.push_str("]}");
+    }
+    out.push(']');
+}
+
+fn write_safety_trace(out: &mut String, trace: &[VerificationJobSafetyTraceStep]) {
+    out.push('[');
+    for (index, step) in trace.iter().enumerate() {
+        if index != 0 {
+            out.push(',');
+        }
+        out.push('{');
+        field_name(out, "action", true);
+        write_optional_string(out, step.action.as_deref());
+        field_string(out, "state", &step.state, false);
+        out.push('}');
     }
     out.push(']');
 }

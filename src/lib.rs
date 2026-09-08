@@ -211,7 +211,7 @@ pub use verification_execution::{
     execute_multi_response, MultiResponseExecutionConfig, MultiResponseExecutionResult,
 };
 pub use verification_job::{
-    parse_verification_job, VerificationJob, VerificationJobParseError,
+    parse_verification_job, VerificationJob, VerificationJobAnalysis, VerificationJobParseError,
     VerificationJobParseErrorKind,
 };
 pub use verification_job_run::{
@@ -221,8 +221,9 @@ pub use verification_job_run::{
 pub use verification_result::{
     VerificationJobAccounting, VerificationJobCutoff, VerificationJobCutoffKind,
     VerificationJobCutoffStage, VerificationJobEvidence, VerificationJobLimits,
-    VerificationJobOutcome, VerificationJobResultEnvelope, VerificationJobTraceStep,
-    VERIFICATION_JOB_RESULT_SCHEMA_VERSION,
+    VerificationJobOutcome, VerificationJobResultEnvelope, VerificationJobSafetyTraceStep,
+    VerificationJobTraceStep, VERIFICATION_JOB_RESULT_SCHEMA_VERSION,
+    VERIFICATION_JOB_SAFETY_RESULT_SCHEMA_VERSION,
 };
 pub use verification_suite::{
     parse_verification_suite, VerificationExpectedOutcome, VerificationSuite,
