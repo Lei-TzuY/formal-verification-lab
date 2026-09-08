@@ -80,11 +80,7 @@ fn write_proposition_job(root: &Path) -> PathBuf {
         "model \"proposition-chain\"\nstate \"start\"\nstate \"done\"\ninitial \"start\"\nedge \"start\" \"finish\" \"done\"\nlabel \"start\" \"entry\"\nlabel \"done\" \"complete\"\n",
     )
     .unwrap();
-    fs::write(
-        root.join("proposition.fvp"),
-        "reachable \"complete\"\n",
-    )
-    .unwrap();
+    fs::write(root.join("proposition.fvp"), "reachable \"complete\"\n").unwrap();
     let manifest = root.join("proposition.fvj");
     fs::write(
         &manifest,
@@ -254,7 +250,9 @@ fn four_family_expectations_match_and_proposition_mismatch_without_reinterpretat
         mismatch.envelope.outcome,
         VerificationRegressionSuiteOutcome::Mismatched
     );
-    assert!(mismatch.envelope.jobs[..3].iter().all(|entry| entry.matched));
+    assert!(mismatch.envelope.jobs[..3]
+        .iter()
+        .all(|entry| entry.matched));
     assert!(!mismatch.envelope.jobs[3].matched);
     assert_eq!(
         mismatch.envelope.jobs[3].observed,
@@ -297,10 +295,12 @@ fn built_binaries_preserve_all_four_direct_envelopes_inside_raw_and_expectation_
     })
     .collect::<Vec<_>>();
 
-    assert!(direct[0].1.starts_with("{\"schema_version\":1,\"outcome\":\"satisfied\""));
-    assert!(direct[1].1.starts_with(
-        "{\"schema_version\":2,\"analysis\":\"safety\",\"outcome\":\"violated\""
-    ));
+    assert!(direct[0]
+        .1
+        .starts_with("{\"schema_version\":1,\"outcome\":\"satisfied\""));
+    assert!(direct[1]
+        .1
+        .starts_with("{\"schema_version\":2,\"analysis\":\"safety\",\"outcome\":\"violated\""));
     assert!(direct[2].1.starts_with(
         "{\"schema_version\":2,\"analysis\":\"exact-state\",\"outcome\":\"inconclusive\""
     ));
@@ -325,9 +325,10 @@ fn built_binaries_preserve_all_four_direct_envelopes_inside_raw_and_expectation_
     assert_eq!(checked.status.code(), Some(0));
     assert!(stderr(&checked).is_empty());
     let checked_json = stdout(&checked);
-    for ((manifest, json), expected) in direct
-        .iter()
-        .zip(["satisfied", "violated", "inconclusive", "satisfied"])
+    for ((manifest, json), expected) in
+        direct
+            .iter()
+            .zip(["satisfied", "violated", "inconclusive", "satisfied"])
     {
         assert!(checked_json.contains(&format!(
             "\"manifest\":\"{manifest}\",\"expected\":\"{expected}\",\"observed\":\"{expected}\",\"matched\":true,\"result\":{json}"
