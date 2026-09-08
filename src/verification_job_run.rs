@@ -1,15 +1,26 @@
 use crate::bounded::BoundedOutcome;
+use crate::checker::{ExplorationLimits, InconclusiveReason};
 use crate::exact_state::{
-    check_exact_state_property_with_limits, parse_exact_state_property, ExactStateStatus,
+    check_exact_state_property_with_limits, parse_exact_state_property, ExactStateEvidence,
+    ExactStateStatus,
 };
 use crate::multi_response::{MultiResponseProperty, MultiResponseStatus};
 use crate::multi_temporal::parse_multi_response_temporal;
+use crate::proposition_expr::{
+    check_proposition_expression_property_with_limits, BoundedPropositionExpressionResult,
+    PropositionExpressionPropertySpec,
+};
 use crate::safety::{check_safety_assertion_with_limits, PropositionSafetySpec, SafetyStatus};
 use crate::verification_execution::{
     execute_multi_response, MultiResponseExecutionConfig, MultiResponseExecutionResult,
 };
 use crate::verification_job::{parse_verification_job, VerificationJob, VerificationJobAnalysis};
-use crate::verification_result::{VerificationJobOutcome, VerificationJobResultEnvelope};
+use crate::verification_result::{
+    VerificationJobAccounting, VerificationJobCutoff, VerificationJobCutoffKind,
+    VerificationJobCutoffStage, VerificationJobEvidence, VerificationJobOutcome,
+    VerificationJobResultEnvelope, VerificationJobStateTraceStep,
+    VERIFICATION_JOB_HETEROGENEOUS_RESULT_SCHEMA_VERSION,
+};
 use crate::{
     parse_declarative_document, parse_declarative_model, parse_proposition_expression,
     TransitionSystem,
@@ -21,8 +32,8 @@ use std::path::{Path, PathBuf};
 /// Historical typed loader for the M55 multi-response job family.
 ///
 /// M59+ keeps this public shape stable. Heterogeneous execution is exposed by
-/// `run_verification_job_json`; callers that need typed safety or exact-state
-/// inputs should use the existing dedicated APIs directly.
+/// `run_verification_job_json`; callers that need typed safety, exact-state, or
+/// proposition-expression inputs should use the existing dedicated APIs directly.
 pub struct LoadedVerificationJob {
     pub job: VerificationJob,
     pub model: TransitionSystem<String>,
@@ -103,6 +114,12 @@ pub fn run_verification_job_json(manifest_path: impl AsRef<Path>) -> Verificatio
             Ok(run) => run,
             Err(error) => error_run(VerificationJobResultEnvelope::exact_state_error(error)),
         },
+        VerificationJobAnalysis::PropositionExpression => {
+            match run_proposition_expression_job_json(manifest_path, job) {
+                Ok(run) => run,
+                Err(error) => error_run(proposition_expression_error(error)),
+            }
+        }
     }
 }
 
@@ -254,6 +271,192 @@ fn run_exact_state_job_json(
         envelope,
         exit_code,
     })
+}
+
+fn run_proposition_expression_job_json(
+    manifest_path: &Path,
+    job: VerificationJob,
+) -> Result<VerificationJobJsonRun, String> {
+    validate_model_only_job(&job, "proposition-expression")?;
+    let (model_path, property_path) = resolve_job_paths(manifest_path, &job);
+
+    let model_input = fs::read_to_string(&model_path).map_err(|error| {
+        format!(
+            "failed to read declarative model '{}': {error}",
+            model_path.display()
+        )
+    })?;
+    let document = parse_declarative_document(&model_input).map_err(|error| error.to_string())?;
+
+    let property_input = fs::read_to_string(&property_path).map_err(|error| {
+        format!(
+            "failed to read proposition-expression property '{}': {error}",
+            property_path.display()
+        )
+    })?;
+    let (canonical_property, spec) = parse_proposition_job_property(&property_input)?;
+    let result =
+        check_proposition_expression_property_with_limits(&document, &spec, job.model_limits())
+            .map_err(|error| error.to_string())?;
+    let envelope = proposition_expression_envelope(
+        document.model().name().to_owned(),
+        canonical_property,
+        job.model_limits(),
+        &result,
+    );
+    let exit_code = match result.outcome {
+        BoundedOutcome::Conclusive(ExactStateStatus::Satisfied) => 0,
+        BoundedOutcome::Conclusive(ExactStateStatus::Violated) => 11,
+        BoundedOutcome::Inconclusive(_) => 3,
+    };
+    debug_assert_eq!(
+        exact_state_execution_outcome(&result.outcome),
+        envelope.outcome
+    );
+    Ok(VerificationJobJsonRun {
+        envelope,
+        exit_code,
+    })
+}
+
+fn parse_proposition_job_property(
+    input: &str,
+) -> Result<(String, PropositionExpressionPropertySpec), String> {
+    let trimmed = input.trim_matches(|ch: char| ch.is_ascii_whitespace());
+    if trimmed.is_empty() {
+        return Err(
+            "proposition-expression property must be 'reachable <expression>' or 'all-eventually <expression>'"
+                .to_owned(),
+        );
+    }
+
+    let Some(separator) = trimmed.find(|ch: char| ch.is_ascii_whitespace()) else {
+        return Err(format!(
+            "proposition-expression property mode '{}' requires a Boolean expression",
+            trimmed
+        ));
+    };
+    let mode = &trimmed[..separator];
+    let expression_input = trimmed[separator..].trim_matches(|ch: char| ch.is_ascii_whitespace());
+    if expression_input.is_empty() {
+        return Err(format!(
+            "proposition-expression property mode '{mode}' requires a Boolean expression"
+        ));
+    }
+
+    let expression =
+        parse_proposition_expression(expression_input).map_err(|error| error.to_string())?;
+    let canonical_expression = expression.canonical_expression();
+    let spec = match mode {
+        "reachable" => PropositionExpressionPropertySpec::reachable(
+            "verification-job-proposition-expression",
+            expression,
+        ),
+        "all-eventually" => PropositionExpressionPropertySpec::all_eventually(
+            "verification-job-proposition-expression",
+            expression,
+        ),
+        _ => {
+            return Err(format!(
+                "unsupported proposition-expression property mode '{mode}'; expected reachable or all-eventually"
+            ));
+        }
+    }
+    .map_err(|error| error.to_string())?;
+
+    Ok((format!("{mode} {canonical_expression}"), spec))
+}
+
+fn proposition_expression_envelope(
+    model: String,
+    property: String,
+    model_limits: ExplorationLimits,
+    result: &BoundedPropositionExpressionResult,
+) -> VerificationJobResultEnvelope {
+    VerificationJobResultEnvelope {
+        schema_version: VERIFICATION_JOB_HETEROGENEOUS_RESULT_SCHEMA_VERSION,
+        analysis: Some("proposition-expression".to_owned()),
+        outcome: exact_state_execution_outcome(&result.outcome),
+        model: Some(model),
+        property: Some(property),
+        weak_fair_actions: Vec::new(),
+        strong_fair_actions: Vec::new(),
+        model_limits: model_limits.into(),
+        product_limits: ExplorationLimits::unbounded().into(),
+        accounting: VerificationJobAccounting {
+            model_states: Some(result.discovered_states),
+            checked_model_states: Some(result.checked_states),
+            explored_model_transitions: Some(result.explored_transitions),
+            retained_model_transitions: Some(result.explored_transitions),
+            max_model_depth_reached: result.max_depth_reached,
+            product_states: None,
+            checked_product_states: None,
+            explored_product_transitions: None,
+            retained_product_transitions: None,
+            max_product_depth_reached: None,
+        },
+        cutoff: result.outcome.inconclusive_reason().map(model_cutoff),
+        evidence: result
+            .evidence
+            .as_ref()
+            .map(convert_state_property_evidence),
+        error: None,
+    }
+}
+
+fn proposition_expression_error(message: impl Into<String>) -> VerificationJobResultEnvelope {
+    let mut envelope = VerificationJobResultEnvelope::error(message);
+    envelope.schema_version = VERIFICATION_JOB_HETEROGENEOUS_RESULT_SCHEMA_VERSION;
+    envelope.analysis = Some("proposition-expression".to_owned());
+    envelope
+}
+
+fn model_cutoff(reason: InconclusiveReason) -> VerificationJobCutoff {
+    match reason {
+        InconclusiveReason::StateLimitReached { limit } => VerificationJobCutoff {
+            stage: VerificationJobCutoffStage::Model,
+            kind: VerificationJobCutoffKind::StateLimit,
+            limit,
+        },
+        InconclusiveReason::TransitionLimitReached { limit } => VerificationJobCutoff {
+            stage: VerificationJobCutoffStage::Model,
+            kind: VerificationJobCutoffKind::TransitionLimit,
+            limit,
+        },
+        InconclusiveReason::DepthLimitReached { limit } => VerificationJobCutoff {
+            stage: VerificationJobCutoffStage::Model,
+            kind: VerificationJobCutoffKind::DepthLimit,
+            limit,
+        },
+    }
+}
+
+fn convert_state_property_evidence(evidence: &ExactStateEvidence) -> VerificationJobEvidence {
+    match evidence {
+        ExactStateEvidence::ReachabilityWitness { trace } => {
+            VerificationJobEvidence::ExactStateReachability {
+                trace: trace.iter().map(convert_state_step).collect(),
+            }
+        }
+        ExactStateEvidence::EventualityFiniteCounterexample { trace } => {
+            VerificationJobEvidence::ExactStateEventualityFinite {
+                trace: trace.iter().map(convert_state_step).collect(),
+            }
+        }
+        ExactStateEvidence::EventualityInfiniteCounterexample { stem, cycle } => {
+            VerificationJobEvidence::ExactStateEventualityInfinite {
+                stem: stem.iter().map(convert_state_step).collect(),
+                cycle: cycle.iter().map(convert_state_step).collect(),
+            }
+        }
+    }
+}
+
+fn convert_state_step(step: &crate::checker::TraceStep<String>) -> VerificationJobStateTraceStep {
+    VerificationJobStateTraceStep {
+        action: step.action.clone(),
+        state: step.state.clone(),
+    }
 }
 
 fn load_multi_response_job(
