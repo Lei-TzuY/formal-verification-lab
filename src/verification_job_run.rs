@@ -295,12 +295,9 @@ fn run_proposition_expression_job_json(
         )
     })?;
     let (canonical_property, spec) = parse_proposition_job_property(&property_input)?;
-    let result = check_proposition_expression_property_with_limits(
-        &document,
-        &spec,
-        job.model_limits(),
-    )
-    .map_err(|error| error.to_string())?;
+    let result =
+        check_proposition_expression_property_with_limits(&document, &spec, job.model_limits())
+            .map_err(|error| error.to_string())?;
     let envelope = proposition_expression_envelope(
         document.model().name().to_owned(),
         canonical_property,
@@ -340,8 +337,7 @@ fn parse_proposition_job_property(
         ));
     };
     let mode = &trimmed[..separator];
-    let expression_input = trimmed[separator..]
-        .trim_matches(|ch: char| ch.is_ascii_whitespace());
+    let expression_input = trimmed[separator..].trim_matches(|ch: char| ch.is_ascii_whitespace());
     if expression_input.is_empty() {
         return Err(format!(
             "proposition-expression property mode '{mode}' requires a Boolean expression"
@@ -399,11 +395,11 @@ fn proposition_expression_envelope(
             retained_product_transitions: None,
             max_product_depth_reached: None,
         },
-        cutoff: result
-            .outcome
-            .inconclusive_reason()
-            .map(model_cutoff),
-        evidence: result.evidence.as_ref().map(convert_state_property_evidence),
+        cutoff: result.outcome.inconclusive_reason().map(model_cutoff),
+        evidence: result
+            .evidence
+            .as_ref()
+            .map(convert_state_property_evidence),
         error: None,
     }
 }
