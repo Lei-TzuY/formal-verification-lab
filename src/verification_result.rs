@@ -528,7 +528,9 @@ fn safety_outcome(outcome: &BoundedOutcome<SafetyStatus>) -> VerificationJobOutc
 
 fn exact_state_outcome(outcome: &BoundedOutcome<ExactStateStatus>) -> VerificationJobOutcome {
     match outcome {
-        BoundedOutcome::Conclusive(ExactStateStatus::Satisfied) => VerificationJobOutcome::Satisfied,
+        BoundedOutcome::Conclusive(ExactStateStatus::Satisfied) => {
+            VerificationJobOutcome::Satisfied
+        }
         BoundedOutcome::Conclusive(ExactStateStatus::Violated) => VerificationJobOutcome::Violated,
         BoundedOutcome::Inconclusive(_) => VerificationJobOutcome::Inconclusive,
     }
