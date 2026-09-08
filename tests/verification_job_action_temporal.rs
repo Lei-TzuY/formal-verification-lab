@@ -1,8 +1,8 @@
 use formal_verification_lab::{
     check_action_temporal_with_fairness_profile_and_limits, parse_action_temporal,
     parse_declarative_model, parse_verification_job, run_verification_job_json, AnalysisLimits,
-    AnalysisOutcome, AnalysisStage, FairnessProfile, TemporalBackend, TemporalCounterexample,
-    TemporalStatus, VerificationJobAnalysis, VerificationJobCutoffKind, VerificationJobCutoffStage,
+    AnalysisOutcome, AnalysisStage, FairnessProfile, TemporalBackend, TemporalStatus,
+    VerificationJobAnalysis, VerificationJobCutoffKind, VerificationJobCutoffStage,
     VerificationJobEvidence, VerificationJobOutcome,
     VERIFICATION_JOB_HETEROGENEOUS_RESULT_SCHEMA_VERSION,
 };
