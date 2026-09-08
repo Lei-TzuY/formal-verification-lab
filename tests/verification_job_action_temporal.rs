@@ -72,7 +72,10 @@ fn action_temporal_analysis_round_trips_in_job_manifest() {
         Some(VerificationJobAnalysis::ActionTemporal)
     );
     assert_eq!(job.canonical_document(), source);
-    assert_eq!(parse_verification_job(&job.canonical_document()).unwrap(), job);
+    assert_eq!(
+        parse_verification_job(&job.canonical_document()).unwrap(),
+        job
+    );
 }
 
 #[test]
@@ -116,7 +119,10 @@ fn response_job_matches_direct_staged_frontend_and_exposes_backend() {
         direct.outcome,
         AnalysisOutcome::Conclusive(TemporalStatus::Satisfied)
     );
-    assert_eq!(run.envelope.accounting.model_states, Some(direct.model_states));
+    assert_eq!(
+        run.envelope.accounting.model_states,
+        Some(direct.model_states)
+    );
     assert_eq!(
         run.envelope.accounting.checked_model_states,
         Some(direct.checked_model_states)
@@ -125,7 +131,10 @@ fn response_job_matches_direct_staged_frontend_and_exposes_backend() {
         run.envelope.accounting.explored_model_transitions,
         Some(direct.explored_model_transitions)
     );
-    assert_eq!(run.envelope.accounting.product_states, Some(direct.product_states));
+    assert_eq!(
+        run.envelope.accounting.product_states,
+        Some(direct.product_states)
+    );
     assert_eq!(
         run.envelope.accounting.checked_product_states,
         Some(direct.checked_product_states)
@@ -180,7 +189,9 @@ fn no_fair_response_violation_preserves_frontend_lasso_only() {
     assert_eq!(obligation, "response");
     assert_eq!(stem.last().unwrap().state, cycle.first().unwrap().state);
     assert_eq!(cycle.first().unwrap().state, cycle.last().unwrap().state);
-    assert!(cycle.iter().any(|step| step.action.as_deref() == Some("wait")));
+    assert!(cycle
+        .iter()
+        .any(|step| step.action.as_deref() == Some("wait")));
     assert!(!run.to_json().contains("pending"));
 }
 
@@ -226,10 +237,16 @@ fn staged_model_and_product_cutoffs_keep_exact_stage_provenance() {
     );
     let model_run = run_verification_job_json(&model_manifest);
     assert_eq!(model_run.exit_code, 3);
-    assert_eq!(model_run.envelope.outcome, VerificationJobOutcome::Inconclusive);
+    assert_eq!(
+        model_run.envelope.outcome,
+        VerificationJobOutcome::Inconclusive
+    );
     let model_cutoff = model_run.envelope.cutoff.expect("model cutoff");
     assert_eq!(model_cutoff.stage, VerificationJobCutoffStage::Model);
-    assert_eq!(model_cutoff.kind, VerificationJobCutoffKind::TransitionLimit);
+    assert_eq!(
+        model_cutoff.kind,
+        VerificationJobCutoffKind::TransitionLimit
+    );
     assert_eq!(model_cutoff.limit, 0);
 
     let product_root = fixture_dir("product-cutoff");

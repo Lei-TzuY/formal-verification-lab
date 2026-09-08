@@ -49,13 +49,9 @@ pub(crate) fn run_action_temporal_job_json(
         model: job.model_limits(),
         product: job.product_limits(),
     };
-    let result = check_action_temporal_with_fairness_profile_and_limits(
-        &model,
-        &spec,
-        &fairness,
-        limits,
-    )
-    .map_err(|error| error.to_string())?;
+    let result =
+        check_action_temporal_with_fairness_profile_and_limits(&model, &spec, &fairness, limits)
+            .map_err(|error| error.to_string())?;
 
     let envelope = action_temporal_envelope(
         model.name().to_owned(),

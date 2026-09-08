@@ -816,7 +816,11 @@ fn write_evidence(out: &mut String, value: &VerificationJobEvidence) {
             write_state_trace(out, trace);
             out.push('}');
         }
-        VerificationJobEvidence::ActionTemporalInfinite { obligation, stem, cycle } => {
+        VerificationJobEvidence::ActionTemporalInfinite {
+            obligation,
+            stem,
+            cycle,
+        } => {
             out.push('{');
             field_string(out, "kind", "temporal_lasso", true);
             field_string(out, "obligation", obligation, false);
