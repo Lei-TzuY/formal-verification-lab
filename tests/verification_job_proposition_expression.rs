@@ -79,7 +79,10 @@ fn direct_spec(mode: &str, expression: &str) -> PropositionExpressionPropertySpe
     }
 }
 
-fn assert_evidence_matches(job: &Option<VerificationJobEvidence>, direct: &Option<ExactStateEvidence>) {
+fn assert_evidence_matches(
+    job: &Option<VerificationJobEvidence>,
+    direct: &Option<ExactStateEvidence>,
+) {
     match (job, direct) {
         (None, None) => {}
         (
@@ -123,11 +126,13 @@ fn assert_evidence_matches(job: &Option<VerificationJobEvidence>, direct: &Optio
 
 #[test]
 fn proposition_expression_analysis_round_trips_in_job_manifest() {
-    let source =
-        "analysis \"proposition-expression\"\nmodel \"m.fvl\"\nproperty \"p.fvp\"";
+    let source = "analysis \"proposition-expression\"\nmodel \"m.fvl\"\nproperty \"p.fvp\"";
     let job = parse_verification_job(source).unwrap();
 
-    assert_eq!(job.analysis(), VerificationJobAnalysis::PropositionExpression);
+    assert_eq!(
+        job.analysis(),
+        VerificationJobAnalysis::PropositionExpression
+    );
     assert_eq!(
         job.declared_analysis(),
         Some(VerificationJobAnalysis::PropositionExpression)
@@ -181,7 +186,10 @@ fn reachable_boolean_job_matches_direct_m24_backend_and_preserves_shortest_witne
         direct.outcome,
         BoundedOutcome::Conclusive(ExactStateStatus::Satisfied)
     );
-    assert_eq!(run.envelope.accounting.model_states, Some(direct.discovered_states));
+    assert_eq!(
+        run.envelope.accounting.model_states,
+        Some(direct.discovered_states)
+    );
     assert_eq!(
         run.envelope.accounting.checked_model_states,
         Some(direct.checked_states)
@@ -229,7 +237,10 @@ fn false_reachability_cutoff_and_initial_witness_remain_proof_honest() {
     );
     let cutoff = run_verification_job_json(&cutoff_manifest);
     assert_eq!(cutoff.exit_code, 3);
-    assert_eq!(cutoff.envelope.outcome, VerificationJobOutcome::Inconclusive);
+    assert_eq!(
+        cutoff.envelope.outcome,
+        VerificationJobOutcome::Inconclusive
+    );
     let cutoff_reason = cutoff.envelope.cutoff.expect("expected model cutoff");
     assert_eq!(cutoff_reason.stage, VerificationJobCutoffStage::Model);
     assert_eq!(
@@ -237,7 +248,10 @@ fn false_reachability_cutoff_and_initial_witness_remain_proof_honest() {
         VerificationJobCutoffKind::TransitionLimit
     );
     assert_eq!(cutoff_reason.limit, 0);
-    assert_eq!(cutoff.envelope.accounting.explored_model_transitions, Some(0));
+    assert_eq!(
+        cutoff.envelope.accounting.explored_model_transitions,
+        Some(0)
+    );
     assert_eq!(cutoff.envelope.evidence, None);
 
     let initial_root = fixture_dir("initial");
@@ -437,7 +451,10 @@ fn representative_boolean_expressions_and_limits_differentially_match_direct_bac
                     },
                     "mode={mode} expression={expression} limits={limit:?}"
                 );
-                assert_eq!(run.envelope.accounting.model_states, Some(direct.discovered_states));
+                assert_eq!(
+                    run.envelope.accounting.model_states,
+                    Some(direct.discovered_states)
+                );
                 assert_eq!(
                     run.envelope.accounting.checked_model_states,
                     Some(direct.checked_states)
@@ -449,10 +466,8 @@ fn representative_boolean_expressions_and_limits_differentially_match_direct_bac
                 assert_evidence_matches(&run.envelope.evidence, &direct.evidence);
                 assert_eq!(
                     run.envelope.cutoff.as_ref().map(|cutoff| cutoff.limit),
-                    direct
-                        .outcome
-                        .inconclusive_reason()
-                        .map(|reason| match reason {
+                    direct.outcome.inconclusive_reason().map(|reason| {
+                        match reason {
                             formal_verification_lab::InconclusiveReason::StateLimitReached {
                                 limit,
                             }
@@ -462,7 +477,8 @@ fn representative_boolean_expressions_and_limits_differentially_match_direct_bac
                             | formal_verification_lab::InconclusiveReason::DepthLimitReached {
                                 limit,
                             } => limit,
-                        })
+                        }
+                    })
                 );
 
                 let _ = fs::remove_dir_all(root);
@@ -474,12 +490,7 @@ fn representative_boolean_expressions_and_limits_differentially_match_direct_bac
 #[test]
 fn built_binary_emits_schema_v2_proposition_results_and_native_exit_codes() {
     let root = fixture_dir("cli");
-    let manifest = write_job(
-        &root,
-        proposition_model(),
-        "reachable \"complete\"\n",
-        "",
-    );
+    let manifest = write_job(&root, proposition_model(), "reachable \"complete\"\n", "");
     let output = run_job_binary(&manifest);
     assert_eq!(output.status.code(), Some(0));
     assert!(output.stderr.is_empty());
