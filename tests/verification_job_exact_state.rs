@@ -128,7 +128,7 @@ fn reachable_job_matches_direct_bounded_exact_state_backend_and_preserves_witnes
     else {
         panic!("direct backend should return reachability witness");
     };
-    let Some(VerificationJobEvidence::ExactStateReachability { trace }) = run.envelope.evidence
+    let Some(VerificationJobEvidence::ExactStateReachability { trace }) = &run.envelope.evidence
     else {
         panic!("job envelope should preserve reachability witness");
     };
