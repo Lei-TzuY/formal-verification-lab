@@ -14,8 +14,10 @@ static NEXT_DIR: AtomicUsize = AtomicUsize::new(0);
 
 fn fixture_dir(kind: &str) -> PathBuf {
     let id = NEXT_DIR.fetch_add(1, Ordering::Relaxed);
-    let root =
-        std::env::temp_dir().join(format!("fvlab-m59-safety-job-{kind}-{}-{id}", std::process::id()));
+    let root = std::env::temp_dir().join(format!(
+        "fvlab-m59-safety-job-{kind}-{}-{id}",
+        std::process::id()
+    ));
     fs::create_dir_all(&root).unwrap();
     root
 }
