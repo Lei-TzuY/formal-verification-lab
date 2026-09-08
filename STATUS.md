@@ -2,37 +2,40 @@
 
 This file records the current integration frontier. Historical capability detail remains in `README.md`; when the README roadmap lags an already-validated integration candidate, this status file is the current phase marker.
 
-## Milestone 59 — heterogeneous verification jobs
+## Milestone 60 — reproducible exact-state verification jobs
 
 **Status: integration candidate complete.**
 
-Milestone 59 promotes the sealed M55–M58 verification-job, machine-readable result, suite, and expectation infrastructure from a single multi-response temporal family to explicit heterogeneous analysis dispatch. Verification-job manifests may declare `analysis "multi-response"` or `analysis "safety"`; historical manifests that omit the directive remain effective multi-response jobs and preserve their canonical document and schema-v1 JSON behavior.
+Milestone 60 extends the M59 heterogeneous verification-job dispatcher with a third explicit family, `analysis "exact-state"`, backed directly by the sealed M20/M24 exact-state frontend rather than a new traversal. Historical manifests without an `analysis` directive remain multi-response jobs, explicit `analysis "multi-response"` keeps schema-v1 behavior, and M59 safety jobs retain their schema-v2 contract.
 
-The declarative Boolean safety family composes the existing proposition-aware model document, Boolean proposition-expression parser, and proof-honest M24 bounded safety authority. It introduces no second state-space traversal. Safety jobs use model-space state/transition/depth budgets only, preserve deterministic shortest falsifying traces, return `INCONCLUSIVE` when a cutoff prevents proof, and reject temporal-only fairness directives or product-space limits before model/property execution instead of silently ignoring them.
+Exact-state job property files use the existing deterministic `reachable("state")` / `all-eventually("state")` syntax. Models are loaded through the M19 declarative compatibility path, properties are parsed by the M20 exact-state parser, and execution delegates to M24 bounded exact-state verification. Model state/transition/depth budgets therefore preserve the existing proof-honest semantics: a positive reachability witness may conclude before a later cutoff, absence/satisfaction claims require enough exploration to prove them, and a blocking cutoff remains `INCONCLUSIVE` instead of being promoted to proof.
 
-Structured safety results use an explicit schema-v2 envelope with `analysis:"safety"`, canonical `SAFE`/`VIOLATED`/`INCONCLUSIVE` status, model-space limits/accounting/cutoff provenance, and dedicated action/state safety trace evidence. Product accounting is absent rather than fabricated and fairness sets are empty. Existing multi-response jobs retain the historical schema-v1 field order, evidence shape, fairness semantics, staged/product accounting, and exit behavior; explicit `analysis "multi-response"` does not inject an `analysis` field into their v1 JSON.
+Exact-state jobs reject temporal-only weak/strong fairness directives and product-space limits before model or property files are read. Violations retain state-property exit 11, incomplete proofs use exit 3, malformed/configuration errors use exit 2, and satisfied properties use exit 0.
 
-The M57 raw suite and M58 expectation runner remain family-agnostic at the orchestration layer: every job is dispatched through the canonical heterogeneous job runner, complete per-job envelopes are preserved unchanged, raw aggregate precedence remains `error > violated > inconclusive > satisfied`, and expectation matching compares only the normalized observed outcome. Mixed suites therefore carry schema-v1 temporal and schema-v2 safety results side by side without rewriting either family.
+Structured exact-state results use heterogeneous schema v2 with `analysis:"exact-state"`, canonical `SATISFIED` / `VIOLATED` / `INCONCLUSIVE` status, model-space limits/accounting/cutoff provenance, and dedicated action/state evidence for positive reachability witnesses, finite eventuality counterexamples, and lasso eventuality counterexamples. Product accounting remains absent rather than fabricated, fairness sets remain empty, and exact-state evidence contains no temporal pending bits.
 
-Executable evidence covers historical manifest/parser compatibility, explicit family round trips, fail-closed unknown/duplicate analysis names, safe/violated/inconclusive safety jobs against direct M24 results, initial-state violations before zero-transition cutoffs, incompatible directive rejection, schema-v1 multi-response compatibility, mixed-family raw suites, mixed-family matched/mismatched expectation suites, deterministic repeated JSON, and built-binary differential preservation across `fvlab temporal job ... --format json` and `fvlab-suite`.
+The family-agnostic M57/M58 suite and expectation infrastructure now carries three verification families without reinterpretation. Raw temporal + safety + exact-state suites preserve each direct job envelope exactly and retain aggregate precedence. Expectation suites compare normalized outcomes only, including matched and mismatched exact-state results. Built `fvlab` and `fvlab-suite` paths are differentially checked so nested suite envelopes remain byte-for-byte the same canonical job JSON produced by direct execution.
 
-The implementation candidate `e6a3a31eb121d8993b847485d7635e21992f7b92` passed CI #492: rustfmt, all-target build, Clippy with `-D warnings`, the complete test suite, and every historical CLI regression gate. The same exact candidate passed Bounded state-property CLI workflow #342. This status update itself still requires exact-head CI before merge.
+Executable evidence includes exact-state family parser/canonical round trips; direct M24 differential accounting and shortest reachability witness preservation; unreachable reachability without fabricated evidence; model-cutoff `INCONCLUSIVE` provenance; conclusive initial-state witnesses before zero-transition cutoffs; finite and lasso eventuality evidence preservation; fail-closed temporal-only configuration validation before file reads; native exit-code and machine-JSON checks through the built binary; three-family raw-suite ordering/precedence; expectation match/mismatch behavior; deterministic repeated suite JSON; and built-binary envelope preservation across all three families.
 
-M59 adds no new safety semantics, fairness semantics, fairness-by-default behavior, witness-text golden matching, shell execution, wall-clock proof bounds, generic plugin/RPC subsystem, or performance/security claim.
+The implementation candidate `c00cf6a54927e229af3139f7a86652ebebd48638` passed CI #502: rustfmt, all-target build, Clippy with `-D warnings`, the complete test suite, and every historical CLI regression gate. The same exact candidate passed Bounded state-property CLI workflow #352. This status update itself still requires exact-head CI before merge.
 
-## Next frontier — Milestone 60: reproducible exact-state property jobs
+M60 adds no new reachability/eventuality semantics, temporal logic, fairness behavior, fairness-by-default behavior, shell execution, wall-clock proof bound, generic plugin/RPC subsystem, or performance/security claim.
 
-M59 proves that the job/suite/regression layer can dispatch more than one verification family without erasing family-specific semantics. The highest-value next capability is to admit the already-sealed M20/M24 exact-state property frontend into the same reproducible infrastructure rather than adding another alias for the existing job command or inventing a generic plugin abstraction.
+## Next frontier — Milestone 61: reproducible Boolean proposition property jobs
 
-Milestone 60 should add one explicit exact-state analysis family whose property file uses the existing deterministic `reachable("state")` / `all-eventually("state")` syntax and whose execution delegates directly to the bounded exact-state authority.
+M60 closes the exact-state reproducibility gap. The next highest-value external verification family is the already-sealed M22/M24 Boolean proposition reachability/eventuality stack, because it can express semantic state classes and Boolean combinations without inventing another model checker or widening the temporal logic surface.
+
+Milestone 61 should add one explicit proposition-expression job family whose property document selects `reachable` or `all-eventually` and carries an M22 Boolean proposition expression. Parsing must remain an ingestion layer: proposition expressions are resolved against the M21 declarative metadata and execution delegates directly to the existing bounded proposition-expression authority.
 
 Acceptance criteria:
 
-- extend the typed job-family discriminator with an exact-state family while preserving every M55–M59 manifest and result unchanged;
-- parse property files through the sealed M20 exact-state parser and execute through the M24 bounded exact-state backend, with no second graph traversal or duplicate reachability/eventuality semantics;
-- preserve proof-honest model state/transition/depth budgets, exact cutoff reasons/accounting, shortest positive reachability witnesses, and finite/lasso universal-eventuality counterexamples;
-- define a versioned family-specific machine envelope only where required, without stuffing temporal pending bits or fairness/product fields into exact-state evidence;
-- reject temporal-only fairness and product-space limits for exact-state jobs before model/property execution;
-- prove mixed temporal + safety + exact-state raw suites and expectation suites preserve deterministic ordering, aggregate precedence, complete nested envelopes, and direct built-binary equivalence;
-- add malformed-property, unreachable reachability, violated eventuality, bounded inconclusive, and conclusive-before-cutoff regressions;
-- add no new temporal logic, fairness-by-default behavior, shell execution, wall-clock proof bound, generic plugin/RPC subsystem, or performance/security claim.
+- add an explicit Boolean proposition property job family while preserving every M55–M60 manifest, schema, exit code, and evidence shape unchanged;
+- define one deterministic, minimal property-file syntax that selects `reachable` or `all-eventually` and reuses the sealed M22 Boolean expression parser instead of duplicating expression semantics;
+- execute through M24 bounded proposition-expression verification with exact model state/transition/depth cutoff reasons and no second graph traversal;
+- preserve shortest positive reachability witnesses, unreachable-without-fabricated-evidence behavior, and finite/lasso universal-eventuality counterexamples;
+- fail closed on unknown proposition references, malformed expressions, temporal fairness directives, and product-space limits before unsupported assumptions can be ignored;
+- define family-specific machine evidence over action/state traces only, with no fabricated product accounting or temporal pending bits;
+- prove four-family temporal + safety + exact-state + Boolean-proposition raw suites and expectation suites preserve deterministic ordering, aggregate precedence, complete nested envelopes, and direct built-binary equivalence;
+- add generated or differential validation against direct M22/M24 results across representative Boolean expressions and resource cutoffs rather than duplicating backend expected values;
+- add no arithmetic/state-field expression language, new liveness semantics, fairness-by-default behavior, shell execution, wall-clock proof bound, generic plugin/RPC subsystem, or performance/security claim.

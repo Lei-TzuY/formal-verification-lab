@@ -1,4 +1,7 @@
 use crate::bounded::BoundedOutcome;
+use crate::exact_state::{
+    check_exact_state_property_with_limits, parse_exact_state_property, ExactStateStatus,
+};
 use crate::multi_response::{MultiResponseProperty, MultiResponseStatus};
 use crate::multi_temporal::parse_multi_response_temporal;
 use crate::safety::{check_safety_assertion_with_limits, PropositionSafetySpec, SafetyStatus};
@@ -17,9 +20,9 @@ use std::path::{Path, PathBuf};
 
 /// Historical typed loader for the M55 multi-response job family.
 ///
-/// M59 keeps this public shape stable. Heterogeneous execution is exposed by
-/// `run_verification_job_json`; callers that need typed safety inputs should use
-/// the existing declarative/safety APIs directly.
+/// M59+ keeps this public shape stable. Heterogeneous execution is exposed by
+/// `run_verification_job_json`; callers that need typed safety or exact-state
+/// inputs should use the existing dedicated APIs directly.
 pub struct LoadedVerificationJob {
     pub job: VerificationJob,
     pub model: TransitionSystem<String>,
@@ -96,6 +99,10 @@ pub fn run_verification_job_json(manifest_path: impl AsRef<Path>) -> Verificatio
             Ok(run) => run,
             Err(error) => error_run(VerificationJobResultEnvelope::safety_error(error)),
         },
+        VerificationJobAnalysis::ExactState => match run_exact_state_job_json(manifest_path, job) {
+            Ok(run) => run,
+            Err(error) => error_run(VerificationJobResultEnvelope::exact_state_error(error)),
+        },
     }
 }
 
@@ -162,7 +169,7 @@ fn run_safety_job_json(
     manifest_path: &Path,
     job: VerificationJob,
 ) -> Result<VerificationJobJsonRun, String> {
-    validate_safety_job(&job)?;
+    validate_model_only_job(&job, "safety")?;
     let (model_path, property_path) = resolve_job_paths(manifest_path, &job);
 
     let model_input = fs::read_to_string(&model_path).map_err(|error| {
@@ -196,6 +203,53 @@ fn run_safety_job_json(
         BoundedOutcome::Inconclusive(_) => 3,
     };
     debug_assert_eq!(safety_execution_outcome(&result.outcome), envelope.outcome);
+    Ok(VerificationJobJsonRun {
+        envelope,
+        exit_code,
+    })
+}
+
+fn run_exact_state_job_json(
+    manifest_path: &Path,
+    job: VerificationJob,
+) -> Result<VerificationJobJsonRun, String> {
+    validate_model_only_job(&job, "exact-state")?;
+    let (model_path, property_path) = resolve_job_paths(manifest_path, &job);
+
+    let model_input = fs::read_to_string(&model_path).map_err(|error| {
+        format!(
+            "failed to read declarative model '{}': {error}",
+            model_path.display()
+        )
+    })?;
+    let model = parse_declarative_model(&model_input).map_err(|error| error.to_string())?;
+
+    let property_input = fs::read_to_string(&property_path).map_err(|error| {
+        format!(
+            "failed to read exact-state property '{}': {error}",
+            property_path.display()
+        )
+    })?;
+    let spec = parse_exact_state_property("verification-job-exact-state", &property_input)
+        .map_err(|error| error.to_string())?;
+    let canonical_property = spec.canonical_expression();
+    let result = check_exact_state_property_with_limits(&model, &spec, job.model_limits())
+        .map_err(|error| error.to_string())?;
+    let envelope = VerificationJobResultEnvelope::from_exact_state(
+        model.name().to_owned(),
+        canonical_property,
+        job.model_limits(),
+        &result,
+    );
+    let exit_code = match result.outcome {
+        BoundedOutcome::Conclusive(ExactStateStatus::Satisfied) => 0,
+        BoundedOutcome::Conclusive(ExactStateStatus::Violated) => 11,
+        BoundedOutcome::Inconclusive(_) => 3,
+    };
+    debug_assert_eq!(
+        exact_state_execution_outcome(&result.outcome),
+        envelope.outcome
+    );
     Ok(VerificationJobJsonRun {
         envelope,
         exit_code,
@@ -245,19 +299,20 @@ fn read_job_manifest(manifest_path: &Path) -> Result<String, VerificationJobLoad
     })
 }
 
-fn validate_safety_job(job: &VerificationJob) -> Result<(), String> {
+fn validate_model_only_job(job: &VerificationJob, family: &str) -> Result<(), String> {
     if !job.weak_fair_actions().is_empty() || !job.strong_fair_actions().is_empty() {
-        return Err(
-            "safety verification jobs do not support weak-fair-action or strong-fair-action directives"
-                .to_owned(),
-        );
+        return Err(format!(
+            "{family} verification jobs do not support weak-fair-action or strong-fair-action directives"
+        ));
     }
     let product_limits = job.product_limits();
     if product_limits.max_states.is_some()
         || product_limits.max_transitions.is_some()
         || product_limits.max_depth.is_some()
     {
-        return Err("safety verification jobs do not support max-product-* limits".to_owned());
+        return Err(format!(
+            "{family} verification jobs do not support max-product-* limits"
+        ));
     }
     Ok(())
 }
@@ -301,6 +356,18 @@ fn safety_execution_outcome(outcome: &BoundedOutcome<SafetyStatus>) -> Verificat
     match outcome {
         BoundedOutcome::Conclusive(SafetyStatus::Safe) => VerificationJobOutcome::Satisfied,
         BoundedOutcome::Conclusive(SafetyStatus::Violated) => VerificationJobOutcome::Violated,
+        BoundedOutcome::Inconclusive(_) => VerificationJobOutcome::Inconclusive,
+    }
+}
+
+fn exact_state_execution_outcome(
+    outcome: &BoundedOutcome<ExactStateStatus>,
+) -> VerificationJobOutcome {
+    match outcome {
+        BoundedOutcome::Conclusive(ExactStateStatus::Satisfied) => {
+            VerificationJobOutcome::Satisfied
+        }
+        BoundedOutcome::Conclusive(ExactStateStatus::Violated) => VerificationJobOutcome::Violated,
         BoundedOutcome::Inconclusive(_) => VerificationJobOutcome::Inconclusive,
     }
 }
