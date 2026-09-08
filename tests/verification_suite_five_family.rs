@@ -34,11 +34,7 @@ fn write_legacy_multi_response_job(root: &Path) -> PathBuf {
     )
     .unwrap();
     let manifest = root.join("legacy.fvj");
-    fs::write(
-        &manifest,
-        "model \"legacy.fvl\"\nproperty \"legacy.fvt\"\n",
-    )
-    .unwrap();
+    fs::write(&manifest, "model \"legacy.fvl\"\nproperty \"legacy.fvt\"\n").unwrap();
     manifest
 }
 
@@ -96,11 +92,7 @@ fn write_action_temporal_job(root: &Path) -> PathBuf {
         "model \"action-temporal-ok\"\nstate \"idle\"\nstate \"waiting\"\ninitial \"idle\"\nedge \"idle\" \"request\" \"waiting\"\nedge \"waiting\" \"grant\" \"idle\"\n",
     )
     .unwrap();
-    fs::write(
-        root.join("action.fvp"),
-        "response(\"request\",\"grant\")\n",
-    )
-    .unwrap();
+    fs::write(root.join("action.fvp"), "response(\"request\",\"grant\")\n").unwrap();
     let manifest = root.join("action.fvj");
     fs::write(
         &manifest,
@@ -110,7 +102,12 @@ fn write_action_temporal_job(root: &Path) -> PathBuf {
     manifest
 }
 
-fn write_suite(root: &Path, name: &str, with_expectations: bool, action_expectation: &str) -> PathBuf {
+fn write_suite(
+    root: &Path,
+    name: &str,
+    with_expectations: bool,
+    action_expectation: &str,
+) -> PathBuf {
     let suite = root.join(format!("{name}.fvs"));
     let body = if with_expectations {
         format!(
@@ -212,7 +209,10 @@ fn raw_five_family_suite_preserves_direct_envelopes_order_and_aggregate_preceden
         run.envelope.jobs[4].result.analysis.as_deref(),
         Some("action-temporal")
     );
-    assert_eq!(run.envelope.jobs[4].result.backend.as_deref(), Some("response"));
+    assert_eq!(
+        run.envelope.jobs[4].result.backend.as_deref(),
+        Some("response")
+    );
     assert_eq!(
         run.to_json(),
         run_verification_suite_json(&suite).to_json(),
