@@ -334,7 +334,7 @@ fn malformed_mode_expression_unknown_reference_and_temporal_configuration_fail_c
         (
             "expression",
             "reachable \"complete\" and\n",
-            "Boolean proposition parse error",
+            "proposition expression parse error",
         ),
         (
             "unknown",
