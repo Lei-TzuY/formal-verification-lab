@@ -246,7 +246,10 @@ fn run_exact_state_job_json(
         BoundedOutcome::Conclusive(ExactStateStatus::Violated) => 11,
         BoundedOutcome::Inconclusive(_) => 3,
     };
-    debug_assert_eq!(exact_state_execution_outcome(&result.outcome), envelope.outcome);
+    debug_assert_eq!(
+        exact_state_execution_outcome(&result.outcome),
+        envelope.outcome
+    );
     Ok(VerificationJobJsonRun {
         envelope,
         exit_code,
@@ -364,9 +367,7 @@ fn exact_state_execution_outcome(
         BoundedOutcome::Conclusive(ExactStateStatus::Satisfied) => {
             VerificationJobOutcome::Satisfied
         }
-        BoundedOutcome::Conclusive(ExactStateStatus::Violated) => {
-            VerificationJobOutcome::Violated
-        }
+        BoundedOutcome::Conclusive(ExactStateStatus::Violated) => VerificationJobOutcome::Violated,
         BoundedOutcome::Inconclusive(_) => VerificationJobOutcome::Inconclusive,
     }
 }
