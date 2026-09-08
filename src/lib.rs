@@ -55,6 +55,7 @@ pub mod temporal;
 pub mod temporal_parse;
 pub mod temporal_report;
 pub mod verification_execution;
+mod verification_action_temporal;
 pub mod verification_job;
 pub mod verification_job_run;
 pub mod verification_result;

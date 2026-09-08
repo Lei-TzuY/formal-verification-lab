@@ -11,6 +11,9 @@ use crate::proposition_expr::{
     PropositionExpressionPropertySpec,
 };
 use crate::safety::{check_safety_assertion_with_limits, PropositionSafetySpec, SafetyStatus};
+use crate::verification_action_temporal::{
+    action_temporal_error, run_action_temporal_job_json,
+};
 use crate::verification_execution::{
     execute_multi_response, MultiResponseExecutionConfig, MultiResponseExecutionResult,
 };
@@ -118,6 +121,12 @@ pub fn run_verification_job_json(manifest_path: impl AsRef<Path>) -> Verificatio
             match run_proposition_expression_job_json(manifest_path, job) {
                 Ok(run) => run,
                 Err(error) => error_run(proposition_expression_error(error)),
+            }
+        }
+        VerificationJobAnalysis::ActionTemporal => {
+            match run_action_temporal_job_json(manifest_path, job) {
+                Ok(run) => run,
+                Err(error) => error_run(action_temporal_error(error)),
             }
         }
     }
@@ -376,6 +385,7 @@ fn proposition_expression_envelope(
     VerificationJobResultEnvelope {
         schema_version: VERIFICATION_JOB_HETEROGENEOUS_RESULT_SCHEMA_VERSION,
         analysis: Some("proposition-expression".to_owned()),
+        backend: None,
         outcome: exact_state_execution_outcome(&result.outcome),
         model: Some(model),
         property: Some(property),
