@@ -40,9 +40,7 @@ fn write_exact_state_job(root: &Path, model: &str, property: &str, tail: &str) -
     let manifest = root.join("job.fvj");
     fs::write(
         &manifest,
-        format!(
-            "analysis \"exact-state\"\nmodel \"model.fvl\"\nproperty \"property.fvp\"\n{tail}"
-        ),
+        format!("analysis \"exact-state\"\nmodel \"model.fvl\"\nproperty \"property.fvp\"\n{tail}"),
     )
     .unwrap();
     manifest
@@ -72,7 +70,10 @@ fn exact_state_analysis_round_trips_in_job_manifest() {
         Some(VerificationJobAnalysis::ExactState)
     );
     assert_eq!(job.canonical_document(), source);
-    assert_eq!(parse_verification_job(&job.canonical_document()).unwrap(), job);
+    assert_eq!(
+        parse_verification_job(&job.canonical_document()).unwrap(),
+        job
+    );
 }
 
 #[test]
@@ -89,21 +90,21 @@ fn reachable_job_matches_direct_bounded_exact_state_backend_and_preserves_witnes
     assert_eq!(run.envelope.analysis.as_deref(), Some("exact-state"));
     assert_eq!(run.envelope.outcome, VerificationJobOutcome::Satisfied);
     assert_eq!(run.envelope.model.as_deref(), Some("chain"));
-    assert_eq!(run.envelope.property.as_deref(), Some("reachable(\"done\")"));
+    assert_eq!(
+        run.envelope.property.as_deref(),
+        Some("reachable(\"done\")")
+    );
     assert!(run.envelope.weak_fair_actions.is_empty());
     assert!(run.envelope.strong_fair_actions.is_empty());
     assert_eq!(run.envelope.accounting.product_states, None);
     assert_eq!(run.envelope.cutoff, None);
 
     let model = parse_declarative_model(chain_model()).unwrap();
-    let spec = parse_exact_state_property("verification-job-exact-state", "reachable(\"done\")")
-        .unwrap();
-    let direct = check_exact_state_property_with_limits(
-        &model,
-        &spec,
-        ExplorationLimits::unbounded(),
-    )
-    .unwrap();
+    let spec =
+        parse_exact_state_property("verification-job-exact-state", "reachable(\"done\")").unwrap();
+    let direct =
+        check_exact_state_property_with_limits(&model, &spec, ExplorationLimits::unbounded())
+            .unwrap();
     assert_eq!(
         direct.outcome,
         BoundedOutcome::Conclusive(ExactStateStatus::Satisfied)
@@ -121,7 +122,9 @@ fn reachable_job_matches_direct_bounded_exact_state_backend_and_preserves_witnes
         Some(direct.explored_transitions)
     );
 
-    let Some(ExactStateEvidence::ReachabilityWitness { trace: direct_trace }) = direct.evidence
+    let Some(ExactStateEvidence::ReachabilityWitness {
+        trace: direct_trace,
+    }) = direct.evidence
     else {
         panic!("direct backend should return reachability witness");
     };
@@ -173,7 +176,10 @@ fn unreachable_and_resource_cutoff_remain_distinct_violation_and_inconclusive_re
         VerificationJobCutoffKind::TransitionLimit
     );
     assert_eq!(cutoff_reason.limit, 0);
-    assert_eq!(cutoff.envelope.accounting.explored_model_transitions, Some(0));
+    assert_eq!(
+        cutoff.envelope.accounting.explored_model_transitions,
+        Some(0)
+    );
     assert_eq!(cutoff.envelope.accounting.product_states, None);
     assert_eq!(cutoff.envelope.evidence, None);
 
@@ -244,7 +250,9 @@ fn eventuality_jobs_preserve_finite_and_lasso_counterexamples() {
     };
     assert_eq!(cycle.first().unwrap().state, cycle.last().unwrap().state);
     assert_eq!(stem.last().unwrap().state, cycle.first().unwrap().state);
-    assert!(cycle.iter().any(|step| step.action.as_deref() == Some("spin")));
+    assert!(cycle
+        .iter()
+        .any(|step| step.action.as_deref() == Some("spin")));
 
     let _ = fs::remove_dir_all(finite_root);
     let _ = fs::remove_dir_all(cycle_root);
@@ -306,12 +314,7 @@ fn built_binary_emits_exact_state_schema_and_native_exit_codes() {
     assert!(json.contains("\"action\":\"finish\",\"state\":\"done\""));
     assert!(!json.contains("\"pending\""));
 
-    let violated = write_exact_state_job(
-        &root,
-        chain_model(),
-        "reachable(\"missing\")\n",
-        "",
-    );
+    let violated = write_exact_state_job(&root, chain_model(), "reachable(\"missing\")\n", "");
     let output = run_job_binary(&violated);
     assert_eq!(output.status.code(), Some(11));
     assert!(output.stderr.is_empty());
