@@ -21,8 +21,12 @@ pub fn render_declarative_deadlock_report(
         }
     )
     .expect("writing to String cannot fail");
-    writeln!(&mut output, "discovered states: {}", result.discovered_states)
-        .expect("writing to String cannot fail");
+    writeln!(
+        &mut output,
+        "discovered states: {}",
+        result.discovered_states
+    )
+    .expect("writing to String cannot fail");
     writeln!(&mut output, "checked states: {}", result.checked_states)
         .expect("writing to String cannot fail");
     writeln!(
