@@ -291,6 +291,19 @@ pub struct DeadlockResult<S> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BoundedDeadlockResult<S> {
+    pub property: String,
+    pub outcome: BoundedOutcome<DeadlockStatus>,
+    pub discovered_states: usize,
+    pub checked_states: usize,
+    pub explored_transitions: usize,
+    pub max_depth_reached: Option<usize>,
+    /// Present only when a genuine terminal state has been checked and found
+    /// outside the legitimate-terminal policy before any blocking cutoff.
+    pub witness: Option<Vec<TraceStep<S>>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DeadlockError {
     EmptyPropertyName,
     Model(ModelError),
@@ -379,5 +392,74 @@ where
             witness: None,
         }),
         GraphSearchOutcome::Inconclusive(_) => Err(DeadlockError::UnexpectedInconclusive),
+    }
+}
+
+/// Detect unexpected terminal states under deterministic model-space resource
+/// limits without treating a cutoff as proof of deadlock freedom.
+///
+/// The terminal predicate is evaluated only by the canonical `after_successors`
+/// probe, after the model has returned that state's complete successor vector.
+/// A state/transition/depth cutoff during later edge expansion therefore cannot
+/// fabricate a terminal. A genuine unexpected terminal found before any
+/// blocking cutoff remains a conclusive shortest witness; `DeadlockFree`
+/// requires exhaustive completion.
+pub fn check_deadlock_with_limits<S>(
+    model: &TransitionSystem<S>,
+    property: &DeadlockProperty<S>,
+    limits: ExplorationLimits,
+) -> Result<BoundedDeadlockResult<S>, DeadlockError>
+where
+    S: Clone + Eq + Hash,
+{
+    let search = search_with_probes(
+        model,
+        limits,
+        |_state| None,
+        |state, transitions| {
+            (transitions.is_empty() && !(property.allowed_terminal)(state))
+                .then(|| "unexpected-terminal".to_owned())
+        },
+    )?;
+
+    let property_name = property.name.clone();
+    let discovered_states = search.discovered_states;
+    let checked_states = search.checked_states;
+    let explored_transitions = search.explored_transitions;
+    let max_depth_reached = search.max_depth_reached;
+
+    match search.outcome {
+        GraphSearchOutcome::Match { trace, .. } => {
+            if trace.is_empty() {
+                return Err(DeadlockError::MissingWitness);
+            }
+            Ok(BoundedDeadlockResult {
+                property: property_name,
+                outcome: BoundedOutcome::Conclusive(DeadlockStatus::DeadlockFound),
+                discovered_states,
+                checked_states,
+                explored_transitions,
+                max_depth_reached,
+                witness: Some(trace),
+            })
+        }
+        GraphSearchOutcome::Exhausted => Ok(BoundedDeadlockResult {
+            property: property_name,
+            outcome: BoundedOutcome::Conclusive(DeadlockStatus::DeadlockFree),
+            discovered_states,
+            checked_states,
+            explored_transitions,
+            max_depth_reached,
+            witness: None,
+        }),
+        GraphSearchOutcome::Inconclusive(reason) => Ok(BoundedDeadlockResult {
+            property: property_name,
+            outcome: BoundedOutcome::Inconclusive(reason),
+            discovered_states,
+            checked_states,
+            explored_transitions,
+            max_depth_reached,
+            witness: None,
+        }),
     }
 }
