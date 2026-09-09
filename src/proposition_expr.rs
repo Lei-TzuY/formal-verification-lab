@@ -157,6 +157,32 @@ fn resolve_expression(
     Ok(members)
 }
 
+/// One pre-resolved Boolean proposition expression for repeated evaluation
+/// during backend exploration. Resolution fails closed before exploration and
+/// evaluation delegates to the same M22 AST semantics used by the existing
+/// proposition-expression frontends.
+#[derive(Debug, Clone)]
+pub(crate) struct ResolvedPropositionExpression {
+    expression: PropositionExpression,
+    members: HashMap<String, HashSet<String>>,
+}
+
+impl ResolvedPropositionExpression {
+    pub(crate) fn resolve(
+        document: &DeclarativeDocument,
+        expression: &PropositionExpression,
+    ) -> Result<Self, PropositionExpressionError> {
+        Ok(Self {
+            expression: expression.clone(),
+            members: resolve_expression(document, expression)?,
+        })
+    }
+
+    pub(crate) fn evaluate(&self, state: &str) -> bool {
+        self.expression.evaluate_resolved(&self.members, state)
+    }
+}
+
 fn quote_string(value: &str) -> String {
     let mut output = String::from("\"");
     for ch in value.chars() {
