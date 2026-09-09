@@ -4,7 +4,7 @@ This file records the current integration frontier. Historical capability detail
 
 ## Milestone 62 — reproducible action-temporal verification jobs
 
-**Status: integration candidate complete.**
+**Status: integration candidate complete; exact-head verified.**
 
 Milestone 62 extends the heterogeneous verification-job dispatcher with a fifth explicit family, `analysis "action-temporal"`, without changing the historical implicit multi-response default or the sealed safety, exact-state, and proposition-expression job contracts.
 
@@ -20,7 +20,7 @@ Structured results use heterogeneous schema v2 with `analysis:"action-temporal"`
 
 Executable evidence includes manifest/parser round trips; response and Büchi backend identity; direct staged frontend differential accounting; no-fair lasso normalization; weak fairness; weak/strong overlap canonicalization; model/product cutoff provenance; malformed temporal input; built `fvlab` JSON/exit integration; and five-family raw/expectation suites that preserve direct nested job envelopes, declaration order, aggregate precedence, deterministic repetition, and built `fvlab` / `fvlab-suite` equivalence across legacy multi-response, safety, exact-state, proposition-expression, and action-temporal jobs.
 
-The implementation candidate `632c29dcf2030b7c4c19db1628fa76c9a342e5b1` passed CI #521: rustfmt, all-target build, Clippy with `-D warnings`, the complete test suite, and every historical CLI regression gate. The same exact candidate passed Bounded state-property CLI workflow #371. This status update itself still requires exact-head CI before merge.
+The exact integration candidate `41a7de5bca73c9c7b32129b5c0314e73d67f8cdb` passed CI #522: rustfmt, all-target build, Clippy with `-D warnings`, the complete test suite, and every historical CLI regression gate. The same exact candidate passed Bounded state-property CLI workflow #372. This evidence synchronization changes documentation only and must itself pass exact-head CI before merge.
 
 M62 adds no new temporal operator, arbitrary LTL/CTL compilation, traversal engine, fairness semantics, fairness-by-default behavior, shell execution, wall-clock proof bound, generic plugin/RPC subsystem, or performance/security claim.
 
