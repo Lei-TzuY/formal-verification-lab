@@ -61,9 +61,7 @@ fn oracle(
 
     if let Some(limit) = limits.max_states.filter(|limit| nodes.len() >= *limit) {
         return OracleResult {
-            outcome: BoundedOutcome::Inconclusive(InconclusiveReason::StateLimitReached {
-                limit,
-            }),
+            outcome: BoundedOutcome::Inconclusive(InconclusiveReason::StateLimitReached { limit }),
             discovered_states: 0,
             checked_states: 0,
             explored_transitions: 0,
@@ -300,19 +298,17 @@ fn all_three_node_graphs_terminal_policies_and_limits_match_independent_oracle()
     for graph_mask in 0..(1usize << EDGE_COUNT) {
         for allowed_terminal_mask in 0..(1usize << N) {
             let model = graph_model(graph_mask);
-            let property = DeadlockProperty::new(
-                "generated-policy",
-                move |state: &usize| allowed_terminal_mask & (1usize << *state) != 0,
-            )
+            let property = DeadlockProperty::new("generated-policy", move |state: &usize| {
+                allowed_terminal_mask & (1usize << *state) != 0
+            })
             .unwrap();
 
             for limits in profiles() {
                 let expected = oracle(graph_mask, allowed_terminal_mask, limits);
                 let first = check_deadlock_with_limits(&model, &property, limits).unwrap();
                 let second = check_deadlock_with_limits(&model, &property, limits).unwrap();
-                let context = format!(
-                    "graph={graph_mask} allowed={allowed_terminal_mask} limits={limits:?}"
-                );
+                let context =
+                    format!("graph={graph_mask} allowed={allowed_terminal_mask} limits={limits:?}");
 
                 assert_eq!(first, second, "determinism {context}");
                 assert_eq!(first.outcome, expected.outcome, "outcome {context}");
@@ -320,7 +316,10 @@ fn all_three_node_graphs_terminal_policies_and_limits_match_independent_oracle()
                     first.discovered_states, expected.discovered_states,
                     "discovered {context}"
                 );
-                assert_eq!(first.checked_states, expected.checked_states, "checked {context}");
+                assert_eq!(
+                    first.checked_states, expected.checked_states,
+                    "checked {context}"
+                );
                 assert_eq!(
                     first.explored_transitions, expected.explored_transitions,
                     "transitions {context}"
