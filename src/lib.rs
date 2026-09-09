@@ -54,6 +54,7 @@ pub mod strong_fairness;
 pub mod temporal;
 pub mod temporal_parse;
 pub mod temporal_report;
+mod verification_action_temporal;
 pub mod verification_execution;
 pub mod verification_job;
 pub mod verification_job_run;

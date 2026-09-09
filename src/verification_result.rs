@@ -159,6 +159,15 @@ pub enum VerificationJobEvidence {
         stem: Vec<VerificationJobStateTraceStep>,
         cycle: Vec<VerificationJobStateTraceStep>,
     },
+    ActionTemporalFinite {
+        obligation: String,
+        trace: Vec<VerificationJobStateTraceStep>,
+    },
+    ActionTemporalInfinite {
+        obligation: String,
+        stem: Vec<VerificationJobStateTraceStep>,
+        cycle: Vec<VerificationJobStateTraceStep>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -167,6 +176,8 @@ pub struct VerificationJobResultEnvelope {
     /// Present only for heterogeneous schema revisions. Historical M56
     /// multi-response envelopes intentionally omit this field from JSON.
     pub analysis: Option<String>,
+    /// Present only for analysis families whose normalized frontend has a stable backend identity.
+    pub backend: Option<String>,
     pub outcome: VerificationJobOutcome,
     pub model: Option<String>,
     pub property: Option<String>,
@@ -192,6 +203,7 @@ impl VerificationJobResultEnvelope {
         Self {
             schema_version: VERIFICATION_JOB_RESULT_SCHEMA_VERSION,
             analysis: None,
+            backend: None,
             outcome: status_outcome(result.status),
             model: Some(model.into()),
             property: Some(result.property.clone()),
@@ -228,6 +240,7 @@ impl VerificationJobResultEnvelope {
         Self {
             schema_version: VERIFICATION_JOB_RESULT_SCHEMA_VERSION,
             analysis: None,
+            backend: None,
             outcome: bounded_outcome(&result.outcome),
             model: Some(model.into()),
             property: Some(result.property.clone()),
@@ -276,6 +289,7 @@ impl VerificationJobResultEnvelope {
         Self {
             schema_version: VERIFICATION_JOB_RESULT_SCHEMA_VERSION,
             analysis: None,
+            backend: None,
             outcome: analysis_outcome(&result.outcome),
             model: Some(model.into()),
             property: Some(result.property.clone()),
@@ -311,6 +325,7 @@ impl VerificationJobResultEnvelope {
         Self {
             schema_version: VERIFICATION_JOB_SAFETY_RESULT_SCHEMA_VERSION,
             analysis: Some("safety".to_owned()),
+            backend: None,
             outcome: safety_outcome(&result.outcome),
             model: Some(model.into()),
             property: Some(result.expression.clone()),
@@ -350,6 +365,7 @@ impl VerificationJobResultEnvelope {
         Self {
             schema_version: VERIFICATION_JOB_EXACT_STATE_RESULT_SCHEMA_VERSION,
             analysis: Some("exact-state".to_owned()),
+            backend: None,
             outcome: exact_state_outcome(&result.outcome),
             model: Some(model.into()),
             property: Some(property.into()),
@@ -376,6 +392,7 @@ impl VerificationJobResultEnvelope {
         Self {
             schema_version: VERIFICATION_JOB_RESULT_SCHEMA_VERSION,
             analysis: None,
+            backend: None,
             outcome: VerificationJobOutcome::Error,
             model: None,
             property: None,
@@ -415,6 +432,9 @@ impl VerificationJobResultEnvelope {
         field_u64(&mut out, "schema_version", self.schema_version as u64, true);
         if let Some(analysis) = self.analysis.as_deref() {
             field_string(&mut out, "analysis", analysis, false);
+        }
+        if let Some(backend) = self.backend.as_deref() {
+            field_string(&mut out, "backend", backend, false);
         }
         field_string(&mut out, "outcome", self.outcome.as_str(), false);
         field_optional_string(
@@ -782,6 +802,28 @@ fn write_evidence(out: &mut String, value: &VerificationJobEvidence) {
         VerificationJobEvidence::ExactStateEventualityInfinite { stem, cycle } => {
             out.push('{');
             field_string(out, "kind", "eventuality_lasso", true);
+            out.push_str(",\"stem\":");
+            write_state_trace(out, stem);
+            out.push_str(",\"cycle\":");
+            write_state_trace(out, cycle);
+            out.push('}');
+        }
+        VerificationJobEvidence::ActionTemporalFinite { obligation, trace } => {
+            out.push('{');
+            field_string(out, "kind", "temporal_finite", true);
+            field_string(out, "obligation", obligation, false);
+            out.push_str(",\"trace\":");
+            write_state_trace(out, trace);
+            out.push('}');
+        }
+        VerificationJobEvidence::ActionTemporalInfinite {
+            obligation,
+            stem,
+            cycle,
+        } => {
+            out.push('{');
+            field_string(out, "kind", "temporal_lasso", true);
+            field_string(out, "obligation", obligation, false);
             out.push_str(",\"stem\":");
             write_state_trace(out, stem);
             out.push_str(",\"cycle\":");
