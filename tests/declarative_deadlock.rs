@@ -1,7 +1,7 @@
 use formal_verification_lab::{
-    check_deadlock_with_limits, check_declarative_deadlock_with_limits, parse_declarative_deadlock_spec,
-    parse_declarative_document, BoundedOutcome, DeadlockProperty, DeadlockStatus, ExplorationLimits,
-    InconclusiveReason, PropositionExpressionError,
+    check_deadlock_with_limits, check_declarative_deadlock_with_limits,
+    parse_declarative_deadlock_spec, parse_declarative_document, BoundedOutcome, DeadlockProperty,
+    DeadlockStatus, ExplorationLimits, InconclusiveReason, PropositionExpressionError,
 };
 
 fn document() -> formal_verification_lab::DeclarativeDocument {
@@ -23,14 +23,11 @@ label "cancelled" "cancelled"
 #[test]
 fn boolean_terminal_policy_is_parsed_canonically_and_proves_deadlock_free() {
     let document = document();
-    let spec = parse_declarative_deadlock_spec("terminal-policy", "\"done\" or \"cancelled\"")
-        .unwrap();
-    let result = check_declarative_deadlock_with_limits(
-        &document,
-        &spec,
-        ExplorationLimits::unbounded(),
-    )
-    .unwrap();
+    let spec =
+        parse_declarative_deadlock_spec("terminal-policy", "\"done\" or \"cancelled\"").unwrap();
+    let result =
+        check_declarative_deadlock_with_limits(&document, &spec, ExplorationLimits::unbounded())
+            .unwrap();
 
     assert_eq!(spec.canonical_expression(), "(\"done\" or \"cancelled\")");
     assert_eq!(result.expression, "(\"done\" or \"cancelled\")");
@@ -48,12 +45,9 @@ fn boolean_terminal_policy_is_parsed_canonically_and_proves_deadlock_free() {
 fn declarative_policy_preserves_direct_backend_shortest_witness_and_accounting() {
     let document = document();
     let spec = parse_declarative_deadlock_spec("terminal-policy", "\"cancelled\"").unwrap();
-    let frontend = check_declarative_deadlock_with_limits(
-        &document,
-        &spec,
-        ExplorationLimits::unbounded(),
-    )
-    .unwrap();
+    let frontend =
+        check_declarative_deadlock_with_limits(&document, &spec, ExplorationLimits::unbounded())
+            .unwrap();
     let direct_property =
         DeadlockProperty::new("terminal-policy", |state: &String| state == "cancelled").unwrap();
     let direct = check_deadlock_with_limits(
@@ -78,12 +72,9 @@ fn declarative_policy_preserves_direct_backend_shortest_witness_and_accounting()
 fn unknown_proposition_fails_before_backend_execution() {
     let document = document();
     let spec = parse_declarative_deadlock_spec("terminal-policy", "\"missing\"").unwrap();
-    let error = check_declarative_deadlock_with_limits(
-        &document,
-        &spec,
-        ExplorationLimits::unbounded(),
-    )
-    .unwrap_err();
+    let error =
+        check_declarative_deadlock_with_limits(&document, &spec, ExplorationLimits::unbounded())
+            .unwrap_err();
 
     assert!(matches!(
         error,
