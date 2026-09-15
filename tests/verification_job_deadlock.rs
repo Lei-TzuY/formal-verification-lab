@@ -35,9 +35,7 @@ fn write_deadlock_job(root: &Path, model: &str, property: &str, tail: &str) -> P
     let manifest = root.join("job.fvj");
     fs::write(
         &manifest,
-        format!(
-            "analysis \"deadlock\"\nmodel \"model.fvl\"\nproperty \"property.fvp\"\n{tail}"
-        ),
+        format!("analysis \"deadlock\"\nmodel \"model.fvl\"\nproperty \"property.fvp\"\n{tail}"),
     )
     .unwrap();
     manifest
@@ -49,20 +47,22 @@ fn deadlock_analysis_round_trips_through_verification_job_manifest() {
     let job = parse_verification_job(source).unwrap();
 
     assert_eq!(job.analysis(), VerificationJobAnalysis::Deadlock);
-    assert_eq!(job.declared_analysis(), Some(VerificationJobAnalysis::Deadlock));
+    assert_eq!(
+        job.declared_analysis(),
+        Some(VerificationJobAnalysis::Deadlock)
+    );
     assert_eq!(job.canonical_document(), source);
-    assert_eq!(parse_verification_job(&job.canonical_document()).unwrap(), job);
+    assert_eq!(
+        parse_verification_job(&job.canonical_document()).unwrap(),
+        job
+    );
 }
 
 #[test]
 fn deadlock_jobs_preserve_native_status_shortest_evidence_and_model_only_accounting() {
     let found_root = fixture_dir("found");
-    let found_manifest = write_deadlock_job(
-        &found_root,
-        deadlock_found_model(),
-        "\"legitimate\"\n",
-        "",
-    );
+    let found_manifest =
+        write_deadlock_job(&found_root, deadlock_found_model(), "\"legitimate\"\n", "");
     let found = run_verification_job_json(&found_manifest);
 
     assert_eq!(found.exit_code, 5);
@@ -119,12 +119,8 @@ fn deadlock_jobs_preserve_native_status_shortest_evidence_and_model_only_account
     );
 
     let free_root = fixture_dir("free");
-    let free_manifest = write_deadlock_job(
-        &free_root,
-        deadlock_free_model(),
-        "\"legitimate\"\n",
-        "",
-    );
+    let free_manifest =
+        write_deadlock_job(&free_root, deadlock_free_model(), "\"legitimate\"\n", "");
     let free = run_verification_job_json(&free_manifest);
     assert_eq!(free.exit_code, 0);
     assert_eq!(free.envelope.outcome, VerificationJobOutcome::Satisfied);
@@ -148,7 +144,10 @@ fn deadlock_job_reports_model_cutoff_without_fabricating_terminal_evidence() {
 
     assert_eq!(run.exit_code, 3);
     assert_eq!(run.envelope.outcome, VerificationJobOutcome::Inconclusive);
-    let cutoff = run.envelope.cutoff.expect("bounded run should expose cutoff");
+    let cutoff = run
+        .envelope
+        .cutoff
+        .expect("bounded run should expose cutoff");
     assert_eq!(cutoff.stage, VerificationJobCutoffStage::Model);
     assert_eq!(cutoff.kind, VerificationJobCutoffKind::TransitionLimit);
     assert_eq!(cutoff.limit, 0);
