@@ -18,6 +18,7 @@ const MAX_PRODUCT_DEPTH: &str = "max-product-depth";
 pub enum VerificationJobAnalysis {
     MultiResponse,
     Safety,
+    Deadlock,
     ExactState,
     PropositionExpression,
     ActionTemporal,
@@ -28,6 +29,7 @@ impl VerificationJobAnalysis {
         match self {
             Self::MultiResponse => "multi-response",
             Self::Safety => "safety",
+            Self::Deadlock => "deadlock",
             Self::ExactState => "exact-state",
             Self::PropositionExpression => "proposition-expression",
             Self::ActionTemporal => "action-temporal",
@@ -38,6 +40,7 @@ impl VerificationJobAnalysis {
         match value {
             "multi-response" => Some(Self::MultiResponse),
             "safety" => Some(Self::Safety),
+            "deadlock" => Some(Self::Deadlock),
             "exact-state" => Some(Self::ExactState),
             "proposition-expression" => Some(Self::PropositionExpression),
             "action-temporal" => Some(Self::ActionTemporal),
@@ -275,7 +278,7 @@ impl fmt::Display for VerificationJobParseError {
             }
             VerificationJobParseErrorKind::InvalidAnalysis { analysis } => write!(
                 f,
-                "unsupported verification analysis '{analysis}'; expected multi-response, safety, exact-state, proposition-expression, or action-temporal"
+                "unsupported verification analysis '{analysis}'; expected multi-response, safety, deadlock, exact-state, proposition-expression, or action-temporal"
             ),
             VerificationJobParseErrorKind::ExpectedNumber => {
                 write!(f, "expected a non-negative decimal integer")
