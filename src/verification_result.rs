@@ -389,9 +389,12 @@ impl VerificationJobResultEnvelope {
                 .outcome
                 .inconclusive_reason()
                 .map(|reason| cutoff(VerificationJobCutoffStage::Model, reason)),
-            evidence: result.witness.as_ref().map(|trace| VerificationJobEvidence::Deadlock {
-                trace: trace.iter().map(convert_state_step).collect(),
-            }),
+            evidence: result
+                .witness
+                .as_ref()
+                .map(|trace| VerificationJobEvidence::Deadlock {
+                    trace: trace.iter().map(convert_state_step).collect(),
+                }),
             error: None,
         }
     }
@@ -606,8 +609,12 @@ fn safety_outcome(outcome: &BoundedOutcome<SafetyStatus>) -> VerificationJobOutc
 
 fn deadlock_outcome(outcome: &BoundedOutcome<DeadlockStatus>) -> VerificationJobOutcome {
     match outcome {
-        BoundedOutcome::Conclusive(DeadlockStatus::DeadlockFree) => VerificationJobOutcome::Satisfied,
-        BoundedOutcome::Conclusive(DeadlockStatus::DeadlockFound) => VerificationJobOutcome::Violated,
+        BoundedOutcome::Conclusive(DeadlockStatus::DeadlockFree) => {
+            VerificationJobOutcome::Satisfied
+        }
+        BoundedOutcome::Conclusive(DeadlockStatus::DeadlockFound) => {
+            VerificationJobOutcome::Violated
+        }
         BoundedOutcome::Inconclusive(_) => VerificationJobOutcome::Inconclusive,
     }
 }
