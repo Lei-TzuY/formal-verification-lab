@@ -1,15 +1,19 @@
 use crate::bounded::{AnalysisOutcome, AnalysisStage, BoundedOutcome};
 use crate::checker::{ExplorationLimits, InconclusiveReason, TraceStep};
+use crate::declarative_deadlock::BoundedDeclarativeDeadlockResult;
 use crate::exact_state::{BoundedExactStateResult, ExactStateEvidence, ExactStateStatus};
 use crate::multi_response::{
     AnalysisMultiResponseResult, BoundedMultiResponseResult, MultiObligationState,
     MultiResponseCounterexample, MultiResponseResult, MultiResponseStatus,
 };
+use crate::property::DeadlockStatus;
 use crate::safety::{BoundedSafetyResult, SafetyStatus};
 
 pub const VERIFICATION_JOB_RESULT_SCHEMA_VERSION: u32 = 1;
 pub const VERIFICATION_JOB_HETEROGENEOUS_RESULT_SCHEMA_VERSION: u32 = 2;
 pub const VERIFICATION_JOB_SAFETY_RESULT_SCHEMA_VERSION: u32 =
+    VERIFICATION_JOB_HETEROGENEOUS_RESULT_SCHEMA_VERSION;
+pub const VERIFICATION_JOB_DEADLOCK_RESULT_SCHEMA_VERSION: u32 =
     VERIFICATION_JOB_HETEROGENEOUS_RESULT_SCHEMA_VERSION;
 pub const VERIFICATION_JOB_EXACT_STATE_RESULT_SCHEMA_VERSION: u32 =
     VERIFICATION_JOB_HETEROGENEOUS_RESULT_SCHEMA_VERSION;
@@ -147,6 +151,9 @@ pub enum VerificationJobEvidence {
         cycle: Vec<VerificationJobTraceStep>,
     },
     Safety {
+        trace: Vec<VerificationJobStateTraceStep>,
+    },
+    Deadlock {
         trace: Vec<VerificationJobStateTraceStep>,
     },
     ExactStateReachability {
@@ -353,6 +360,42 @@ impl VerificationJobResultEnvelope {
         }
     }
 
+    /// Schema-v2 envelope for declarative bounded deadlock jobs. Deadlock uses
+    /// model-space budgets only and preserves the deterministic shortest
+    /// unexpected-terminal witness without manufacturing product accounting.
+    pub fn from_deadlock(
+        model: impl Into<String>,
+        model_limits: ExplorationLimits,
+        result: &BoundedDeclarativeDeadlockResult,
+    ) -> Self {
+        Self {
+            schema_version: VERIFICATION_JOB_DEADLOCK_RESULT_SCHEMA_VERSION,
+            analysis: Some("deadlock".to_owned()),
+            backend: None,
+            outcome: deadlock_outcome(&result.outcome),
+            model: Some(model.into()),
+            property: Some(result.expression.clone()),
+            weak_fair_actions: Vec::new(),
+            strong_fair_actions: Vec::new(),
+            model_limits: model_limits.into(),
+            product_limits: ExplorationLimits::unbounded().into(),
+            accounting: model_only_accounting(
+                result.discovered_states,
+                result.checked_states,
+                result.explored_transitions,
+                result.max_depth_reached,
+            ),
+            cutoff: result
+                .outcome
+                .inconclusive_reason()
+                .map(|reason| cutoff(VerificationJobCutoffStage::Model, reason)),
+            evidence: result.witness.as_ref().map(|trace| VerificationJobEvidence::Deadlock {
+                trace: trace.iter().map(convert_state_step).collect(),
+            }),
+            error: None,
+        }
+    }
+
     /// Schema-v2 envelope for the existing bounded exact-state frontend.
     /// Exact-state jobs use model-space budgets only and preserve the backend's
     /// positive reachability witness or finite/lasso eventuality counterexample.
@@ -411,6 +454,13 @@ impl VerificationJobResultEnvelope {
         let mut envelope = Self::error(message);
         envelope.schema_version = VERIFICATION_JOB_SAFETY_RESULT_SCHEMA_VERSION;
         envelope.analysis = Some("safety".to_owned());
+        envelope
+    }
+
+    pub fn deadlock_error(message: impl Into<String>) -> Self {
+        let mut envelope = Self::error(message);
+        envelope.schema_version = VERIFICATION_JOB_DEADLOCK_RESULT_SCHEMA_VERSION;
+        envelope.analysis = Some("deadlock".to_owned());
         envelope
     }
 
@@ -509,6 +559,14 @@ fn canonical_status(
             VerificationJobOutcome::Error => None,
         };
     }
+    if analysis == Some("deadlock") {
+        return match outcome {
+            VerificationJobOutcome::Satisfied => Some("DEADLOCK_FREE"),
+            VerificationJobOutcome::Violated => Some("DEADLOCK_FOUND"),
+            VerificationJobOutcome::Inconclusive => Some("INCONCLUSIVE"),
+            VerificationJobOutcome::Error => None,
+        };
+    }
     match outcome {
         VerificationJobOutcome::Satisfied => Some("SATISFIED"),
         VerificationJobOutcome::Violated => Some("VIOLATED"),
@@ -542,6 +600,14 @@ fn safety_outcome(outcome: &BoundedOutcome<SafetyStatus>) -> VerificationJobOutc
     match outcome {
         BoundedOutcome::Conclusive(SafetyStatus::Safe) => VerificationJobOutcome::Satisfied,
         BoundedOutcome::Conclusive(SafetyStatus::Violated) => VerificationJobOutcome::Violated,
+        BoundedOutcome::Inconclusive(_) => VerificationJobOutcome::Inconclusive,
+    }
+}
+
+fn deadlock_outcome(outcome: &BoundedOutcome<DeadlockStatus>) -> VerificationJobOutcome {
+    match outcome {
+        BoundedOutcome::Conclusive(DeadlockStatus::DeadlockFree) => VerificationJobOutcome::Satisfied,
+        BoundedOutcome::Conclusive(DeadlockStatus::DeadlockFound) => VerificationJobOutcome::Violated,
         BoundedOutcome::Inconclusive(_) => VerificationJobOutcome::Inconclusive,
     }
 }
@@ -781,6 +847,13 @@ fn write_evidence(out: &mut String, value: &VerificationJobEvidence) {
         VerificationJobEvidence::Safety { trace } => {
             out.push('{');
             field_string(out, "kind", "safety", true);
+            out.push_str(",\"trace\":");
+            write_state_trace(out, trace);
+            out.push('}');
+        }
+        VerificationJobEvidence::Deadlock { trace } => {
+            out.push('{');
+            field_string(out, "kind", "deadlock", true);
             out.push_str(",\"trace\":");
             write_state_trace(out, trace);
             out.push('}');
