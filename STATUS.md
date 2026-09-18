@@ -4,40 +4,48 @@ This file records the current integration frontier. Historical capability detail
 
 ## Milestone 62 — reproducible action-temporal verification jobs
 
-**Status: integration candidate complete; exact-head verified.**
+**Status: sealed in `main` at `09907e6a58c23407363dca76568374bbd6a881ac`.**
 
 Milestone 62 extends the heterogeneous verification-job dispatcher with a fifth explicit family, `analysis "action-temporal"`, without changing the historical implicit multi-response default or the sealed safety, exact-state, and proposition-expression job contracts.
 
-Action-temporal property files reuse the existing M18 textual grammar exactly: `response("trigger","response")` and `infinitely-often("action"[, ...])`. The job layer does not implement temporal semantics. It parses the existing specification, canonicalizes it through the existing frontend, and delegates execution to `check_action_temporal_with_fairness_profile_and_limits`.
+Action-temporal property files reuse the existing M18 textual grammar exactly: `response("trigger","response")` and `infinitely-often("action"[, ...])`. The job layer does not implement temporal semantics. It parses the existing specification, canonicalizes it through the existing frontend, and delegates execution to the sealed action-temporal authority.
 
-The family preserves the canonical backend identity exposed by the frontend: response specifications report `backend:"response"`; recurring-action specifications report `backend:"buchi"`. Machine evidence contains only frontend model-state/action traces. Pending-bit vectors, monitor control state, and Büchi automaton control state remain internal implementation details and are not leaked into the heterogeneous job schema.
+Model/product budgets, exact-action fairness profiles, schema-v2 normalized evidence, backend identity, cutoff provenance, five-family raw/expectation suites, and built-binary equivalence remain covered by the historical M62 tests. M62 adds no new temporal operator, traversal engine, fairness-by-default behavior, shell execution, wall-clock proof bound, or performance/security claim.
 
-Model and product state/transition/depth budgets reuse the sealed staged temporal APIs. A blocking model cutoff remains model-stage `INCONCLUSIVE`; a blocking product cutoff remains product-stage `INCONCLUSIVE`. Real finite or lasso violations already justified before a later cutoff remain conclusive. No prefix gap is promoted to proof.
+## Milestone 63 — declarative bounded deadlock policies and reproducible jobs
 
-Weak and strong exact-action fairness declarations reuse the existing `FairnessProfile`. No-fairness remains the default. Weak/strong overlap is canonicalized to the strong class by the existing fairness authority, and fairness continues to constrain infinite executions only.
+**Status: integration candidate complete; exact-head verified.**
 
-Structured results use heterogeneous schema v2 with `analysis:"action-temporal"`, stable backend identity, canonical property text, explicit fairness sets, independent model/product limits and accounting, exact cutoff provenance, and normalized finite/lasso evidence. Satisfied jobs use exit 0, temporal violations retain exit 10, incomplete verification uses exit 3, and malformed/configuration errors use exit 2.
+Milestone 63 closes the external deadlock-policy gap as one backend-to-job vertical slice rather than a wrapper-only family.
 
-Executable evidence includes manifest/parser round trips; response and Büchi backend identity; direct staged frontend differential accounting; no-fair lasso normalization; weak fairness; weak/strong overlap canonicalization; model/product cutoff provenance; malformed temporal input; built `fvlab` JSON/exit integration; and five-family raw/expectation suites that preserve direct nested job envelopes, declaration order, aggregate precedence, deterministic repetition, and built `fvlab` / `fvlab-suite` equivalence across legacy multi-response, safety, exact-state, proposition-expression, and action-temporal jobs.
+The canonical deadlock backend now exposes `check_deadlock_with_limits` over the existing deterministic `search_with_probes` BFS substrate. State/transition/depth cutoffs return explicit `INCONCLUSIVE`; a genuine unexpected terminal discovered before a later cutoff remains conclusively `DEADLOCK_FOUND`; `DEADLOCK_FREE` requires exhaustive completion. Terminal detection remains in the `after_successors` probe, so partial exploration cannot fabricate a terminal.
 
-The exact integration candidate `41a7de5bca73c9c7b32129b5c0314e73d67f8cdb` passed CI #522: rustfmt, all-target build, Clippy with `-D warnings`, the complete test suite, and every historical CLI regression gate. The same exact candidate passed Bounded state-property CLI workflow #372. This evidence synchronization changes documentation only and must itself pass exact-head CI before merge.
+`DeclarativeDeadlockSpec` reuses the existing M22 Boolean proposition-expression grammar and one shared pre-resolved evaluator. Every proposition reference is resolved before backend exploration. No second Boolean semantics or graph traversal was introduced.
 
-M62 adds no new temporal operator, arbitrary LTL/CTL compilation, traversal engine, fairness semantics, fairness-by-default behavior, shell execution, wall-clock proof bound, generic plugin/RPC subsystem, or performance/security claim.
+The external `fvlab-deadlock` binary accepts a declarative model file, a legitimate-terminal proposition expression, and model-space `--max-states`, `--max-transitions`, and `--max-depth` limits. Deadlock-free exits 0, a real unexpected terminal exits 5, incomplete exploration exits 3, and malformed/model/reference/configuration errors exit 2.
 
-## Next frontier — Milestone 63: declarative bounded deadlock policies and reproducible jobs
+The heterogeneous job dispatcher now accepts explicit `analysis "deadlock"` jobs backed by the same declarative frontend. Temporal-only fairness assumptions and product limits are rejected before deadlock execution. Schema-v2 results carry model-only accounting and cutoff provenance plus action/state shortest-witness evidence; product accounting, pending vectors, and temporal control state remain absent.
 
-M62 completes reproducible job coverage for the existing external action-temporal language. The highest-value remaining external verification gap is deadlock policy: M7 has a trusted deterministic deadlock backend, but legitimate-terminal policy is still supplied as a Rust predicate and `check_deadlock` is exhaustive-only. Declarative models and M22 Boolean propositions therefore cannot yet express a portable policy such as “terminal states are legitimate when `done or cancelled`”, and a resource cutoff cannot yet be propagated honestly through deadlock verification.
+Raw and expectation suites now cover six analysis families while preserving declaration order, aggregate precedence, complete nested envelopes, deterministic repetition, and direct built-binary equivalence. The bounded backend is independently checked by a **36,864-case** oracle over all 512 directed three-state graphs × 8 legitimate-terminal policies × 9 deterministic limit profiles, including initial terminals, exact-bound completion, cutoff-before-witness, witness-before-later-cutoff, and no-false-terminal cases.
 
-Milestone 63 should close that gap as one coherent backend-to-job vertical slice rather than adding a wrapper-only family.
+Exact candidate `96e4cae04df59c6e8b120a750835d1c258ef5ea6` passed CI #543 and Bounded state-property CLI workflow #393. The branch is based on `main=09907e6a58c23407363dca76568374bbd6a881ac`, behind 0, mergeable, with no reviews or unresolved review threads at closure audit time.
+
+M63 adds no fairness interpretation for finite deadlocks, symbolic-state engine, arithmetic state-expression language, second traversal engine, wall-clock proof bound, or performance/security claim.
+
+## Next frontier — Milestone 64: proof-honest bounded recurrence / cycle discovery
+
+M63 seals the remaining externally configurable finite-terminal policy path. The next core architectural gap is recurrence: M8 has a trusted deterministic SCC/cycle analysis over a completely captured reachable graph, but it is exhaustive-only. A resource cutoff cannot currently be represented without either abandoning the analysis or risking an unsound “acyclic” conclusion from a partial prefix.
+
+Milestone 64 should add bounded recurrence as a core semantic capability before introducing another declarative/job wrapper.
 
 Acceptance criteria:
 
-- add bounded deadlock verification on the canonical BFS substrate with state/transition/depth limits and explicit `INCONCLUSIVE`; a real unexpected terminal found before a later cutoff may conclude `DEADLOCK_FOUND`, while `DEADLOCK_FREE` requires exhaustive completion;
-- preserve deterministic shortest unexpected-terminal witnesses, exact accounting, canonical limit precedence, and the invariant that partial exploration never fabricates a terminal;
-- add a typed/textual declarative deadlock-policy frontend whose legitimate-terminal predicate is an existing M22 Boolean proposition expression, resolving every proposition reference before backend execution and reusing the existing expression semantics rather than introducing another Boolean evaluator;
-- expose the frontend against external declarative model files with model-space limits, native deadlock violation exit 5, inconclusive exit 3, and malformed/reference/configuration exit 2;
-- add explicit `analysis "deadlock"` verification jobs backed by the same frontend, rejecting temporal-only fairness and product limits before execution and preserving historical job families unchanged;
-- extend schema-v2 machine results with model-space deadlock accounting/cutoff provenance and action/state shortest-witness evidence only; do not manufacture product accounting or temporal control state;
-- extend raw and expectation suites to six families while preserving declaration order, aggregate precedence, complete nested envelopes, deterministic repetition, and direct built-binary equivalence;
-- validate bounded deadlock semantics with an independent generated small-graph × legitimate-terminal-set × limit-profile oracle, including initial terminals, exact-bound completion, cutoff-before-witness, witness-before-later-cutoff, and no-false-terminal cases;
-- add no fairness interpretation for finite deadlocks, symbolic-state engine, arithmetic state-expression language, second traversal engine, wall-clock proof bound, or performance/security claim.
+- add deterministic state/transition/depth budgets to recurrence discovery without changing the sealed unbounded `analyze_recurrence` result;
+- treat a real closed cycle entirely contained in retained explored edges as a conclusive positive witness even when a later cutoff would otherwise occur;
+- report conclusive acyclicity only after complete reachable-graph exploration; a cutoff with no justified cycle must be `INCONCLUSIVE`, never “acyclic”;
+- preserve canonical model-limit precedence and exact model accounting, and distinguish retained edges from unknown successors so a cutoff cannot fabricate a terminal, SCC boundary, or cycle;
+- preserve deterministic shortest global stem to the reported cycle entry and a real-edge closed cycle witness; do not claim the returned cycle is globally shortest unless proved;
+- keep exhaustive SCC partition reporting on the sealed unbounded API only unless the bounded exploration completed; do not present partial SCCs as the full-model partition;
+- validate semantics with an independent generated small-graph × limit-profile oracle covering cutoff-before-cycle, cycle-before-later-cutoff, exact-bound completion, self-loops, multi-node cycles, and acyclic prefixes;
+- retain the existing 512-graph SCC oracle and 50,000-node iterative deep-graph regressions unchanged as migration gates;
+- add no fairness interpretation, symbolic-state engine, second traversal engine, wall-clock proof bound, or performance claim.
