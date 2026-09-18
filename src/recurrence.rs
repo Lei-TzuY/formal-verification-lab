@@ -181,13 +181,7 @@ where
 
 fn analyze_snapshot<S>(
     graph: &ReachableGraph<S>,
-) -> Result<
-    (
-        Vec<StronglyConnectedComponent<S>>,
-        Option<CycleWitness<S>>,
-    ),
-    RecurrenceError,
->
+) -> Result<(Vec<StronglyConnectedComponent<S>>, Option<CycleWitness<S>>), RecurrenceError>
 where
     S: Clone + Eq,
 {
