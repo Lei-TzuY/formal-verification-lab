@@ -232,8 +232,8 @@ fn oracle(mask: usize, limits: ExplorationLimits) -> OracleResult {
     }
 
     let first_cycle_component = components.iter().position(|(_, cyclic)| *cyclic);
-    let first_cycle_entry = first_cycle_component
-        .and_then(|index| components[index].0.first().copied());
+    let first_cycle_entry =
+        first_cycle_component.and_then(|index| components[index].0.first().copied());
     let first_cycle_distance = first_cycle_entry.map(|entry| distance[0][entry]);
 
     let outcome = if first_cycle_component.is_some() {
@@ -331,9 +331,8 @@ fn retained_self_loop_is_conclusive_before_later_transition_cutoff() {
 
 #[test]
 fn retained_two_state_cycle_is_conclusive_before_later_cutoff() {
-    let mask = (1usize << edge_index(0, 1))
-        | (1usize << edge_index(1, 0))
-        | (1usize << edge_index(1, 2));
+    let mask =
+        (1usize << edge_index(0, 1)) | (1usize << edge_index(1, 0)) | (1usize << edge_index(1, 2));
     let result = analyze_recurrence_with_limits(
         &graph_model(mask),
         ExplorationLimits {
@@ -420,7 +419,10 @@ fn unbounded_limits_preserve_sealed_recurrence_structure() {
             "mask={mask}"
         );
         assert_eq!(bounded.first_cycle, sealed.first_cycle, "mask={mask}");
-        assert_eq!(bounded.discovered_states, sealed.discovered_states, "mask={mask}");
+        assert_eq!(
+            bounded.discovered_states, sealed.discovered_states,
+            "mask={mask}"
+        );
         assert_eq!(
             bounded.explored_transitions, sealed.explored_transitions,
             "mask={mask}"
