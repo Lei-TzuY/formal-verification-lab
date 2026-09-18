@@ -203,7 +203,7 @@ fn oracle(mask: usize, limits: ExplorationLimits) -> OracleResult {
     }
     for (from, edges) in capture.outgoing.iter().enumerate() {
         for &to in edges {
-            distance[from][to] = 1;
+            distance[from][to] = distance[from][to].min(1);
         }
     }
     for via in 0..count {
