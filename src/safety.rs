@@ -5,8 +5,9 @@ use crate::property::{
     check_reachability, check_reachability_with_limits, ReachabilityError, ReachabilityProperty,
     ReachabilityStatus,
 };
-use crate::proposition_expr::{PropositionExpression, PropositionExpressionError};
-use std::collections::HashSet;
+use crate::proposition_expr::{
+    PropositionExpression, PropositionExpressionError, ResolvedPropositionExpression,
+};
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -98,52 +99,6 @@ impl From<ReachabilityError> for SafetyError {
     }
 }
 
-#[derive(Debug, Clone)]
-enum ResolvedExpression {
-    Atom(HashSet<String>),
-    Not(Box<ResolvedExpression>),
-    And(Box<ResolvedExpression>, Box<ResolvedExpression>),
-    Or(Box<ResolvedExpression>, Box<ResolvedExpression>),
-}
-
-impl ResolvedExpression {
-    fn resolve(
-        document: &DeclarativeDocument,
-        expression: &PropositionExpression,
-    ) -> Result<Self, PropositionExpressionError> {
-        match expression {
-            PropositionExpression::Atom(proposition) => {
-                let states = document.proposition_states(proposition).ok_or_else(|| {
-                    PropositionExpressionError::UnknownProposition {
-                        proposition: proposition.clone(),
-                    }
-                })?;
-                Ok(Self::Atom(states.iter().cloned().collect()))
-            }
-            PropositionExpression::Not(inner) => {
-                Ok(Self::Not(Box::new(Self::resolve(document, inner)?)))
-            }
-            PropositionExpression::And(left, right) => Ok(Self::And(
-                Box::new(Self::resolve(document, left)?),
-                Box::new(Self::resolve(document, right)?),
-            )),
-            PropositionExpression::Or(left, right) => Ok(Self::Or(
-                Box::new(Self::resolve(document, left)?),
-                Box::new(Self::resolve(document, right)?),
-            )),
-        }
-    }
-
-    fn evaluate(&self, state: &str) -> bool {
-        match self {
-            Self::Atom(states) => states.contains(state),
-            Self::Not(inner) => !inner.evaluate(state),
-            Self::And(left, right) => left.evaluate(state) && right.evaluate(state),
-            Self::Or(left, right) => left.evaluate(state) || right.evaluate(state),
-        }
-    }
-}
-
 /// Verify that every reachable state satisfies a Boolean proposition expression.
 ///
 /// This is intentionally a query-time safety property rather than a model
@@ -155,7 +110,7 @@ pub fn check_safety_assertion(
     document: &DeclarativeDocument,
     spec: &PropositionSafetySpec,
 ) -> Result<SafetyResult, SafetyError> {
-    let resolved = ResolvedExpression::resolve(document, &spec.expression)?;
+    let resolved = ResolvedPropositionExpression::resolve(document, &spec.expression)?;
     let property = ReachabilityProperty::new(spec.name.clone(), move |state: &String| {
         !resolved.evaluate(state)
     })?;
@@ -183,7 +138,7 @@ pub fn check_safety_assertion_with_limits(
     spec: &PropositionSafetySpec,
     limits: ExplorationLimits,
 ) -> Result<BoundedSafetyResult, SafetyError> {
-    let resolved = ResolvedExpression::resolve(document, &spec.expression)?;
+    let resolved = ResolvedPropositionExpression::resolve(document, &spec.expression)?;
     let property = ReachabilityProperty::new(spec.name.clone(), move |state: &String| {
         !resolved.evaluate(state)
     })?;

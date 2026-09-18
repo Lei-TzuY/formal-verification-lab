@@ -1,11 +1,15 @@
 use crate::bounded::BoundedOutcome;
 use crate::checker::{ExplorationLimits, InconclusiveReason};
+use crate::declarative_deadlock::{
+    check_declarative_deadlock_with_limits, parse_declarative_deadlock_spec,
+};
 use crate::exact_state::{
     check_exact_state_property_with_limits, parse_exact_state_property, ExactStateEvidence,
     ExactStateStatus,
 };
 use crate::multi_response::{MultiResponseProperty, MultiResponseStatus};
 use crate::multi_temporal::parse_multi_response_temporal;
+use crate::property::DeadlockStatus;
 use crate::proposition_expr::{
     check_proposition_expression_property_with_limits, BoundedPropositionExpressionResult,
     PropositionExpressionPropertySpec,
@@ -110,6 +114,10 @@ pub fn run_verification_job_json(manifest_path: impl AsRef<Path>) -> Verificatio
         VerificationJobAnalysis::Safety => match run_safety_job_json(manifest_path, job) {
             Ok(run) => run,
             Err(error) => error_run(VerificationJobResultEnvelope::safety_error(error)),
+        },
+        VerificationJobAnalysis::Deadlock => match run_deadlock_job_json(manifest_path, job) {
+            Ok(run) => run,
+            Err(error) => error_run(VerificationJobResultEnvelope::deadlock_error(error)),
         },
         VerificationJobAnalysis::ExactState => match run_exact_state_job_json(manifest_path, job) {
             Ok(run) => run,
@@ -227,6 +235,51 @@ fn run_safety_job_json(
         BoundedOutcome::Inconclusive(_) => 3,
     };
     debug_assert_eq!(safety_execution_outcome(&result.outcome), envelope.outcome);
+    Ok(VerificationJobJsonRun {
+        envelope,
+        exit_code,
+    })
+}
+
+fn run_deadlock_job_json(
+    manifest_path: &Path,
+    job: VerificationJob,
+) -> Result<VerificationJobJsonRun, String> {
+    validate_model_only_job(&job, "deadlock")?;
+    let (model_path, property_path) = resolve_job_paths(manifest_path, &job);
+
+    let model_input = fs::read_to_string(&model_path).map_err(|error| {
+        format!(
+            "failed to read declarative model '{}': {error}",
+            model_path.display()
+        )
+    })?;
+    let document = parse_declarative_document(&model_input).map_err(|error| error.to_string())?;
+
+    let property_input = fs::read_to_string(&property_path).map_err(|error| {
+        format!(
+            "failed to read deadlock property '{}': {error}",
+            property_path.display()
+        )
+    })?;
+    let spec = parse_declarative_deadlock_spec("verification-job-deadlock", &property_input)
+        .map_err(|error| error.to_string())?;
+    let result = check_declarative_deadlock_with_limits(&document, &spec, job.model_limits())
+        .map_err(|error| error.to_string())?;
+    let envelope = VerificationJobResultEnvelope::from_deadlock(
+        document.model().name().to_owned(),
+        job.model_limits(),
+        &result,
+    );
+    let exit_code = match result.outcome {
+        BoundedOutcome::Conclusive(DeadlockStatus::DeadlockFree) => 0,
+        BoundedOutcome::Conclusive(DeadlockStatus::DeadlockFound) => 5,
+        BoundedOutcome::Inconclusive(_) => 3,
+    };
+    debug_assert_eq!(
+        deadlock_execution_outcome(&result.outcome),
+        envelope.outcome
+    );
     Ok(VerificationJobJsonRun {
         envelope,
         exit_code,
@@ -567,6 +620,18 @@ fn safety_execution_outcome(outcome: &BoundedOutcome<SafetyStatus>) -> Verificat
     match outcome {
         BoundedOutcome::Conclusive(SafetyStatus::Safe) => VerificationJobOutcome::Satisfied,
         BoundedOutcome::Conclusive(SafetyStatus::Violated) => VerificationJobOutcome::Violated,
+        BoundedOutcome::Inconclusive(_) => VerificationJobOutcome::Inconclusive,
+    }
+}
+
+fn deadlock_execution_outcome(outcome: &BoundedOutcome<DeadlockStatus>) -> VerificationJobOutcome {
+    match outcome {
+        BoundedOutcome::Conclusive(DeadlockStatus::DeadlockFree) => {
+            VerificationJobOutcome::Satisfied
+        }
+        BoundedOutcome::Conclusive(DeadlockStatus::DeadlockFound) => {
+            VerificationJobOutcome::Violated
+        }
         BoundedOutcome::Inconclusive(_) => VerificationJobOutcome::Inconclusive,
     }
 }

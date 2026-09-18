@@ -16,6 +16,8 @@ pub mod builder;
 pub mod checker;
 pub mod combined_fairness;
 pub mod declarative;
+pub mod declarative_deadlock;
+pub mod declarative_deadlock_report;
 pub mod eventuality;
 pub mod eventuality_report;
 pub mod exact_state;
@@ -92,6 +94,11 @@ pub use combined_fairness::{
 pub use declarative::{
     parse_declarative_document, parse_declarative_model, DeclarativeDocument, DeclarativeModelError,
 };
+pub use declarative_deadlock::{
+    check_declarative_deadlock_with_limits, parse_declarative_deadlock_spec,
+    BoundedDeclarativeDeadlockResult, DeclarativeDeadlockError, DeclarativeDeadlockSpec,
+};
+pub use declarative_deadlock_report::render_declarative_deadlock_report;
 pub use eventuality::{
     check_eventuality, check_eventuality_with_limits, BoundedEventualityResult,
     EventualityCounterexample, EventualityError, EventualityProperty, EventualityResult,
@@ -149,9 +156,10 @@ pub use multi_temporal::{
     ResponseActionRole,
 };
 pub use property::{
-    check_deadlock, check_reachability, check_reachability_with_limits, BoundedReachabilityResult,
-    DeadlockError, DeadlockProperty, DeadlockResult, DeadlockStatus, ReachabilityError,
-    ReachabilityProperty, ReachabilityResult, ReachabilityStatus,
+    check_deadlock, check_deadlock_with_limits, check_reachability, check_reachability_with_limits,
+    BoundedDeadlockResult, BoundedReachabilityResult, DeadlockError, DeadlockProperty,
+    DeadlockResult, DeadlockStatus, ReachabilityError, ReachabilityProperty, ReachabilityResult,
+    ReachabilityStatus,
 };
 pub use proposition::{
     check_proposition_property, check_proposition_property_with_limits, BoundedPropositionResult,
