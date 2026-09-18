@@ -126,7 +126,10 @@ where
     S: Clone + Eq + Hash,
 {
     let captured = capture_reachable_graph(model).map_err(RecurrenceError::from)?;
-    let (components, first_cycle) = analyze_snapshot(&captured.graph)?;
+    let SnapshotRecurrence {
+        components,
+        first_cycle,
+    } = analyze_snapshot(&captured.graph)?;
 
     Ok(RecurrenceAnalysis {
         discovered_states: captured.discovered_states,
@@ -154,7 +157,10 @@ where
 {
     let captured =
         capture_reachable_graph_with_limits(model, limits).map_err(RecurrenceError::from)?;
-    let (prefix_components, first_cycle) = analyze_snapshot(&captured.graph)?;
+    let SnapshotRecurrence {
+        components: prefix_components,
+        first_cycle,
+    } = analyze_snapshot(&captured.graph)?;
 
     let complete = matches!(captured.completion, GraphCaptureCompletion::Complete);
     let outcome = if first_cycle.is_some() {
@@ -179,9 +185,12 @@ where
     })
 }
 
-fn analyze_snapshot<S>(
-    graph: &ReachableGraph<S>,
-) -> Result<(Vec<StronglyConnectedComponent<S>>, Option<CycleWitness<S>>), RecurrenceError>
+struct SnapshotRecurrence<S> {
+    components: Vec<StronglyConnectedComponent<S>>,
+    first_cycle: Option<CycleWitness<S>>,
+}
+
+fn analyze_snapshot<S>(graph: &ReachableGraph<S>) -> Result<SnapshotRecurrence<S>, RecurrenceError>
 where
     S: Clone + Eq,
 {
@@ -202,7 +211,10 @@ where
         .transpose()?
         .flatten();
 
-    Ok((components, first_cycle))
+    Ok(SnapshotRecurrence {
+        components,
+        first_cycle,
+    })
 }
 
 pub(crate) fn strongly_connected_components<S>(graph: &ReachableGraph<S>) -> Vec<Vec<usize>> {
