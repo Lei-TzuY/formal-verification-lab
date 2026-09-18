@@ -175,8 +175,8 @@ pub use proposition_expr::{
 pub use proposition_expr_report::render_proposition_expression_report;
 pub use proposition_report::render_proposition_report;
 pub use recurrence::{
-    analyze_recurrence, CycleWitness, RecurrenceAnalysis, RecurrenceError,
-    StronglyConnectedComponent,
+    analyze_recurrence, analyze_recurrence_with_limits, BoundedRecurrenceResult, CycleWitness,
+    RecurrenceAnalysis, RecurrenceError, RecurrenceStatus, StronglyConnectedComponent,
 };
 pub use reduction::{
     audit_sleep_set_reduction, IndependenceError, IndependenceRelation, ReducedExploration,
