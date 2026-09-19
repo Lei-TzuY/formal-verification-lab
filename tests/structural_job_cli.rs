@@ -29,8 +29,7 @@ edge "a" "later" "b"
 
 fn temp_root(kind: &str) -> PathBuf {
     let id = NEXT_DIR.fetch_add(1, Ordering::Relaxed);
-    let root =
-        std::env::temp_dir().join(format!("fvlab-m66-{kind}-{}-{id}", std::process::id()));
+    let root = std::env::temp_dir().join(format!("fvlab-m66-{kind}-{}-{id}", std::process::id()));
     fs::create_dir_all(root.join("models")).unwrap();
     root
 }
@@ -100,11 +99,7 @@ fn relative_model_job_is_reproducible_and_cli_json_matches_library_runner() {
 fn complete_cycle_job_is_neutral_success_with_cycle_evidence() {
     let root = temp_root("cycle");
     let manifest = write_job(&root, CYCLIC, "");
-    let output = run_cli(&[
-        "scc".into(),
-        "job".into(),
-        manifest.display().to_string(),
-    ]);
+    let output = run_cli(&["scc".into(), "job".into(), manifest.display().to_string()]);
     let json = stdout(&output);
 
     assert_eq!(output.status.code(), Some(0));
@@ -121,18 +116,12 @@ fn complete_cycle_job_is_neutral_success_with_cycle_evidence() {
 fn conclusive_cycle_before_cutoff_keeps_cutoff_but_not_partial_partition() {
     let root = temp_root("cycle-cutoff");
     let manifest = write_job(&root, CYCLE_BEFORE_CUTOFF, "max-transitions 1");
-    let output = run_cli(&[
-        "scc".into(),
-        "job".into(),
-        manifest.display().to_string(),
-    ]);
+    let output = run_cli(&["scc".into(), "job".into(), manifest.display().to_string()]);
     let json = stdout(&output);
 
     assert_eq!(output.status.code(), Some(0));
     assert!(json.contains("\"outcome\":\"cycle_found\""));
-    assert!(json.contains(
-        "\"cutoff\":{\"kind\":\"transition_limit\",\"limit\":1}"
-    ));
+    assert!(json.contains("\"cutoff\":{\"kind\":\"transition_limit\",\"limit\":1}"));
     assert!(json.contains("\"components\":null"));
     assert!(json.contains("\"evidence\":{\"component_index\":0"));
     assert!(json.contains("\"action\":\"loop\""));
@@ -144,18 +133,12 @@ fn conclusive_cycle_before_cutoff_keeps_cutoff_but_not_partial_partition() {
 fn incomplete_acyclic_prefix_is_inconclusive_exit_three() {
     let root = temp_root("inconclusive");
     let manifest = write_job(&root, ACYCLIC, "max-transitions 0");
-    let output = run_cli(&[
-        "scc".into(),
-        "job".into(),
-        manifest.display().to_string(),
-    ]);
+    let output = run_cli(&["scc".into(), "job".into(), manifest.display().to_string()]);
     let json = stdout(&output);
 
     assert_eq!(output.status.code(), Some(3));
     assert!(json.contains("\"outcome\":\"inconclusive\""));
-    assert!(json.contains(
-        "\"cutoff\":{\"kind\":\"transition_limit\",\"limit\":0}"
-    ));
+    assert!(json.contains("\"cutoff\":{\"kind\":\"transition_limit\",\"limit\":0}"));
     assert!(json.contains("\"components\":null"));
     assert!(json.contains("\"evidence\":null"));
 
@@ -183,8 +166,14 @@ fn verification_only_directives_fail_closed_as_structural_job_errors() {
         let json = stdout(&output);
 
         assert_eq!(output.status.code(), Some(2), "{directive}: {json}");
-        assert!(json.contains("\"outcome\":\"error\""), "{directive}: {json}");
-        assert!(json.contains("unsupported directive"), "{directive}: {json}");
+        assert!(
+            json.contains("\"outcome\":\"error\""),
+            "{directive}: {json}"
+        );
+        assert!(
+            json.contains("unsupported directive"),
+            "{directive}: {json}"
+        );
 
         fs::remove_dir_all(root).ok();
     }
@@ -199,11 +188,7 @@ fn malformed_model_missing_model_file_and_unsupported_format_fail_closed() {
         "",
     );
 
-    let malformed = run_cli(&[
-        "scc".into(),
-        "job".into(),
-        manifest.display().to_string(),
-    ]);
+    let malformed = run_cli(&["scc".into(), "job".into(), manifest.display().to_string()]);
     assert_eq!(malformed.status.code(), Some(2));
     assert!(stdout(&malformed).contains("\"outcome\":\"error\""));
 
