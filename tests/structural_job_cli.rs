@@ -158,11 +158,7 @@ fn verification_only_directives_fail_closed_as_structural_job_errors() {
     {
         let root = temp_root(&format!("invalid-{index}"));
         let manifest = write_job(&root, ACYCLIC, directive);
-        let output = run_cli(&[
-            "scc".into(),
-            "job".into(),
-            manifest.display().to_string(),
-        ]);
+        let output = run_cli(&["scc".into(), "job".into(), manifest.display().to_string()]);
         let json = stdout(&output);
 
         assert_eq!(output.status.code(), Some(2), "{directive}: {json}");
