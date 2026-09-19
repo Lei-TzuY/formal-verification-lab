@@ -61,9 +61,7 @@ fn conclusive_cycle_can_preserve_cutoff_and_withhold_full_partition() {
 
     let json = envelope.to_json();
     assert!(json.contains("\"outcome\":\"cycle_found\""));
-    assert!(json.contains(
-        "\"cutoff\":{\"kind\":\"transition_limit\",\"limit\":1}"
-    ));
+    assert!(json.contains("\"cutoff\":{\"kind\":\"transition_limit\",\"limit\":1}"));
     assert!(json.contains("\"components\":null"));
     assert!(json.contains("\"component_index\":0"));
     assert!(json.contains("\"action\":\"loop\""));
@@ -75,9 +73,9 @@ fn error_envelope_is_versioned_neutral_json_and_escapes_messages() {
     assert_eq!(envelope.outcome, StructuralJobOutcome::Error);
 
     let json = envelope.to_json();
-    assert!(json.starts_with(
-        "{\"schema_version\":1,\"analysis\":\"recurrence\",\"outcome\":\"error\""
-    ));
+    assert!(
+        json.starts_with("{\"schema_version\":1,\"analysis\":\"recurrence\",\"outcome\":\"error\"")
+    );
     assert!(json.contains("\"model\":null"));
     assert!(json.contains("\"components\":null"));
     assert!(json.contains("\"evidence\":null"));
