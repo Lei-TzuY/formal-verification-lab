@@ -1,5 +1,9 @@
-use crate::checker::TraceStep;
-use crate::graph::{capture_reachable_graph, shortest_path, GraphCaptureError, ReachableGraph};
+use crate::bounded::BoundedOutcome;
+use crate::checker::{ExplorationLimits, TraceStep};
+use crate::graph::{
+    capture_reachable_graph, capture_reachable_graph_with_limits, shortest_path,
+    GraphCaptureCompletion, GraphCaptureError, ReachableGraph,
+};
 use crate::model::{ModelError, TransitionSystem};
 use std::collections::HashSet;
 use std::fmt;
@@ -35,6 +39,34 @@ pub struct RecurrenceAnalysis<S> {
     pub explored_transitions: usize,
     pub max_depth_reached: Option<usize>,
     pub components: Vec<StronglyConnectedComponent<S>>,
+    pub first_cycle: Option<CycleWitness<S>>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RecurrenceStatus {
+    Acyclic,
+    CycleFound,
+}
+
+/// Proof-honest recurrence result under deterministic model-space limits.
+///
+/// A cycle is conclusive as soon as a real closed cycle exists entirely in the
+/// retained explored prefix. Acyclicity is conclusive only after the reachable
+/// graph is completely explored. `components` is therefore exposed only for a
+/// complete capture; an incomplete prefix is never presented as the full-model
+/// SCC partition.
+///
+/// When `first_cycle` comes from an incomplete prefix, its `component_index`
+/// refers only to the deterministic SCC ordering of that retained prefix. The
+/// witness itself is nevertheless a real full-model path and closed cycle.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BoundedRecurrenceResult<S> {
+    pub outcome: BoundedOutcome<RecurrenceStatus>,
+    pub discovered_states: usize,
+    pub checked_states: usize,
+    pub explored_transitions: usize,
+    pub max_depth_reached: Option<usize>,
+    pub components: Option<Vec<StronglyConnectedComponent<S>>>,
     pub first_cycle: Option<CycleWitness<S>>,
 }
 
@@ -94,30 +126,92 @@ where
     S: Clone + Eq + Hash,
 {
     let captured = capture_reachable_graph(model).map_err(RecurrenceError::from)?;
-    let component_ids = strongly_connected_components(&captured.graph);
+    let SnapshotRecurrence {
+        components,
+        first_cycle,
+    } = analyze_snapshot(&captured.graph)?;
+
+    Ok(RecurrenceAnalysis {
+        discovered_states: captured.discovered_states,
+        explored_transitions: captured.explored_transitions,
+        max_depth_reached: captured.max_depth_reached,
+        components,
+        first_cycle,
+    })
+}
+
+/// Analyze recurrence under deterministic model-space state, transition, and
+/// depth limits.
+///
+/// The bounded graph substrate retains only transitions that were actually
+/// counted and whose targets are justified. Any closed cycle found in that
+/// prefix is therefore a real cycle of the original model and is conclusive
+/// even if exploration later became incomplete. In contrast, absence of a
+/// cycle proves acyclicity only when the reachable graph capture completed.
+pub fn analyze_recurrence_with_limits<S>(
+    model: &TransitionSystem<S>,
+    limits: ExplorationLimits,
+) -> Result<BoundedRecurrenceResult<S>, RecurrenceError>
+where
+    S: Clone + Eq + Hash,
+{
+    let captured =
+        capture_reachable_graph_with_limits(model, limits).map_err(RecurrenceError::from)?;
+    let SnapshotRecurrence {
+        components: prefix_components,
+        first_cycle,
+    } = analyze_snapshot(&captured.graph)?;
+
+    let complete = matches!(captured.completion, GraphCaptureCompletion::Complete);
+    let outcome = if first_cycle.is_some() {
+        BoundedOutcome::Conclusive(RecurrenceStatus::CycleFound)
+    } else {
+        match captured.completion {
+            GraphCaptureCompletion::Complete => {
+                BoundedOutcome::Conclusive(RecurrenceStatus::Acyclic)
+            }
+            GraphCaptureCompletion::Inconclusive(reason) => BoundedOutcome::Inconclusive(reason),
+        }
+    };
+
+    Ok(BoundedRecurrenceResult {
+        outcome,
+        discovered_states: captured.discovered_states,
+        checked_states: captured.checked_states,
+        explored_transitions: captured.explored_transitions,
+        max_depth_reached: captured.max_depth_reached,
+        components: complete.then_some(prefix_components),
+        first_cycle,
+    })
+}
+
+struct SnapshotRecurrence<S> {
+    components: Vec<StronglyConnectedComponent<S>>,
+    first_cycle: Option<CycleWitness<S>>,
+}
+
+fn analyze_snapshot<S>(graph: &ReachableGraph<S>) -> Result<SnapshotRecurrence<S>, RecurrenceError>
+where
+    S: Clone + Eq,
+{
+    let component_ids = strongly_connected_components(graph);
     let components = component_ids
         .iter()
         .map(|ids| StronglyConnectedComponent {
-            states: ids
-                .iter()
-                .map(|id| captured.graph.states[*id].clone())
-                .collect(),
-            cyclic: component_is_cyclic(&captured.graph, ids),
+            states: ids.iter().map(|id| graph.states[*id].clone()).collect(),
+            cyclic: component_is_cyclic(graph, ids),
         })
         .collect::<Vec<_>>();
 
     let first_cycle = component_ids
         .iter()
         .enumerate()
-        .find(|(_, ids)| component_is_cyclic(&captured.graph, ids))
-        .map(|(component_index, ids)| cycle_witness(&captured.graph, component_index, ids))
+        .find(|(_, ids)| component_is_cyclic(graph, ids))
+        .map(|(component_index, ids)| cycle_witness(graph, component_index, ids))
         .transpose()?
         .flatten();
 
-    Ok(RecurrenceAnalysis {
-        discovered_states: captured.discovered_states,
-        explored_transitions: captured.explored_transitions,
-        max_depth_reached: captured.max_depth_reached,
+    Ok(SnapshotRecurrence {
         components,
         first_cycle,
     })
