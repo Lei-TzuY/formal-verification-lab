@@ -122,6 +122,7 @@ use formal_verification_lab::safety::{
 };
 use formal_verification_lab::safety_report::{render_bounded_safety_report, render_safety_report};
 use formal_verification_lab::strong_fairness::StrongFairness;
+use formal_verification_lab::structural_job_run::run_structural_job_json;
 use formal_verification_lab::temporal::{
     check_action_temporal, check_action_temporal_with_fairness_profile,
     check_action_temporal_with_fairness_profile_and_limits,
@@ -138,7 +139,6 @@ use formal_verification_lab::temporal_parse::parse_action_temporal;
 use formal_verification_lab::temporal_report::{
     render_analysis_temporal_report, render_bounded_temporal_report, render_temporal_report,
 };
-use formal_verification_lab::structural_job_run::run_structural_job_json;
 use formal_verification_lab::verification_job_run::{
     load_verification_job, run_verification_job_json,
 };
@@ -319,16 +319,10 @@ fn scc_command(args: &[String]) -> Result<ExitCode, String> {
         {
             run_structural_job_json_cli(manifest_path)
         }
-        [command, _manifest_path, flag, format]
-            if command == "job" && flag == "--format" =>
-        {
-            Err(format!(
-                "unsupported structural job format '{format}'; expected json"
-            ))
-        }
-        [command, manifest_path] if command == "job" => {
-            run_structural_job_json_cli(manifest_path)
-        }
+        [command, _manifest_path, flag, format] if command == "job" && flag == "--format" => Err(
+            format!("unsupported structural job format '{format}'; expected json"),
+        ),
+        [command, manifest_path] if command == "job" => run_structural_job_json_cli(manifest_path),
         [command, path, option_args @ ..] if command == "file" => {
             run_recurrence_file(path, option_args)
         }
