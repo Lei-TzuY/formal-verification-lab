@@ -2,9 +2,7 @@ use crate::bounded::BoundedOutcome;
 use crate::parse_declarative_model;
 use crate::recurrence::{analyze_recurrence_with_limits, RecurrenceStatus};
 use crate::structural_job::{parse_structural_job, StructuralJobAnalysis};
-use crate::structural_result::{
-    StructuralJobOutcome, StructuralJobResultEnvelope,
-};
+use crate::structural_result::{StructuralJobOutcome, StructuralJobResultEnvelope};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -66,11 +64,8 @@ fn run_recurrence_job(
         Ok(result) => result,
         Err(error) => return error_run(error.to_string()),
     };
-    let envelope = StructuralJobResultEnvelope::from_recurrence(
-        model.name().to_owned(),
-        limits,
-        &result,
-    );
+    let envelope =
+        StructuralJobResultEnvelope::from_recurrence(model.name().to_owned(), limits, &result);
     let exit_code = match result.outcome {
         BoundedOutcome::Conclusive(RecurrenceStatus::CycleFound)
         | BoundedOutcome::Conclusive(RecurrenceStatus::Acyclic) => 0,
