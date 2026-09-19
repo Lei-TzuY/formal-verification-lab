@@ -347,9 +347,7 @@ impl<'a> LineParser<'a> {
         Ok(self.input[start..self.position].to_owned())
     }
 
-    fn parse_string(
-        &mut self,
-    ) -> Result<String, (usize, StructuralJobParseErrorKind)> {
+    fn parse_string(&mut self) -> Result<String, (usize, StructuralJobParseErrorKind)> {
         let start = self.position;
         if self.peek() != Some('"') {
             return Err((start, StructuralJobParseErrorKind::ExpectedString));
@@ -390,9 +388,7 @@ impl<'a> LineParser<'a> {
         }
     }
 
-    fn parse_number(
-        &mut self,
-    ) -> Result<usize, (usize, StructuralJobParseErrorKind)> {
+    fn parse_number(&mut self) -> Result<usize, (usize, StructuralJobParseErrorKind)> {
         let start = self.position;
         while let Some(ch) = self.peek() {
             if !ch.is_ascii_digit() {
