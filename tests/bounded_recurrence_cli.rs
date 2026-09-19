@@ -32,10 +32,8 @@ edge "a" "later" "b"
 
 fn temp_model(kind: &str, input: &str) -> PathBuf {
     let id = NEXT_FILE.fetch_add(1, Ordering::Relaxed);
-    let path = std::env::temp_dir().join(format!(
-        "fvlab-m65-{kind}-{}-{id}.fvl",
-        std::process::id()
-    ));
+    let path =
+        std::env::temp_dir().join(format!("fvlab-m65-{kind}-{}-{id}.fvl", std::process::id()));
     fs::write(&path, input).expect("temporary model should be writable");
     path
 }
@@ -169,11 +167,7 @@ fn file_cli_rejects_malformed_models_and_bad_or_duplicate_limit_options() {
         "malformed",
         "model \"broken\"\nstate \"a\"\ninitial \"missing\"\n",
     );
-    let malformed_output = run(&[
-        "scc".into(),
-        "file".into(),
-        malformed.display().to_string(),
-    ]);
+    let malformed_output = run(&["scc".into(), "file".into(), malformed.display().to_string()]);
     assert_eq!(malformed_output.status.code(), Some(2));
     assert!(stderr(&malformed_output).contains("error:"));
     assert!(stderr(&malformed_output).contains("missing"));
