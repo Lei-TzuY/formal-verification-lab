@@ -1,5 +1,5 @@
 use crate::bounded::BoundedOutcome;
-use crate::checker::{ExplorationLimits, TraceStep};
+use crate::checker::{ExplorationLimits, InconclusiveReason, TraceStep};
 use crate::graph::{
     capture_reachable_graph, capture_reachable_graph_with_limits, shortest_path,
     GraphCaptureCompletion, GraphCaptureError, ReachableGraph,
