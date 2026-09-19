@@ -53,6 +53,9 @@ pub mod response_report;
 pub mod safety;
 pub mod safety_report;
 pub mod strong_fairness;
+pub mod structural_job;
+pub mod structural_job_run;
+pub mod structural_result;
 pub mod temporal;
 pub mod temporal_parse;
 pub mod temporal_report;
@@ -201,6 +204,16 @@ pub use safety::{
 };
 pub use safety_report::render_safety_report;
 pub use strong_fairness::{check_buchi_with_strong_fairness, StrongFairness, StrongFairnessError};
+pub use structural_job::{
+    parse_structural_job, StructuralJob, StructuralJobAnalysis, StructuralJobParseError,
+    StructuralJobParseErrorKind,
+};
+pub use structural_job_run::{run_structural_job_json, StructuralJobJsonRun};
+pub use structural_result::{
+    StructuralJobAccounting, StructuralJobComponent, StructuralJobCutoff, StructuralJobCutoffKind,
+    StructuralJobCycleEvidence, StructuralJobLimits, StructuralJobOutcome,
+    StructuralJobResultEnvelope, StructuralJobTraceStep, STRUCTURAL_JOB_RESULT_SCHEMA_VERSION,
+};
 pub use temporal::{
     check_action_temporal, check_action_temporal_with_fairness_profile,
     check_action_temporal_with_fairness_profile_and_limits,

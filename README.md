@@ -311,6 +311,16 @@ Product-only and staged routes preserve existing proof-honest cutoff semantics a
 
 M52 adds no fairness-by-default behavior, new response semantics, new traversal engine, textual fairness grammar, wall-clock proof bound, or performance claim.
 
+### Milestones 53–66 — reproducible verification and neutral structural jobs
+
+Milestones 53–54 add a deterministic textual multi-response frontend and external model/property-file CLI, compiling named exact-action response clauses directly to the sealed multi-response authorities while keeping fairness as an explicit external assumption.
+
+Milestones 55–58 add reproducible verification-job manifests, versioned machine-readable result envelopes, deterministic multi-job suites, and explicit expectation-aware regression checking. Milestones 59–63 then extend that job/suite substrate across declarative Boolean safety, exact-state, proposition-expression, action-temporal, and bounded declarative deadlock verification without changing the underlying property engines.
+
+Milestones 64–65 extend recurrence with proof-honest model-space state/transition/depth budgets and external declarative-file reporting. A retained real cycle remains conclusive even if exploration later hits a cutoff; absence of a cycle is conclusive only after complete reachable-graph capture, and incomplete prefixes never masquerade as a complete SCC partition.
+
+Milestone 66 adds a separate reproducible structural-analysis job protocol for recurrence. Its manifest requires a model but no fake property, delegates directly to `analyze_recurrence_with_limits`, rejects verification-only fairness/product directives, and emits a versioned neutral JSON envelope with `cycle_found`, `acyclic`, `inconclusive`, or `error`. Both `cycle_found` and `acyclic` remain neutral structural outcomes; regression expectations are a separate higher-level concern.
+
 ## Architecture
 
 ```text
@@ -345,10 +355,19 @@ src/buchi.rs                  unbounded, product-bounded + staged Büchi semanti
 src/temporal.rs               typed response/recurring routing, including weak/strong/combined fairness
 src/temporal_parse.rs         textual parser for the typed temporal subset
 src/temporal_report.rs        normalized unbounded/product-bounded/staged reporting
+src/multi_temporal.rs          textual named multi-response property frontend
 src/exact_state.rs            exact-state frontend + backend routing
 src/proposition.rs            named-proposition frontend + backend routing
 src/proposition_expr.rs       Boolean proposition AST/parser + backend routing
 src/safety.rs                 query-time Boolean safety assertion frontend
+src/verification_job.rs       reproducible heterogeneous verification-job manifests
+src/verification_job_run.rs   verification-job loading, dispatch and execution
+src/verification_result.rs    versioned machine-readable verification envelopes
+src/verification_suite.rs     deterministic multi-job suite manifests/expectations
+src/verification_suite_run.rs suite execution and regression expectation checking
+src/structural_job.rs         neutral recurrence structural-job manifests
+src/structural_job_run.rs     manifest-relative structural execution
+src/structural_result.rs      versioned neutral structural result envelopes
 src/*_report.rs               deterministic analysis-specific reporting
 src/*_examples.rs             executable teaching models
 src/main.rs                   CLI/file/exit-status integration; no model traversal logic
@@ -490,7 +509,7 @@ M25–M29 retain product/staged semantic and built-binary regression suites. M32
 - Strong fairness means an action enabled infinitely often on an admitted infinite execution must also be taken infinitely often; intermittent enablement therefore matters.
 - Fairness assumptions remain external to the textual temporal grammar. The grammar is still deliberately limited to `response(...)` and `infinitely-often(...)`.
 - M45–M52 provide explicit combined weak/strong fairness semantics through generalized Büchi, single-response, typed/textual/declarative action-temporal, multi-response, and finite-monitor APIs across unbounded, product-bounded, and staged analysis; M48 exposes mixed temporal assumptions on the CLI, M50 exposes mixed finite-monitor assumptions on `monitor`, M51 exposes mixed multi-response assumptions on direct `respond dual-grant*` routes, and M52 exposes mixed single-response assumptions on direct `respond request-grant*` routes.
-- M35/M42/M49 provide the multi-response weak/strong/combined fairness backend authority, and M51 exposes it externally for the direct multi-response teaching models. No multi-clause textual temporal syntax is introduced yet.
+- M35/M42/M49 provide the multi-response weak/strong/combined fairness backend authority, M51 exposes it for the direct teaching models, and M53/M54 add deterministic textual/file multi-response property surfaces. Fairness remains an external assumption surface rather than part of the property grammar.
 - M37 exposes finite-monitor weak fairness on the direct `monitor` CLI, M44 exposes strong-fair monitor verification, and M50 exposes canonical mixed weak/strong monitor assumptions through the same direct command for unbounded, product-bounded, and staged analysis.
 - Response obligations remain Boolean pending obligations, not per-request identity queues.
 - The action-temporal frontend supports exact action atoms only; it has no wildcard/Boolean action predicate language, nested temporal operators, temporal negation, or arbitrary formula composition.
@@ -499,19 +518,23 @@ M25–M29 retain product/staged semantic and built-binary regression suites. M32
 - No SAT/SMT, BDDs, symbolic execution, theorem proving, symmetry reduction, disk-backed state storage, parallel exploration, or distributed checking is implemented.
 - The sleep-set engine remains experimental and differentially audited, not a standalone trusted POR proof backend.
 - Deterministic witnesses require deterministic successor ordering; declarative models preserve input edge ordering to make this explicit.
+- M66 structural recurrence jobs deliberately do not reuse `satisfied` / `violated`: `cycle_found` and `acyclic` are neutral structural outcomes unless a separate regression expectation assigns meaning to them.
 - No milestone makes a performance claim from CI timing.
 
 ## Roadmap
 
-Milestones 1–52 now form a coherent explicit-state stack: safety and bounded honesty -> typed models and independent graph validation -> reachability/deadlock/recurrence -> eventuality and response obligations -> finite monitors and generalized Büchi acceptance -> shared graph/product substrates -> typed/textual/declarative specification frontends -> bounded state properties -> product/staged temporal budgets -> iterative deep-graph SCC traversal -> opt-in exact-action weak fairness -> bounded/staged enablement provenance -> weak-fair response and monitor composition -> opt-in exact-action strong fairness -> proof-honest bounded/staged strong-fair verification -> strong-fair response/temporal/multi-response/monitor composition -> explicit combined weak/strong fairness -> proof-honest bounded/staged combined-fair Büchi -> combined-fair response/action-temporal -> external combined-fair temporal CLI -> combined-fair multi-response -> combined-fair finite-monitor backend/direct CLI -> external combined-fair multi-response CLI/reporting -> external combined-fair single-response CLI/reporting.
+Milestones 1–66 now form a coherent explicit-state stack: canonical safety/bounded exploration -> typed finite models and independent graph validation -> reachability/deadlock/recurrence/eventuality -> response obligations, finite monitors and generalized Büchi acceptance -> shared graph/action-product substrates -> typed/textual/declarative property frontends -> proof-honest model/product budgets -> iterative deep-graph SCC traversal -> opt-in weak, strong and combined fairness -> external multi-response/property-file surfaces -> reproducible heterogeneous verification jobs, result envelopes and expectation-aware suites -> bounded declarative deadlock -> proof-honest bounded recurrence -> declarative recurrence CLI -> neutral reproducible structural-analysis jobs.
 
-M52 seals the direct single-response fairness surface. The next highest-value specification frontier is **Milestone 53: textual multi-response temporal frontend**. The M11/M25/M28/M49 multi-response authorities already support no-fair, bounded/staged, and combined-fair verification, but external textual temporal syntax still represents only one response obligation at a time.
+Milestone 66 deliberately separates structural discovery from property verification. A recurrence job reports `cycle_found`, `acyclic`, `inconclusive`, or `error`; it does not reinterpret graph structure as a pass/fail property.
 
-Acceptance criteria for M53:
+The next high-value slice is **Milestone 67: deterministic structural-analysis suites and explicit structural expectations**. The M66 single-job protocol is now stable enough to support reproducible orchestration without collapsing structural outcomes into `VerificationJobOutcome`.
 
-- add a deterministic textual representation for conjunctions of named exact-action response clauses, with position-aware fail-closed diagnostics, escaping, and canonical rendering;
-- compile directly to the sealed `MultiResponseProperty` semantics rather than adding another response traversal or acceptance interpretation;
-- preserve exact no-fair, combined-fair, product-bounded, and staged model-before-product behavior, including clause identity, finite pending terminals, lasso evidence, and cutoff provenance;
-- integrate the textual multi-response property with external declarative model files without changing the finite-model grammar;
-- add independent generated differential evidence against direct multi-response verification plus parser/round-trip/malformed-input regressions;
-- keep fairness as an external assumption surface, preserve historical single-response temporal grammar compatibility, and add no fairness-by-default behavior, wall-clock proof bound, or performance claim.
+Acceptance criteria for M67:
+
+- add a dedicated structural-suite manifest that references multiple M66 structural jobs in deterministic declaration order and resolves job paths relative to the suite manifest;
+- preserve every raw M66 result envelope exactly enough for machine comparison and never rewrite `cycle_found` / `acyclic` into property-style satisfaction;
+- keep raw suite execution neutral, then add a separate explicit regression-expectation mode for structural outcomes such as expected `cycle_found`, `acyclic`, `inconclusive`, or `error`;
+- define deterministic aggregate precedence, mismatch reporting, suite-size limits, malformed/missing job handling, and stable JSON output;
+- reuse the sealed M66 job runner/result schema rather than adding another recurrence traversal or SCC implementation;
+- add direct-runner versus built-binary differential coverage, relative-path tests, ordered mixed-outcome suites, matching/mismatching expectations, and fail-closed malformed inputs;
+- preserve all existing verification-job/suite behavior and add no fairness interpretation, symbolic engine, wall-clock proof bound, or performance claim.

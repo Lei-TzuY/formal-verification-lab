@@ -1,55 +1,51 @@
 # Project Status
 
-This file records the current integration frontier. Historical capability detail remains in `README.md`; when the README roadmap lags an already-validated integration candidate, this status file is the current phase marker.
+This file records the current integration frontier. Historical capability detail remains in `README.md`; this file is the canonical short-form phase marker.
 
-## Milestone 64 — proof-honest bounded recurrence / cycle discovery
+## Milestone 64 — proof-honest bounded recurrence
 
 **Status: sealed in `main` at `7a384ac9a66c31c767f1124fd08319645f79d01b`.**
 
-Milestone 64 extends recurrence analysis with deterministic model-space state, transition, and depth budgets while preserving the sealed exhaustive `analyze_recurrence` behavior.
+M64 adds deterministic model-space state/transition/depth budgets to recurrence while preserving the exhaustive `analyze_recurrence` contract. Retained real cycles are conclusive even if a later cutoff occurs; an acyclic conclusion requires complete reachable-graph capture. Incomplete prefixes never masquerade as the full SCC partition. The independent 4,608-case bounded recurrence oracle plus the historical SCC/deep-graph regressions remain gates.
 
-`analyze_recurrence_with_limits` reuses `capture_reachable_graph_with_limits` and the existing iterative Tarjan/shortest-path substrate. Any closed cycle entirely contained in retained explored edges is a real full-model cycle, so it is conclusively reported as `CycleFound` even when exploration later becomes incomplete. By contrast, absence of a cycle proves `Acyclic` only when reachable-graph capture completes; an incomplete acyclic prefix is explicitly `INCONCLUSIVE`.
+## Milestone 65 — declarative bounded recurrence CLI
 
-Bounded results expose exact discovery/check/transition/depth accounting and deterministic stem-plus-cycle evidence. A full SCC partition is exposed only when capture completed. Incomplete prefixes never masquerade as the full-model partition. The independent **4,608-case** oracle covers all 512 directed three-state graphs × 9 deterministic limit profiles, while the sealed 512-graph SCC oracle and 50,000-node iterative deep-chain/deep-cycle regressions remain migration gates.
+**Status: sealed in `main` at `aec42f5a77c89534e44f3401b2dd8066d5025102`.**
 
-Post-merge exact-main CI #552 and Bounded state-property CLI workflow #402 both succeeded.
+M65 exposes the M64 proof boundary to declarative model files through `fvlab scc file <path> [limits]`, preserving cutoff provenance even after conclusive cycle discovery and withholding complete-partition claims when exploration is incomplete. Conclusive `CYCLE_FOUND` / `ACYCLIC` exit 0, incomplete exploration exits 3, and malformed input exits 2.
 
-## Milestone 65 — declarative bounded recurrence reporting and file CLI
+## Milestone 66 — neutral structural-analysis job protocol
 
-**Status: integration candidate complete; exact-head verified before closure metadata.**
+**Status: integration candidate complete on PR #67.**
 
-Milestone 65 exposes the M64 proof boundary to external declarative finite models without converting structural recurrence into a pass/fail verification property.
+M66 adds a reproducible structural job protocol without forcing recurrence into the property-verification `satisfied` / `violated` envelope.
 
-The bounded recurrence result now preserves `cutoff_reason` even when a retained real cycle makes the structural outcome conclusively `CycleFound`. This closes a provenance gap: the report can truthfully distinguish “cycle proved and exploration complete” from “cycle proved before a later resource cutoff.” The proof status itself is unchanged.
+Implemented contract:
 
-`render_bounded_recurrence_report` renders `CYCLE_FOUND`, `ACYCLIC`, or `INCONCLUSIVE`, exact model accounting, cutoff provenance, and deterministic cycle evidence. A complete SCC partition is rendered only when exploration completed; otherwise the report explicitly says the partition is unavailable rather than presenting a prefix partition as exhaustive.
+- manifest grammar: `analysis "recurrence"`, required `model`, optional model-space `max-states`, `max-transitions`, and `max-depth`;
+- property, fairness, and product-limit directives fail closed;
+- manifest-relative model resolution and direct delegation to the sealed `analyze_recurrence_with_limits` authority;
+- versioned neutral JSON outcomes `cycle_found`, `acyclic`, `inconclusive`, and `error`;
+- exact accounting and cutoff provenance, including conclusive retained cycles found before a later cutoff;
+- complete SCC partitions only after complete capture; incomplete prefixes expose no fake exhaustive partition;
+- deterministic stem-plus-cycle evidence;
+- `fvlab scc job <manifest> [--format json]` with exits 0 / 3 / 2 for conclusive structural result / inconclusive / error;
+- canonical manifest round trips, schema regressions, external-file execution, malformed-input coverage, and historical integration gates.
 
-`fvlab scc file <path> [--max-states N] [--max-transitions N] [--max-depth N]` loads the existing declarative `.fvl` graph grammar and delegates directly to `analyze_recurrence_with_limits`. Both conclusive structural outcomes exit 0, incomplete exploration exits 3, and malformed file/model/options exit 2. Historical `scc counter` and `scc traffic-light` continue to use the sealed unbounded renderer and retain their existing surface.
+Exact pre-closure candidate `a4dbcdad32223718c9983f6e7ac4f616d5f9b773` passed CI #563 (format, build, Clippy with `-D warnings`, full tests, all historical CLI gates) and Bounded state-property CLI #413. Closure metadata changes must pass the same exact-head gates before merge.
 
-Executable evidence includes:
-- the unchanged M64 **4,608-case** bounded recurrence oracle, now also checking exact cutoff provenance;
-- six built-binary regressions covering complete acyclic, complete cyclic, cycle-before-later-cutoff, cutoff-without-cycle, malformed model/options, and historical hard-coded SCC compatibility;
-- direct backend/report versus external-file CLI output equality on the new paths;
-- exact candidate `87b0ea56c97ca911208b52cc2df3be601b0db99c` passed CI #555 (format, build, Clippy with `-D warnings`, full tests, and historical CLI gates) and Bounded state-property CLI workflow #405;
-- CI #555 executed `tests/bounded_recurrence.rs` 6/6 including the generated oracle and `tests/bounded_recurrence_cli.rs` 6/6.
+M66 adds no second SCC implementation, fairness interpretation, symbolic engine, wall-clock proof bound, or performance claim.
 
-M65 introduces no verification-job family, fairness interpretation, symbolic engine, second recurrence semantics, wall-clock proof bound, or performance claim.
+## Next frontier — Milestone 67: deterministic structural-analysis suites and expectations
 
-## Next frontier — Milestone 66: neutral structural-analysis job protocol
-
-The current reproducible verification-job stack assumes every analysis has a required property file and normalizes outcomes to `satisfied` / `violated`. That shape is appropriate for property verification but is semantically wrong for recurrence: `CycleFound` and `Acyclic` are both neutral structural analysis results unless a separate user expectation turns one into a regression condition.
-
-Milestone 66 should add a reproducible **structural-analysis** protocol instead of forcing recurrence into the property-verification envelope.
+M66 stabilizes one neutral structural job and its result envelope. The next architectural gap is reproducible multi-job orchestration that preserves structural neutrality while allowing explicit regression expectations as a separate contract.
 
 Acceptance criteria:
 
-- define an explicit recurrence/structural job family whose manifest does not require a fake property file;
-- preserve model-space state/transition/depth budgets and reject temporal-only fairness/product-limit directives fail-closed;
-- define a versioned structural result envelope with neutral `CYCLE_FOUND`, `ACYCLIC`, `INCONCLUSIVE`, and `ERROR` outcomes rather than reusing `VerificationJobOutcome::{Satisfied,Violated}`;
-- preserve exact model accounting, cutoff provenance, complete-partition availability, and deterministic stem-plus-cycle evidence;
-- route execution through the sealed `analyze_recurrence_with_limits` authority; do not add another SCC or graph traversal implementation;
-- provide canonical manifest parse/render round trips and path resolution relative to the manifest;
-- add built-binary JSON job integration for complete acyclic/cyclic, conclusive-cycle-before-cutoff, incomplete acyclic prefix, malformed input, and incompatible directives;
-- keep the existing property-verification job schema and six established verification families byte/behavior compatible;
-- defer suite expectation semantics until the neutral structural result protocol is stable; a later milestone may define explicit expectations such as “expect acyclic” without redefining raw cycle discovery itself;
-- add no fairness interpretation, symbolic engine, wall-clock proof bound, or performance claim.
+- define a dedicated structural-suite manifest with deterministic job order, manifest-relative job paths, and a bounded suite size;
+- run each entry through the sealed M66 job runner and preserve its raw neutral envelope;
+- keep raw suite execution neutral; do not turn `cycle_found` or `acyclic` into verification pass/fail states;
+- add a separate expectation mode with explicit expected structural outcomes and deterministic mismatch reporting;
+- define stable aggregate JSON, exit behavior, malformed/missing-job handling, and outcome precedence;
+- validate ordered mixed-outcome suites, relative paths, matching/mismatching expectations, raw-vs-CLI equivalence, and fail-closed invalid manifests;
+- preserve the existing property-verification suite protocol byte/behavior compatibility and add no new graph traversal, fairness semantics, wall-clock proof bound, or performance claim.
