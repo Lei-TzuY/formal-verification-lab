@@ -99,10 +99,11 @@ use formal_verification_lab::proposition_expr_report::{
 use formal_verification_lab::proposition_report::{
     render_bounded_proposition_report, render_proposition_report,
 };
-use formal_verification_lab::recurrence::analyze_recurrence;
+use formal_verification_lab::recurrence::{analyze_recurrence, analyze_recurrence_with_limits};
 use formal_verification_lab::reduction::{audit_sleep_set_reduction, IndependenceRelation};
 use formal_verification_lab::report::{
-    render_deadlock_report, render_reachability_report, render_recurrence_report, render_report,
+    render_bounded_recurrence_report, render_deadlock_report, render_reachability_report,
+    render_recurrence_report, render_report,
 };
 use formal_verification_lab::response::{
     check_response, check_response_with_fairness_profile,
@@ -312,6 +313,9 @@ fn run_counter_deadlock(
 
 fn scc_command(args: &[String]) -> Result<ExitCode, String> {
     match args {
+        [command, path, option_args @ ..] if command == "file" => {
+            run_recurrence_file(path, option_args)
+        }
         [example] if example == "counter" => {
             run_recurrence(bounded_counter().map_err(|error| error.to_string())?)
         }
@@ -319,7 +323,7 @@ fn scc_command(args: &[String]) -> Result<ExitCode, String> {
             run_recurrence(traffic_light().map_err(|error| error.to_string())?)
         }
         [example] => Err(format!(
-            "unknown SCC example '{example}'; expected counter or traffic-light"
+            "unknown SCC example '{example}'; expected counter, traffic-light, or file <path>"
         )),
         _ => Err(usage()),
     }
@@ -334,6 +338,23 @@ where
     let analysis = analyze_recurrence(&model).map_err(|error| error.to_string())?;
     print!("{}", render_recurrence_report(model.name(), &analysis));
     Ok(ExitCode::SUCCESS)
+}
+
+fn run_recurrence_file(path: &str, option_args: &[String]) -> Result<ExitCode, String> {
+    let input = fs::read_to_string(path)
+        .map_err(|error| format!("failed to read declarative model '{path}': {error}"))?;
+    let model = parse_declarative_model(&input).map_err(|error| error.to_string())?;
+    let limits = parse_limits(option_args)?;
+    let result =
+        analyze_recurrence_with_limits(&model, limits).map_err(|error| error.to_string())?;
+    print!(
+        "{}",
+        render_bounded_recurrence_report(model.name(), &result)
+    );
+    Ok(match result.outcome {
+        BoundedOutcome::Conclusive(_) => ExitCode::SUCCESS,
+        BoundedOutcome::Inconclusive(_) => ExitCode::from(3),
+    })
 }
 
 fn eventuality_command(args: &[String]) -> Result<ExitCode, String> {
@@ -1788,7 +1809,7 @@ fn status_exit_code(status: VerificationStatus) -> ExitCode {
 }
 
 fn usage() -> String {
-    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | eventually <counter-three|counter-four|traffic-never> | respond <request-grant|request-grant-unfair|request-grant-terminal> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | respond <dual-grant|dual-grant-unfair-b|dual-grant-terminal-b> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | monitor <session-ok|session-double-open|session-stuck|session-unfair-close|session-open-terminal> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | buchi <pulses|pulses-unfair|finite-ignore|finite-strict> [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal <request-grant|request-grant-unfair|pulses|pulses-unfair> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal check <request-grant|request-grant-unfair|pulses|pulses-unfair> <expression> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal file <path> <expression> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal multi-file <model-path> <property-path> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal job <manifest-path> | state file <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition file <path> <reachable|all-eventually> <proposition> [--max-states N] [--max-transitions N] [--max-depth N] | proposition expr <path> <reachable|all-eventually> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition always <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N]]"
+    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | scc file <path> [--max-states N] [--max-transitions N] [--max-depth N] | eventually <counter-three|counter-four|traffic-never> | respond <request-grant|request-grant-unfair|request-grant-terminal> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | respond <dual-grant|dual-grant-unfair-b|dual-grant-terminal-b> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | monitor <session-ok|session-double-open|session-stuck|session-unfair-close|session-open-terminal> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | buchi <pulses|pulses-unfair|finite-ignore|finite-strict> [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal <request-grant|request-grant-unfair|pulses|pulses-unfair> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal check <request-grant|request-grant-unfair|pulses|pulses-unfair> <expression> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal file <path> <expression> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal multi-file <model-path> <property-path> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal job <manifest-path> | state file <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition file <path> <reachable|all-eventually> <proposition> [--max-states N] [--max-transitions N] [--max-depth N] | proposition expr <path> <reachable|all-eventually> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition always <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N]]"
         .to_owned()
 }
 

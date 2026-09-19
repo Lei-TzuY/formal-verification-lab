@@ -1,5 +1,5 @@
 use crate::bounded::BoundedOutcome;
-use crate::checker::{ExplorationLimits, TraceStep};
+use crate::checker::{ExplorationLimits, InconclusiveReason, TraceStep};
 use crate::graph::{
     capture_reachable_graph, capture_reachable_graph_with_limits, shortest_path,
     GraphCaptureCompletion, GraphCaptureError, ReachableGraph,
@@ -66,6 +66,9 @@ pub struct BoundedRecurrenceResult<S> {
     pub checked_states: usize,
     pub explored_transitions: usize,
     pub max_depth_reached: Option<usize>,
+    /// Resource cutoff that ended model exploration, even when a retained
+    /// cycle already makes the recurrence outcome conclusive.
+    pub cutoff_reason: Option<InconclusiveReason>,
     pub components: Option<Vec<StronglyConnectedComponent<S>>>,
     pub first_cycle: Option<CycleWitness<S>>,
 }
@@ -162,16 +165,17 @@ where
         first_cycle,
     } = analyze_snapshot(&captured.graph)?;
 
-    let complete = matches!(captured.completion, GraphCaptureCompletion::Complete);
+    let cutoff_reason = match captured.completion {
+        GraphCaptureCompletion::Complete => None,
+        GraphCaptureCompletion::Inconclusive(reason) => Some(reason),
+    };
+    let complete = cutoff_reason.is_none();
     let outcome = if first_cycle.is_some() {
         BoundedOutcome::Conclusive(RecurrenceStatus::CycleFound)
+    } else if let Some(reason) = cutoff_reason {
+        BoundedOutcome::Inconclusive(reason)
     } else {
-        match captured.completion {
-            GraphCaptureCompletion::Complete => {
-                BoundedOutcome::Conclusive(RecurrenceStatus::Acyclic)
-            }
-            GraphCaptureCompletion::Inconclusive(reason) => BoundedOutcome::Inconclusive(reason),
-        }
+        BoundedOutcome::Conclusive(RecurrenceStatus::Acyclic)
     };
 
     Ok(BoundedRecurrenceResult {
@@ -180,6 +184,7 @@ where
         checked_states: captured.checked_states,
         explored_transitions: captured.explored_transitions,
         max_depth_reached: captured.max_depth_reached,
+        cutoff_reason,
         components: complete.then_some(prefix_components),
         first_cycle,
     })

@@ -1,6 +1,7 @@
+use crate::bounded::BoundedOutcome;
 use crate::checker::{CheckResult, InconclusiveReason, VerificationStatus};
 use crate::property::{DeadlockResult, DeadlockStatus, ReachabilityResult, ReachabilityStatus};
-use crate::recurrence::RecurrenceAnalysis;
+use crate::recurrence::{BoundedRecurrenceResult, RecurrenceAnalysis, RecurrenceStatus};
 use std::fmt::{Debug, Write};
 
 /// Render a stable, line-oriented report suitable for the CLI and snapshots.
@@ -237,6 +238,104 @@ pub fn render_recurrence_report<S: Debug>(
     }
 
     if let Some(witness) = &analysis.first_cycle {
+        writeln!(&mut output, "cycle component: {}", witness.component_index)
+            .expect("writing to String cannot fail");
+        writeln!(&mut output, "stem:").expect("writing to String cannot fail");
+        render_trace(&mut output, &witness.stem, "initial");
+        writeln!(&mut output, "cycle:").expect("writing to String cannot fail");
+        render_trace(&mut output, &witness.cycle, "cycle-entry");
+    } else {
+        writeln!(&mut output, "cycle witness: none").expect("writing to String cannot fail");
+    }
+
+    output
+}
+
+/// Render proof-honest recurrence analysis under deterministic model-space
+/// limits. A complete SCC partition is printed only when exploration completed;
+/// a retained cycle may still be conclusive after a later cutoff.
+pub fn render_bounded_recurrence_report<S: Debug>(
+    model_name: &str,
+    result: &BoundedRecurrenceResult<S>,
+) -> String {
+    let mut output = String::new();
+    writeln!(&mut output, "model: {model_name}").expect("writing to String cannot fail");
+    writeln!(
+        &mut output,
+        "recurrence: {}",
+        match result.outcome {
+            BoundedOutcome::Conclusive(RecurrenceStatus::CycleFound) => "CYCLE_FOUND",
+            BoundedOutcome::Conclusive(RecurrenceStatus::Acyclic) => "ACYCLIC",
+            BoundedOutcome::Inconclusive(_) => "INCONCLUSIVE",
+        }
+    )
+    .expect("writing to String cannot fail");
+    writeln!(
+        &mut output,
+        "discovered states: {}",
+        result.discovered_states
+    )
+    .expect("writing to String cannot fail");
+    writeln!(&mut output, "checked states: {}", result.checked_states)
+        .expect("writing to String cannot fail");
+    writeln!(
+        &mut output,
+        "explored transitions: {}",
+        result.explored_transitions
+    )
+    .expect("writing to String cannot fail");
+    match result.max_depth_reached {
+        Some(depth) => writeln!(&mut output, "max depth reached: {depth}"),
+        None => writeln!(&mut output, "max depth reached: none"),
+    }
+    .expect("writing to String cannot fail");
+
+    if let Some(reason) = result.cutoff_reason {
+        match reason {
+            InconclusiveReason::StateLimitReached { limit } => writeln!(
+                &mut output,
+                "cutoff reason: state limit reached (max {limit})"
+            ),
+            InconclusiveReason::TransitionLimitReached { limit } => writeln!(
+                &mut output,
+                "cutoff reason: transition limit reached (max {limit})"
+            ),
+            InconclusiveReason::DepthLimitReached { limit } => writeln!(
+                &mut output,
+                "cutoff reason: depth limit reached (max {limit})"
+            ),
+        }
+        .expect("writing to String cannot fail");
+    } else {
+        writeln!(&mut output, "cutoff reason: none").expect("writing to String cannot fail");
+    }
+
+    if let Some(components) = &result.components {
+        let cyclic_count = components
+            .iter()
+            .filter(|component| component.cyclic)
+            .count();
+        writeln!(&mut output, "scc count: {}", components.len())
+            .expect("writing to String cannot fail");
+        writeln!(&mut output, "cyclic scc count: {cyclic_count}")
+            .expect("writing to String cannot fail");
+        for (index, component) in components.iter().enumerate() {
+            writeln!(
+                &mut output,
+                "scc {index}: cyclic={} states={:?}",
+                component.cyclic, component.states
+            )
+            .expect("writing to String cannot fail");
+        }
+    } else {
+        writeln!(
+            &mut output,
+            "scc partition: unavailable (incomplete exploration)"
+        )
+        .expect("writing to String cannot fail");
+    }
+
+    if let Some(witness) = &result.first_cycle {
         writeln!(&mut output, "cycle component: {}", witness.component_index)
             .expect("writing to String cannot fail");
         writeln!(&mut output, "stem:").expect("writing to String cannot fail");
