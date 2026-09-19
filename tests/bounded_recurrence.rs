@@ -65,6 +65,7 @@ struct OracleResult {
     checked_states: usize,
     explored_transitions: usize,
     max_depth_reached: Option<usize>,
+    cutoff_reason: Option<InconclusiveReason>,
     components: Option<Vec<OracleComponent>>,
     first_cycle_component: Option<usize>,
     first_cycle_entry: Option<usize>,
@@ -260,6 +261,7 @@ fn oracle(mask: usize, limits: ExplorationLimits) -> OracleResult {
         checked_states: capture.checked_states,
         explored_transitions: capture.explored_transitions,
         max_depth_reached: capture.max_depth_reached,
+        cutoff_reason: capture.completion,
         components: exposed_components,
         first_cycle_component,
         first_cycle_entry: first_cycle_entry.map(|id| capture.states[id]),
@@ -323,6 +325,10 @@ fn retained_self_loop_is_conclusive_before_later_transition_cutoff() {
         BoundedOutcome::Conclusive(RecurrenceStatus::CycleFound)
     );
     assert!(result.components.is_none());
+    assert_eq!(
+        result.cutoff_reason,
+        Some(InconclusiveReason::TransitionLimitReached { limit: 1 })
+    );
     let witness = result.first_cycle.unwrap();
     assert_eq!(witness.stem.len(), 1);
     assert_eq!(witness.cycle.first().unwrap().state, 0);
@@ -462,6 +468,10 @@ fn all_three_node_graphs_and_limits_match_independent_prefix_oracle() {
             assert_eq!(
                 first.max_depth_reached, expected.max_depth_reached,
                 "depth {context}"
+            );
+            assert_eq!(
+                first.cutoff_reason, expected.cutoff_reason,
+                "cutoff reason {context}"
             );
 
             match (&first.components, &expected.components) {
