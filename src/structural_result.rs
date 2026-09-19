@@ -171,12 +171,7 @@ impl StructuralJobResultEnvelope {
     pub fn to_json(&self) -> String {
         let mut out = String::new();
         out.push('{');
-        field_u64(
-            &mut out,
-            "schema_version",
-            self.schema_version as u64,
-            true,
-        );
+        field_u64(&mut out, "schema_version", self.schema_version as u64, true);
         field_string(&mut out, "analysis", &self.analysis, false);
         field_string(&mut out, "outcome", self.outcome.as_str(), false);
         field_optional_string(&mut out, "model", self.model.as_deref(), false);
@@ -280,12 +275,7 @@ fn field_limits(out: &mut String, limits: &StructuralJobLimits) {
 
 fn field_accounting(out: &mut String, accounting: &StructuralJobAccounting) {
     out.push_str(",\"accounting\":{");
-    field_optional_usize(
-        out,
-        "discovered_states",
-        accounting.discovered_states,
-        true,
-    );
+    field_optional_usize(out, "discovered_states", accounting.discovered_states, true);
     field_optional_usize(out, "checked_states", accounting.checked_states, false);
     field_optional_usize(
         out,
