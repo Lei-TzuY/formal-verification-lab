@@ -131,60 +131,23 @@ impl std::error::Error for WorkspaceSnapshotBuildError {}
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum WorkspaceSnapshotParseErrorKind {
     MissingHeader,
-    UnsupportedVersion {
-        version: u32,
-    },
-    InvalidHeader {
-        message: String,
-    },
-    InvalidNumber {
-        field: &'static str,
-    },
-    Truncated {
-        section: &'static str,
-    },
-    MissingFrameTerminator {
-        section: &'static str,
-    },
-    InvalidUtf8Frame {
-        section: &'static str,
-    },
-    NonCanonicalSourceId {
-        source_id: String,
-    },
-    DuplicateSourceId {
-        source_id: String,
-    },
-    RootMissing {
-        source_id: String,
-    },
-    MissingDependency {
-        source_id: String,
-    },
-    UnexpectedSource {
-        source_id: String,
-    },
-    InvalidEmbeddedManifest {
-        source_id: String,
-        message: String,
-    },
-    EntryCountMismatch {
-        expected: usize,
-        actual: usize,
-    },
-    SourceByteCountMismatch {
-        expected: usize,
-        actual: usize,
-    },
-    TooManyEntries {
-        limit: usize,
-    },
-    TooManySourceBytes {
-        limit: usize,
-    },
-    SourceIdTooLong {
-        limit: usize,
-    },
+    UnsupportedVersion { version: u32 },
+    InvalidHeader { message: String },
+    InvalidNumber { field: &'static str },
+    Truncated { section: &'static str },
+    MissingFrameTerminator { section: &'static str },
+    InvalidUtf8Frame { section: &'static str },
+    NonCanonicalSourceId { source_id: String },
+    DuplicateSourceId { source_id: String },
+    RootMissing { source_id: String },
+    MissingDependency { source_id: String },
+    UnexpectedSource { source_id: String },
+    InvalidEmbeddedManifest { source_id: String, message: String },
+    EntryCountMismatch { expected: usize, actual: usize },
+    SourceByteCountMismatch { expected: usize, actual: usize },
+    TooManyEntries { limit: usize },
+    TooManySourceBytes { limit: usize },
+    SourceIdTooLong { limit: usize },
     TrailingPayload,
 }
 
@@ -301,12 +264,7 @@ pub fn create_workspace_snapshot(
 
     let mut sources = BTreeMap::new();
     let mut total_bytes = 0usize;
-    let root_text = read_build_source(
-        provider,
-        &root_source_id,
-        &mut sources,
-        &mut total_bytes,
-    )?;
+    let root_text = read_build_source(provider, &root_source_id, &mut sources, &mut total_bytes)?;
     let suite = parse_orchestration_suite(&root_text).map_err(|error| {
         WorkspaceSnapshotBuildError::InvalidManifest {
             source_id: root_source_id.clone(),
@@ -317,12 +275,7 @@ pub fn create_workspace_snapshot(
     for entry in suite.entries() {
         let job_source_id =
             resolve_build_dependency(&root_source_id, entry.job_path(), &root_source_id)?;
-        let job_text = read_build_source(
-            provider,
-            &job_source_id,
-            &mut sources,
-            &mut total_bytes,
-        )?;
+        let job_text = read_build_source(provider, &job_source_id, &mut sources, &mut total_bytes)?;
         for dependency in parse_job_dependencies(entry.family(), &job_source_id, &job_text)
             .map_err(|message| WorkspaceSnapshotBuildError::InvalidManifest {
                 source_id: job_source_id.clone(),
@@ -396,11 +349,7 @@ pub fn parse_workspace_snapshot(
             WorkspaceSnapshotParseErrorKind::MissingHeader,
         ));
     }
-    let version = parse_u32_field(
-        header_parts.next(),
-        header_offset,
-        "schema version",
-    )?;
+    let version = parse_u32_field(header_parts.next(), header_offset, "schema version")?;
     if header_parts.next().is_some() {
         return Err(WorkspaceSnapshotParseError::new(
             header_offset,
@@ -460,8 +409,11 @@ pub fn parse_workspace_snapshot(
     }
     let expected_entries =
         parse_usize_field(entries_parts.next(), entries_header_offset, "entry count")?;
-    let expected_source_bytes =
-        parse_usize_field(entries_parts.next(), entries_header_offset, "source byte count")?;
+    let expected_source_bytes = parse_usize_field(
+        entries_parts.next(),
+        entries_header_offset,
+        "source byte count",
+    )?;
     if entries_parts.next().is_some() {
         return Err(WorkspaceSnapshotParseError::new(
             entries_header_offset,
@@ -501,10 +453,16 @@ pub fn parse_workspace_snapshot(
                 },
             ));
         }
-        let source_id_len =
-            parse_usize_field(source_parts.next(), source_header_offset, "source id byte length")?;
-        let text_len =
-            parse_usize_field(source_parts.next(), source_header_offset, "source text byte length")?;
+        let source_id_len = parse_usize_field(
+            source_parts.next(),
+            source_header_offset,
+            "source id byte length",
+        )?;
+        let text_len = parse_usize_field(
+            source_parts.next(),
+            source_header_offset,
+            "source text byte length",
+        )?;
         if source_parts.next().is_some() {
             return Err(WorkspaceSnapshotParseError::new(
                 source_header_offset,
@@ -628,12 +586,13 @@ fn read_build_source(
         });
     }
     ensure_build_source_id_len(source_id)?;
-    let text = provider.read_text(source_id).map_err(|error| {
-        WorkspaceSnapshotBuildError::SourceRead {
-            source_id: source_id.to_owned(),
-            kind: error.kind(),
-        }
-    })?;
+    let text =
+        provider
+            .read_text(source_id)
+            .map_err(|error| WorkspaceSnapshotBuildError::SourceRead {
+                source_id: source_id.to_owned(),
+                kind: error.kind(),
+            })?;
     *total_bytes = total_bytes.checked_add(text.len()).ok_or(
         WorkspaceSnapshotBuildError::TooManySourceBytes {
             limit: MAX_WORKSPACE_SNAPSHOT_SOURCE_BYTES,
@@ -705,7 +664,7 @@ fn parse_job_dependencies(
             ])
         }
     }
-    .map_err(|message| format!("{source_id}: {message}"))
+    .map_err(|message: String| format!("{source_id}: {message}"))
 }
 
 fn validate_snapshot_closure(
@@ -747,8 +706,8 @@ fn validate_snapshot_closure(
                 },
             )
         })?;
-        let dependencies =
-            parse_job_dependencies(entry.family(), &job_source_id, job_text).map_err(|message| {
+        let dependencies = parse_job_dependencies(entry.family(), &job_source_id, job_text)
+            .map_err(|message| {
                 WorkspaceSnapshotParseError::new(
                     0,
                     WorkspaceSnapshotParseErrorKind::InvalidEmbeddedManifest {
@@ -758,8 +717,7 @@ fn validate_snapshot_closure(
                 )
             })?;
         for dependency in dependencies {
-            let dependency_source_id =
-                resolve_snapshot_dependency(&job_source_id, &dependency)?;
+            let dependency_source_id = resolve_snapshot_dependency(&job_source_id, &dependency)?;
             expected.insert(dependency_source_id.clone());
             if !snapshot.sources.contains_key(&dependency_source_id) {
                 return Err(WorkspaceSnapshotParseError::new(
@@ -895,10 +853,7 @@ impl<'a> SnapshotCursor<'a> {
         self.position == self.bytes.len()
     }
 
-    fn read_line(
-        &mut self,
-        section: &'static str,
-    ) -> Result<&'a str, WorkspaceSnapshotParseError> {
+    fn read_line(&mut self, section: &'static str) -> Result<&'a str, WorkspaceSnapshotParseError> {
         let start = self.position;
         let Some(relative_end) = self.bytes[start..].iter().position(|byte| *byte == b'\n') else {
             return Err(WorkspaceSnapshotParseError::new(
