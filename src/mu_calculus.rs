@@ -252,6 +252,7 @@ where
         atom_holds: &atom_holds,
         environment: HashMap::new(),
         fixpoint_iterations: 0,
+        _atom: std::marker::PhantomData,
     };
     let satisfying = evaluator.eval(formula);
     let fixpoint_iterations = evaluator.fixpoint_iterations;
