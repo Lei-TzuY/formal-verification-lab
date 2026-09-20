@@ -172,56 +172,51 @@ M87 makes no certificate-authenticity, signature, trust-chain, bounded-parity, s
 
 ## Milestone 88 — outcome-neutral multi-family job orchestration
 
-**Status: implementation candidate complete on PR #87.**
+**Status: sealed in `main` at `2cea4671cba87132bc6a130d29d946022393fa49`.**
 
-M88 adds one additive family-tagged orchestration layer above the sealed verification, structural and certificate-verification job protocols instead of creating a third family-specific suite engine.
+M88 adds one additive family-tagged orchestration layer above the sealed verification, structural and certificate-verification job protocols. It preserves every native nested envelope, keeps regression expectations family-aware, and separates orchestration `complete / attention / error` from domain truth/structure/artifact outcomes. Verification `violated` and structural `cycle_found` remain non-error domain results; certificate `rejected` yields operational attention. Exact closure candidate `af642c99726097f80a3e704e864882b6d9235ef9` passed CI #726 and Bounded state-property CLI #576 before squash integration.
+
+## Milestone 89 — host-independent virtual workspace execution
+
+**Status: implementation candidate complete on PR #88.**
+
+M89 promotes the sealed M88 job/orchestration stack from direct host-filesystem coupling to one shared logical UTF-8 text-source substrate while preserving every historical path API as a compatibility wrapper.
 
 Implemented contract:
 
-- orchestration manifests use explicit `verification`, `structural`, and `certificate-verification` family tags; dispatch never probes file contents or relies on parse failure to infer a family;
-- every job path resolves relative to the orchestration manifest, while duplicate identity is `(family, path)`, so one logical path can be referenced under different explicitly declared families without ambiguity;
-- expectations are family-aware and fail closed at parse time on cross-family values such as `verified` for a verification job;
-- nested family result envelopes remain typed and are preserved verbatim in deterministic JSON; heterogeneous payloads use indirection so the orchestration enum does not inherit the largest verification-result size;
-- raw orchestration status is deliberately operational rather than domain-semantic: `complete`, `attention`, or `error`;
-- verification `violated`, structural `cycle_found`, and other family-native non-error outcomes do not become orchestration failures; certificate `rejected` yields `attention`, while family `error` yields orchestration `error`;
-- raw exit codes are 0 / 16 / 2 for `complete / attention / error`;
-- expectation mode requires every entry to declare a family-native expected outcome, reports `matched / mismatched / error`, preserves a separate execution status, and uses exit 13 for mismatch;
-- an expected `rejected` or `error` may satisfy a regression expectation while the original nested result and operational status remain visible;
-- built `fvlab-orchestrate <suite> [--check-expectations] --format json` exposes the generic layer without removing or reinterpreting existing verification/structural suite APIs or CLIs;
-- mixed-family regressions execute real modal μ verification, recurrence, and certificate-verification jobs, compare nested typed envelopes to each direct family runner, cover complete/attention/error plus matched/mismatch behavior, lock the verification-violation and structural-cycle neutrality boundary, and require built CLI stdout/exit to equal the library runner.
+- one public `TextSourceProvider` abstraction is shared by verification, structural, certificate-verification and M88 orchestration; there is no family-specific loader hierarchy;
+- `FileSystemTextSourceProvider`, `RootedFileSystemTextSourceProvider` and deterministic `MapTextSourceProvider` adapters cover compatibility, host-rooted logical workspaces and fully in-memory execution;
+- logical source ids normalize separator/dot components, resolve dependencies relative to the logical manifest id, and rooted/map providers reject absolute ids or unresolved `..` root escapes fail-closed;
+- existing path-based runner APIs convert their path to a source id and delegate through the same provider-aware execution core;
+- provider-aware verification dispatch reads canonical manifest/model/property texts through the provider, including CTL, modal μ-calculus, action-temporal and historical verification families rather than silently reopening files in those deeper paths;
+- structural recurrence and certificate-verification jobs resolve referenced sources through the same logical identity rules;
+- M88 raw and expectation orchestration have provider-aware entrypoints and dispatch nested jobs through the supplied provider, so a complete mixed-family workspace can execute from an in-memory map without temporary files;
+- provider-mode I/O diagnostics use logical source ids plus stable error kinds instead of host-root absolute paths;
+- the rooted/map boundary rejects `../outside`, POSIX absolute and Windows-drive absolute logical ids consistently; no security-sandbox or symlink-confinement claim is made;
+- regressions prove existing path APIs equal rooted-provider results for representative successful family/orchestration runs;
+- rooted filesystem and in-memory map providers produce equal typed/JSON results for satisfied, violated, recurrence-cycle, verified, rejected and expectation-mode outcomes;
+- the same logical setup-error workspace under two different physical host roots and a map provider produces byte-identical JSON containing the logical missing source and no host-root string.
 
-Convergence evidence:
+Exact implementation candidate `bba7dfd80b0e5143a2630f07ad297cc804e09399` passed CI #734 (format, all-target build, Clippy with `-D warnings`, full tests including M89 virtual-workspace differentials plus every historical CTL/μ/parity/certificate/job/suite/orchestration gate and historical CLI smoke tests) and Bounded state-property CLI #584. Closure metadata changes must pass the same exact-head gates before merge.
 
-- initial candidate CI #716 exposed rustfmt-only ordering/layout differences; those were applied without semantic changes;
-- CI #721 then exposed Clippy `large_enum_variant` on heterogeneous typed payloads; the fix boxes all family payloads rather than suppressing the warning, preserving exact nested values and JSON;
-- exact implementation candidate `414a6da76fb3b9557b514b4d05f92eca366ed3cc` passed CI #724 (format, all-target build, Clippy with `-D warnings`, full tests including mixed-family orchestration/built-binary regressions plus every historical CTL/μ/parity/certificate/job/suite gate and every historical CLI smoke test) and Bounded state-property CLI #574.
+M89 intentionally introduces no archive/bundle format, digest/hash, signature, cryptographic authenticity, filesystem sandbox, bounded-parity, symbolic, fairness or performance claim.
 
-Closure metadata changes must pass the same exact-head gates before merge.
+## Next frontier — Milestone 90: versioned portable workspace snapshot and replay
 
-M88 introduces no performance, cryptographic authenticity, bounded-parity, symbolic, or fairness claim.
-
-## Next frontier — Milestone 89: host-independent virtual workspace execution
-
-Post-M88 architecture audit found that all three canonical job formats now have deterministic `canonical_document()` renderers and M88 supplies deterministic family-tagged orchestration, but execution is still directly coupled to host filesystem I/O:
-
-- verification, structural, certificate-verification, verification-suite, structural-suite and orchestration runners call `fs::read_to_string` directly;
-- there is no source-provider, virtual-filesystem, loader, or in-memory workspace abstraction in the repository;
-- verification and structural runners embed resolved filesystem paths in some I/O error strings, while certificate-verification already uses submitted logical paths for referenced model/property/certificate failures;
-- M88 preserves nested family envelopes exactly, so any host-path instability in a family runner is intentionally inherited rather than rewritten;
-- no digest/hash/provenance layer currently records which exact logical source texts produced a result.
-
-M89 should introduce one host-independent UTF-8 text-source execution substrate that can execute the sealed job families and M88 orchestration from logical source identities rather than hard-wired filesystem reads.
+M89 seals the execution substrate required for portable replay, but the caller still has to supply the logical source texts separately. M90 should package one M88 orchestration root plus its complete transitive logical source closure into a deterministic versioned UTF-8 artifact and replay it exclusively through the sealed M89 map-backed provider.
 
 Acceptance criteria:
 
-- define one logical text-source provider abstraction shared by verification, structural, certificate-verification and orchestration execution; do not add one loader abstraction per family;
-- provider-aware job runners must parse the same canonical manifests and resolve dependencies relative to the logical manifest identity, without direct `fs::read_to_string` calls in provider-mode core logic;
-- add a filesystem adapter so all existing path-based public APIs and CLIs remain compatible wrappers over the same execution semantics;
-- add an in-memory/map-backed provider suitable for deterministic tests and future portable replay; provider-mode execution must not require temporary files;
-- provider-mode diagnostics must use logical submitted source identities and must not leak host absolute paths;
-- add provider-aware M88 raw and expectation orchestration so an entire mixed-family workspace can execute without touching the host filesystem after sources are supplied;
-- differential tests must show filesystem and in-memory providers produce the same typed outcomes/nested JSON for representative satisfied/violated, cycle, verified/rejected and setup-error cases;
-- execute the same logical workspace under two different host roots and require byte-identical provider-mode JSON, including error cases;
-- preserve all existing family result schemas, exit semantics, certificate trust boundaries and current path-based APIs;
-- do not add a bundle/archive/hash/signature format in M89. Portable locked workspace artifacts should be a later milestone built on the sealed source-provider substrate rather than coupled to host-path behavior.
+- define an explicit schema/version for a portable workspace snapshot containing one normalized orchestration root id plus the exact logical UTF-8 sources required by that root;
+- discover the snapshot dependency closure by parsing the sealed orchestration manifest and each explicitly tagged family manifest, then resolving only their declared model/property/certificate dependencies; do not walk arbitrary filesystem directories or infer job families from content;
+- canonical rendering must order entries deterministically by normalized logical source id and preserve exact source text bytes through render/parse round trips, including embedded newlines, quotes and backslashes;
+- use explicit framing/length metadata so arbitrary UTF-8 source text is unambiguous; parser must fail closed on truncation, trailing payload, duplicate ids, invalid/root-escaping ids, invalid UTF-8 framing, count mismatch and missing root/dependency entries;
+- enforce bounded parser/build resource accounting for entry count and aggregate embedded source bytes so malformed artifacts cannot request unbounded allocation;
+- snapshot creation must be provider-aware: two different rooted filesystem providers and one map provider containing the same logical workspace must produce byte-identical snapshot artifacts;
+- replay must construct an in-memory M89 provider from the embedded entries and execute raw or expectation M88 orchestration without reading the host filesystem;
+- after snapshot creation, changing or removing the original host files must not change replay output;
+- raw and expectation replay JSON/exit codes must equal direct M89 provider execution for representative satisfied/violated, recurrence-cycle, verified/rejected and setup-error workspaces;
+- add direct library APIs first, then one built snapshot/replay CLI with direct-library vs built-binary differential coverage;
+- preserve every existing path/provider API, family result schema, M88 orchestration schema/exit semantics and certificate trust boundary;
+- make no hash, signature, tamper-authentication, cryptographic authenticity, compression, performance or security-sandbox claim. Integrity/authenticity can be a later dedicated milestone if implemented and evidenced.
 
