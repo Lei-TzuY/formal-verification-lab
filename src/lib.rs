@@ -44,6 +44,7 @@ pub mod monitor_strong_fairness;
 pub mod mu_bounded;
 pub mod mu_calculus;
 pub mod mu_parity;
+pub mod mu_parity_certificate;
 pub mod mu_parse;
 pub mod multi_response;
 pub mod multi_response_examples;
@@ -192,6 +193,13 @@ pub use mu_parity::{
     evaluate_mu_via_parity, verify_mu_parity_evidence, MuParityError, MuParityEvaluation,
     MuParityEvidenceError, MuParityFixpointKind, MuParityInitialEvidence, MuParityMove,
     MuParityPosition, MuParityPositionKind, MuParityStrategyChoice, MuParityStrategyEvidence,
+};
+pub use mu_parity_certificate::{
+    create_declarative_mu_parity_certificate, parse_declarative_mu_parity_certificate,
+    render_declarative_mu_parity_certificate, verify_declarative_mu_parity_certificate,
+    DeclarativeMuParityCertificate, DeclarativeMuParityCertificateError, MuParityCertificateChoice,
+    MuParityCertificateInitial, MuParityCertificateParseError,
+    DECLARATIVE_MU_PARITY_CERTIFICATE_SCHEMA_VERSION,
 };
 pub use mu_parse::{parse_mu_formula, render_mu_formula, MuParseError, MuParseErrorKind};
 pub use multi_response::{

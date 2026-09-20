@@ -208,6 +208,7 @@ struct LabelDecl {
 pub struct DeclarativeDocument {
     model: TransitionSystem<String>,
     propositions: BTreeMap<String, Vec<String>>,
+    canonical_identity: String,
 }
 
 impl DeclarativeDocument {
@@ -227,6 +228,15 @@ impl DeclarativeDocument {
     pub fn state_has_proposition(&self, state: &str, proposition: &str) -> bool {
         self.proposition_states(proposition)
             .is_some_and(|states| states.iter().any(|candidate| candidate == state))
+    }
+
+    /// Canonical source-level identity used to bind portable verification artifacts.
+    ///
+    /// This preserves validated declaration order while ignoring comments and
+    /// insignificant whitespace. It is metadata only; verification continues to
+    /// execute exclusively over the canonical transition system.
+    pub fn canonical_identity(&self) -> &str {
+        &self.canonical_identity
     }
 }
 
@@ -398,6 +408,8 @@ pub fn parse_declarative_document(
         }
     }
 
+    let canonical_identity = render_canonical_identity(&name, &states, &initials, &edges, &labels);
+
     let mut adjacency: HashMap<String, Vec<Transition<String>>> = states
         .iter()
         .cloned()
@@ -442,6 +454,7 @@ pub fn parse_declarative_document(
     Ok(DeclarativeDocument {
         model,
         propositions,
+        canonical_identity,
     })
 }
 
@@ -452,6 +465,58 @@ pub fn parse_declarative_model(
     input: &str,
 ) -> Result<TransitionSystem<String>, DeclarativeModelError> {
     Ok(parse_declarative_document(input)?.into_model())
+}
+
+fn render_canonical_identity(
+    name: &str,
+    states: &[String],
+    initials: &[(usize, String)],
+    edges: &[EdgeDecl],
+    labels: &[LabelDecl],
+) -> String {
+    let mut output = String::new();
+    push_identity_directive(&mut output, "model", &[name]);
+    for state in states {
+        push_identity_directive(&mut output, "state", &[state]);
+    }
+    for (_, state) in initials {
+        push_identity_directive(&mut output, "initial", &[state]);
+    }
+    for edge in edges {
+        push_identity_directive(
+            &mut output,
+            "edge",
+            &[edge.from.as_str(), edge.action.as_str(), edge.to.as_str()],
+        );
+    }
+    for label in labels {
+        push_identity_directive(
+            &mut output,
+            "label",
+            &[label.state.as_str(), label.proposition.as_str()],
+        );
+    }
+    output
+}
+
+fn push_identity_directive(output: &mut String, directive: &str, values: &[&str]) {
+    output.push_str(directive);
+    for value in values {
+        output.push(' ');
+        output.push('"');
+        for ch in value.chars() {
+            match ch {
+                '\\' => output.push_str("\\\\"),
+                '"' => output.push_str("\\\""),
+                '\n' => output.push_str("\\n"),
+                '\r' => output.push_str("\\r"),
+                '\t' => output.push_str("\\t"),
+                other => output.push(other),
+            }
+        }
+        output.push('"');
+    }
+    output.push('\n');
 }
 
 struct LineParser<'a> {

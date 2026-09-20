@@ -150,39 +150,49 @@ M84 promotes the sealed M81 parity kernel from winning-region classification to 
 
 ## Milestone 85 — typed modal mu-calculus parity strategy evidence
 
-**Status: implementation candidate complete on PR #84.**
+**Status: sealed in `main` at `1a26321cb56deaaef6b13ad3232fa4c986ead75b`.**
 
-M85 bridges the sealed M84 generic strategy certificates back into the M81 μ-calculus evaluation game without changing schema-v4, verification jobs, suites, or CLI behavior.
+M85 maps the sealed M84 generic positional strategies back into typed modal μ-calculus evaluation-game positions and semantic moves, associates initial roots with certified winners, and adds `verify_mu_parity_evidence`, which reconstructs the canonical evaluation game and delegates strategy correctness to M84 without trusting rendered evidence. Its 3,584-case generated evidence gate agrees with M75/M81 truth results. Exact closure candidate `100112bee60cad58a7eae4f13ce9ad0c5ef0119b` passed CI #692 and Bounded state-property CLI #542 before squash integration.
+
+## Milestone 86 — versioned declarative modal mu-calculus parity certificate
+
+**Status: implementation candidate complete on PR #85.**
+
+M86 promotes M85's typed in-memory evidence into an explicit versioned artifact for the declarative complete-parity surface while keeping ordinary `mu file`, M83 verification-job schema-v4, bounded μ semantics, and the default fixpoint path unchanged.
 
 Implemented contract:
 
-- `MuParityEvaluation<S>` keeps its existing generic shape and adds typed normalized evaluation-game positions rather than introducing atom/variable generic parameters into downstream declarative/job APIs;
-- each position records reachable model-state index, normalized formula-node index/kind, owner, and priority;
-- certified Even/Odd strategies are mapped to semantic moves: Boolean left/right branch, model successor, terminal modal self-loop, fixpoint body, bound-variable return, or outcome self-loop;
-- every initial root position records its truth and certified winning player;
-- `evaluate_mu_via_parity` now verifies the M84 Even and Odd strategies before exposing typed evidence;
-- `verify_mu_parity_evidence` validates formula binding/monotonicity first, recaptures the canonical complete graph, rebuilds the normalized evaluation game, checks canonical position metadata and semantic move labels, reconstructs generic `ParityStrategy` values, delegates parity correctness to the sealed M84 verifier, requires the two winning regions to partition the game, and revalidates satisfying/initial state results and model accounting;
-- focused regressions cover outcome, Boolean, modal successor, terminal modal self-loop, fixpoint-body and variable-return moves, plus nested alternation and lexical shadowing;
-- tamper regressions reject altered position kinds, semantic move labels, missing winner moves, incomplete winning partitions, and altered initial winners;
-- a generated 3,584-case two-state graph × P/Q valuation × native μ-formula gate requires the typed evidence verifier to accept every produced certificate and requires truth/initial results to match M75/M81.
+- `DeclarativeDocument` now exposes a canonical source-level model identity generated from validated model/state/initial/edge/label declarations; declaration order and semantic content are preserved, while comments and insignificant whitespace are ignored. This identity is artifact-binding metadata only and does not introduce a second execution graph;
+- certificate schema v1 is deterministic and line-oriented rather than Rust `Debug` output or an implicit reuse of verification-job JSON;
+- the artifact binds the canonical declarative model identity and canonical rendered μ formula and records model accounting, satisfying-state ids, every typed M85 evaluation-game position, Even/Odd winning regions, semantic strategy choices, and initial-root winners;
+- render → parse → render is deterministic and exact, with stable escaping for backslash, quotes, newline, carriage return, and tab;
+- the parser fails closed on unsupported versions, malformed strings/tokens, duplicate singleton directives, missing/truncated sections, count mismatches, and invalid references;
+- certificate creation delegates to the sealed declarative parity evaluator;
+- certificate verification validates the requested formula through the existing M76 parse/validation/proposition-binding rules, checks model/formula bindings, recaptures the canonical complete graph, reconstructs M85 typed evidence, and invokes `verify_mu_parity_evidence`;
+- the certificate verifier contains no parity-solver call and does not decide correctness by re-solving the submitted model-checking problem;
+- direct `fvlab mu certificate create <model> <expression> <certificate>` and `... verify ...` commands expose the sealed library surface without changing ordinary `mu file` behavior;
+- built-binary regressions cover relative paths, create→verify, wrong formula, wrong model, truncation, and tampered accounting;
+- library regressions cover canonical model identity, exact parser/render roundtrip, independent evidence verification, unsupported versions, duplicate directives, missing positions, out-of-range references, semantic-move tampering, initial-result tampering, and accounting tampering.
 
-Implementation candidate `4d4a256d2af1b757a61505a1c5ea3dd250836fd0` passed CI #690 (format, all-target build, Clippy with `-D warnings`, full tests including the generated M85 evidence gate and all historical CTL/μ/parity/job/suite tests, plus every historical CLI gate) and Bounded state-property CLI #540. Closure metadata changes must pass the same exact-head gates before merge.
+The library-only intermediate candidate `22b25583b7e40f8a1bcf9f6bc5adebe0a0aa9f43` passed CI #699 and Bounded state-property CLI #549 before the CLI surface was added. Full implementation candidate `8fcf6a90b82da3e048d41eeb7ca9a46cb8d85f1d` passed CI #704 (format, all-target build, Clippy with `-D warnings`, full tests including certificate library and built-binary regressions plus all historical CTL/μ/parity/job/suite gates, and every historical CLI smoke test) and Bounded state-property CLI #554. Closure metadata changes must pass the same exact-head gates before merge.
 
-M85 remains typed/in-memory and makes no portable proof-certificate, bounded-parity, symbolic, fairness, or performance claim.
+M86 makes no cryptographic authenticity, signature, trust-chain, bounded-parity, symbolic, fairness, or performance claim.
 
-## Next frontier — Milestone 86: versioned declarative modal mu-calculus parity certificate
+## Next frontier — Milestone 87: reproducible modal mu-calculus certificate verification jobs
 
-Promote the sealed M85 typed evidence into a deterministic, versioned artifact only for the declarative complete-parity surface. Do not expose raw Rust debug output or silently reinterpret schema-v4 verification-job results as proof certificates.
+Promote M86 certificate verification into a manifest-relative, machine-readable CI/job surface without misclassifying artifact validity as a model-checking `satisfied` / `violated` result and without modifying M83 schema-v4.
 
-Acceptance criteria:
+Architecture boundary established by the M86 closure audit:
 
-- define an explicit certificate schema/version whose fields are derived from M85 typed position/strategy/initial evidence and are sufficient to reconstruct that evidence without relying on Rust type/debug formatting;
-- bind the artifact to the canonical declarative model identity/state ordering and canonical rendered μ formula; reject certificate reuse against a different model/formula;
-- deterministic render + parse must round-trip exactly and preserve strategy player, winning positions, semantic choices, priorities, and initial-root winners;
-- certificate verification must parse/validate the model and μ formula through the sealed M76/M82 frontend, rebuild the canonical complete evaluation game, reconstruct M85 typed evidence, and invoke `verify_mu_parity_evidence`; it must not call the parity solver to decide whether the submitted certificate is correct;
-- malformed, truncated, duplicate, out-of-range, wrong-model, wrong-formula, and semantically tampered certificates must fail closed with stable errors;
-- add an explicit direct CLI verification path for certificate files only after the library parser/verifier is sealed; keep ordinary `mu file` output and M83 verification-job schema unchanged in this milestone;
-- add deterministic parser/render roundtrip, independent verification, tamper, manifest-relative/built-binary, and representative alternation/shadowing regressions;
-- preserve M75's 90,112-case CTL→μ differential, M77's 15,360-case bounded oracle, M81/M85's parity/evidence generated gates, M84's strategy certification gate, and every historical job/suite/CLI gate;
-- make no cryptographic authenticity, bounded-parity, symbolic, fairness, or performance claim.
+- existing heterogeneous verification jobs model property outcomes (`satisfied / violated / inconclusive / error`) and therefore are not the correct semantic envelope for proof-artifact validity;
+- structural recurrence jobs have their own neutral `cycle_found / acyclic` semantics and likewise must not be overloaded;
+- M87 should use a dedicated certificate-verification job/result surface with `verified / rejected / error` semantics, while reusing M86's parser and independent verifier;
+- `rejected` means a submitted certificate artifact loaded but failed parsing/binding/evidence verification; `error` is reserved for job/manifest/I/O/model/property setup failures that prevent artifact validation;
+- manifests should resolve model, property/formula, and certificate paths relative to the manifest and render canonically/deterministically;
+- the runner must not create a replacement certificate or invoke the parity solver; it verifies only the referenced artifact;
+- machine-readable results should identify schema version, outcome, referenced paths, canonical formula when available, submitted certificate schema when parseable, and a stable rejection/error message without embedding or silently rewriting the certificate;
+- malformed manifests, missing files, invalid model/formula inputs, wrong bindings, truncated/tampered certificates, and unsupported certificate versions must retain the `rejected` versus `error` boundary deterministically;
+- add direct runner vs built-CLI differential coverage, manifest-relative fixtures, deterministic JSON, and representative valid/rejected/error cases;
+- defer suite orchestration to a post-M87 architecture audit rather than adding a certificate-specific suite engine preemptively;
+- preserve every historical CTL/μ/parity/certificate/job/suite/CLI gate and make no cryptographic authenticity or performance claim.
 
