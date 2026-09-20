@@ -60,8 +60,7 @@ certificate "certificates/reach.mupc"
             if directive == "model"
     ));
 
-    let missing =
-        parse_certificate_verification_job("model \"a\"\nproperty \"p\"").unwrap_err();
+    let missing = parse_certificate_verification_job("model \"a\"\nproperty \"p\"").unwrap_err();
     assert!(matches!(
         missing.kind(),
         CertificateVerificationJobParseErrorKind::MissingDirective { directive }
@@ -214,7 +213,10 @@ fn setup_failures_are_errors_before_certificate_validation() {
     )
     .unwrap();
     let malformed = run_certificate_verification_job_json(&malformed_manifest);
-    assert_eq!(malformed.exit_code, CERTIFICATE_VERIFICATION_ERROR_EXIT_CODE);
+    assert_eq!(
+        malformed.exit_code,
+        CERTIFICATE_VERIFICATION_ERROR_EXIT_CODE
+    );
     assert_eq!(malformed.envelope.model, None);
     assert_eq!(malformed.envelope.canonical_formula, None);
 
