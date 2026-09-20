@@ -43,9 +43,7 @@ fn write_job(root: &Path, model: &str, property: &str, tail: &str) -> PathBuf {
     let manifest = root.join("portable/job.fvj");
     fs::write(
         &manifest,
-        format!(
-            "analysis \"mu-calculus\"\nmodel \"model.fvl\"\nproperty \"property.mu\"\n{tail}"
-        ),
+        format!("analysis \"mu-calculus\"\nmodel \"model.fvl\"\nproperty \"property.mu\"\n{tail}"),
     )
     .unwrap();
     manifest
@@ -116,7 +114,10 @@ fn complete_mu_jobs_match_direct_frontend_and_emit_two_valued_schema_v4() {
         mu.possibly_satisfying_states,
         direct.evaluation.satisfying_state_indices.len()
     );
-    assert_eq!(mu.fixpoint_iterations, direct.evaluation.fixpoint_iterations);
+    assert_eq!(
+        mu.fixpoint_iterations,
+        direct.evaluation.fixpoint_iterations
+    );
     assert_eq!(mu.initial[0].truth, VerificationJobMuTruth::True);
 
     fs::write(root.join("portable/property.mu"), r#""complete""#).unwrap();
@@ -195,7 +196,10 @@ fn bounded_mu_jobs_match_m77_and_preserve_all_cutoff_classes() {
             mu.possibly_satisfying_states,
             direct.evaluation.possibly_satisfying_state_indices.len()
         );
-        assert_eq!(mu.fixpoint_iterations, direct.evaluation.fixpoint_iterations);
+        assert_eq!(
+            mu.fixpoint_iterations,
+            direct.evaluation.fixpoint_iterations
+        );
         assert_eq!(mu.initial[0].truth, VerificationJobMuTruth::Unknown);
         assert_eq!(direct.evaluation.initial[0].truth, BoundedMuTruth::Unknown);
 
@@ -241,7 +245,10 @@ fn bounded_mu_jobs_preserve_early_conclusions_and_zero_budget_honesty() {
     );
     let zero_run = run_verification_job_json(&zero_manifest);
     assert_eq!(zero_run.exit_code, 3);
-    assert_eq!(zero_run.envelope.outcome, VerificationJobOutcome::Inconclusive);
+    assert_eq!(
+        zero_run.envelope.outcome,
+        VerificationJobOutcome::Inconclusive
+    );
     let mu = zero_run.envelope.mu.as_ref().unwrap();
     assert!(!mu.initial_states_complete);
     assert_eq!(mu.retained_states, 0);
