@@ -206,13 +206,8 @@ where
     let mut initial = Vec::with_capacity(graph.initial_ids.len());
     for &state_index in &graph.initial_ids {
         let satisfied = satisfying[state_index];
-        let evidence = explain_top_level(
-            formula,
-            state_index,
-            satisfied,
-            &satisfying,
-            &mut evaluator,
-        );
+        let evidence =
+            explain_top_level(formula, state_index, satisfied, &satisfying, &mut evaluator);
         initial.push(CtlInitialEvaluation {
             state_index,
             state: graph.states[state_index].clone(),
@@ -280,7 +275,7 @@ where
                 let left = self.eval(left);
                 let right = self.eval(right);
                 union(&left, &right)
-            },
+            }
             CtlFormula::Ex(inner) => {
                 let inner = self.eval(inner);
                 pre_exists(self.graph, &inner)
@@ -420,11 +415,7 @@ fn greatest_fixpoint_all<S>(graph: &ReachableGraph<S>, guard: &[bool]) -> Vec<bo
     }
 }
 
-fn least_until_exists<S>(
-    graph: &ReachableGraph<S>,
-    left: &[bool],
-    right: &[bool],
-) -> Vec<bool> {
+fn least_until_exists<S>(graph: &ReachableGraph<S>, left: &[bool], right: &[bool]) -> Vec<bool> {
     let mut current = right.to_vec();
     loop {
         let previous = current.clone();
@@ -438,11 +429,7 @@ fn least_until_exists<S>(
     }
 }
 
-fn least_until_all<S>(
-    graph: &ReachableGraph<S>,
-    left: &[bool],
-    right: &[bool],
-) -> Vec<bool> {
+fn least_until_all<S>(graph: &ReachableGraph<S>, left: &[bool], right: &[bool]) -> Vec<bool> {
     let mut current = right.to_vec();
     loop {
         let previous = current.clone();
@@ -478,9 +465,7 @@ where
             let all = vec![true; target.len()];
             finite_path_evidence(evaluator.graph, state, &all, &target)
         }
-        CtlFormula::Eg(_inner) if satisfied => {
-            lasso_evidence(evaluator.graph, state, top_values)
-        }
+        CtlFormula::Eg(_inner) if satisfied => lasso_evidence(evaluator.graph, state, top_values),
         CtlFormula::Eu(left, right) if satisfied => {
             let left = evaluator.eval(left);
             let right = evaluator.eval(right);
@@ -511,8 +496,7 @@ where
             if finite_bad[state] {
                 finite_path_evidence(evaluator.graph, state, &not_right, &bad)
             } else {
-                let forever_not_right =
-                    greatest_fixpoint_exists(evaluator.graph, &not_right);
+                let forever_not_right = greatest_fixpoint_exists(evaluator.graph, &not_right);
                 lasso_evidence(evaluator.graph, state, &forever_not_right)
             }
         }
@@ -670,10 +654,7 @@ fn lasso_evidence<S: Clone>(
             let edge = graph.outgoing[current]
                 .iter()
                 .find(|edge| allowed[edge.target])?;
-            (
-                edge.target,
-                CtlEvidenceAction::Model(edge.action.clone()),
-            )
+            (edge.target, CtlEvidenceAction::Model(edge.action.clone()))
         };
 
         trace.push(CtlEvidenceStep {
