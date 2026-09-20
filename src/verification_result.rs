@@ -504,10 +504,7 @@ impl VerificationJobResultEnvelope {
         }
     }
 
-    pub fn from_ctl_complete(
-        model: impl Into<String>,
-        result: &DeclarativeCtlResult,
-    ) -> Self {
+    pub fn from_ctl_complete(model: impl Into<String>, result: &DeclarativeCtlResult) -> Self {
         Self {
             schema_version: VERIFICATION_JOB_CTL_RESULT_SCHEMA_VERSION,
             analysis: Some("ctl".to_owned()),
@@ -930,7 +927,12 @@ fn convert_ctl_step(step: &crate::ctl::CtlEvidenceStep<String>) -> VerificationJ
 
 fn write_ctl_details(out: &mut String, ctl: &VerificationJobCtlDetails) {
     out.push('{');
-    field_bool(out, "initial_states_complete", ctl.initial_states_complete, true);
+    field_bool(
+        out,
+        "initial_states_complete",
+        ctl.initial_states_complete,
+        true,
+    );
     field_u64(out, "retained_states", ctl.retained_states as u64, false);
     field_u64(
         out,
