@@ -92,14 +92,9 @@ impl RootedFileSystemTextSourceProvider {
 
 impl TextSourceProvider for RootedFileSystemTextSourceProvider {
     fn read_text(&self, source_id: &str) -> Result<String, TextSourceError> {
-        let normalized = normalize_source_id(source_id)
-            .map_err(|_| TextSourceError::new(source_id, TextSourceErrorKind::InvalidData))?;
-        if is_absolute_source_id(&normalized) || escapes_logical_root(&normalized) {
-            return Err(TextSourceError::new(
-                normalized,
-                TextSourceErrorKind::InvalidData,
-            ));
-        }
+        let normalized = normalize_workspace_source_id(source_id).map_err(|error| {
+            TextSourceError::new(error.source_id().to_owned(), TextSourceErrorKind::InvalidData)
+        })?;
         fs::read_to_string(self.root.join(source_id_to_path(&normalized)))
             .map_err(|error| TextSourceError::new(normalized, classify_io_error(&error)))
     }
@@ -133,12 +128,12 @@ impl MapTextSourceProvider {
         source_id: impl AsRef<str>,
         text: impl Into<String>,
     ) -> Result<Option<String>, TextSourceIdError> {
-        let source_id = normalize_source_id(source_id.as_ref())?;
+        let source_id = normalize_workspace_source_id(source_id.as_ref())?;
         Ok(self.sources.insert(source_id, text.into()))
     }
 
     pub fn contains(&self, source_id: &str) -> bool {
-        normalize_source_id(source_id)
+        normalize_workspace_source_id(source_id)
             .ok()
             .is_some_and(|source_id| self.sources.contains_key(&source_id))
     }
@@ -146,8 +141,9 @@ impl MapTextSourceProvider {
 
 impl TextSourceProvider for MapTextSourceProvider {
     fn read_text(&self, source_id: &str) -> Result<String, TextSourceError> {
-        let normalized = normalize_source_id(source_id)
-            .map_err(|_| TextSourceError::new(source_id, TextSourceErrorKind::InvalidData))?;
+        let normalized = normalize_workspace_source_id(source_id).map_err(|error| {
+            TextSourceError::new(error.source_id().to_owned(), TextSourceErrorKind::InvalidData)
+        })?;
         self.sources
             .get(&normalized)
             .cloned()
@@ -257,6 +253,18 @@ pub fn normalize_source_id(source_id: &str) -> Result<String, TextSourceIdError>
         Ok(".".to_owned())
     } else {
         Ok(joined)
+    }
+}
+
+fn normalize_workspace_source_id(source_id: &str) -> Result<String, TextSourceIdError> {
+    let normalized = normalize_source_id(source_id)?;
+    if is_absolute_source_id(&normalized) || escapes_logical_root(&normalized) {
+        Err(TextSourceIdError::new(
+            normalized,
+            TextSourceIdErrorKind::EscapesRoot,
+        ))
+    } else {
+        Ok(normalized)
     }
 }
 
