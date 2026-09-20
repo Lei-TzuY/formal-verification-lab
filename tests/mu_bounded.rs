@@ -1,7 +1,7 @@
 use formal_verification_lab::{
     evaluate_mu, evaluate_mu_with_limits, BoundedMuError, BoundedMuStatus, BoundedMuTruth,
-    BoundedOutcome, ExplorationLimits, InconclusiveReason, Invariant, MuFormula,
-    MuValidationError, StateVariable, Transition, TransitionSystem,
+    BoundedOutcome, ExplorationLimits, InconclusiveReason, Invariant, MuFormula, MuValidationError,
+    StateVariable, Transition, TransitionSystem,
 };
 use std::collections::HashMap;
 
@@ -339,10 +339,7 @@ fn representative_formulas() -> Vec<MuFormula<Atom, u8>> {
                     MuFormula::diamond(MuFormula::var(0)),
                     MuFormula::mu(
                         1,
-                        MuFormula::or(
-                            q.clone(),
-                            MuFormula::diamond(MuFormula::var(1)),
-                        ),
+                        MuFormula::or(q.clone(), MuFormula::diamond(MuFormula::var(1))),
                     ),
                 ),
             ),
@@ -364,12 +361,7 @@ fn representative_formulas() -> Vec<MuFormula<Atom, u8>> {
     ]
 }
 
-fn oracle_mu(
-    formula: &MuFormula<Atom, u8>,
-    edges: &[Vec<u8>; 2],
-    p_mask: u8,
-    q_mask: u8,
-) -> u8 {
+fn oracle_mu(formula: &MuFormula<Atom, u8>, edges: &[Vec<u8>; 2], p_mask: u8, q_mask: u8) -> u8 {
     let mut environment = HashMap::new();
     oracle_eval(formula, edges, p_mask, q_mask, &mut environment)
 }
