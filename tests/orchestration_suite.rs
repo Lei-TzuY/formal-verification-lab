@@ -113,19 +113,19 @@ fn raw_orchestration_preserves_direct_family_payloads_and_order() {
 
     match &run.envelope.jobs[0].result {
         OrchestrationNestedResult::Verification(result) => {
-            assert_eq!(result, &verification.envelope);
+            assert_eq!(result.as_ref(), &verification.envelope);
         }
         other => panic!("expected verification result, got {other:?}"),
     }
     match &run.envelope.jobs[1].result {
         OrchestrationNestedResult::Structural(result) => {
-            assert_eq!(result, &structural.envelope);
+            assert_eq!(result.as_ref(), &structural.envelope);
         }
         other => panic!("expected structural result, got {other:?}"),
     }
     match &run.envelope.jobs[2].result {
         OrchestrationNestedResult::CertificateVerification(result) => {
-            assert_eq!(result, &certificate.envelope);
+            assert_eq!(result.as_ref(), &certificate.envelope);
         }
         other => panic!("expected certificate result, got {other:?}"),
     }
