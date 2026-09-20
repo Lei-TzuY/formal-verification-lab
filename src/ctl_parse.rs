@@ -10,6 +10,7 @@ pub enum CtlParseErrorKind {
     ExpectedCloseBracket,
     UnterminatedString,
     InvalidEscape { escape: String },
+    EmptyProposition,
     TrailingInput,
 }
 
@@ -52,6 +53,9 @@ impl fmt::Display for CtlParseError {
             }
             CtlParseErrorKind::InvalidEscape { escape } => {
                 write!(f, "unsupported string escape '\\{escape}'")
+            }
+            CtlParseErrorKind::EmptyProposition => {
+                write!(f, "proposition name must not be empty")
             }
             CtlParseErrorKind::TrailingInput => {
                 write!(f, "unexpected trailing input after CTL expression")
@@ -282,7 +286,16 @@ impl<'a> Parser<'a> {
         }
 
         match self.current_byte() {
-            Some(b'"') => Ok(CtlFormula::atom(self.parse_string()?)),
+            Some(b'"') => {
+                let atom = self.parse_string()?;
+                if atom.trim().is_empty() {
+                    return Err(CtlParseError::new(
+                        start,
+                        CtlParseErrorKind::EmptyProposition,
+                    ));
+                }
+                Ok(CtlFormula::atom(atom))
+            }
             Some(b'(') => {
                 self.position += 1;
                 let formula = self.parse_or()?;
@@ -381,11 +394,11 @@ fn is_identifier_byte(byte: u8) -> bool {
 }
 
 fn quote_string(value: &str) -> String {
-    let mut output = String::from(""");
+    let mut output = String::from("\"");
     for ch in value.chars() {
         match ch {
             '\\' => output.push_str("\\\\"),
-            '"' => output.push_str("\\""),
+            '"' => output.push_str("\\\""),
             '\n' => output.push_str("\\n"),
             '\r' => output.push_str("\\r"),
             '\t' => output.push_str("\\t"),
