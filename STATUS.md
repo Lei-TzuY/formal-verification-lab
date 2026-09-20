@@ -92,40 +92,44 @@ M76 exposes the sealed M75 authority through deterministic textual μ-calculus s
 
 ## Milestone 77 — proof-honest bounded modal mu-calculus semantics
 
-**Status: implementation candidate complete on PR #77.**
+**Status: sealed in `main` at `a806252511da8f49ed2771e221adbfd140351792`.**
 
-M77 promotes the typed complete-graph μ-calculus to deterministic model-space cutoffs without treating an incomplete prefix as a total Kripke structure.
+M77 adds conservative lower/upper modal μ-calculus semantics over canonical bounded graph captures, lower/upper lexical fixpoint environments, proven-terminal-only totalization, zero-budget honesty, and exact complete-capture delegation to M75. An independent bitset interpreter checks 15,360 two-state graph × valuation × native μ-formula × deterministic-limit cases. Exact closure candidate `8c1ac8fbd86a35d4a8dece4fb79124b052b3b333` passed CI #638 and Bounded state-property CLI #488 before integration.
+
+## Milestone 78 — bounded declarative modal mu-calculus file frontend
+
+**Status: implementation candidate complete on PR #78.**
+
+M78 exposes the sealed M77 proof boundary through the existing M76 parser, proposition binder, report style, and direct file command without duplicating bounded semantics.
 
 Implemented contract:
 
-- reuses the canonical bounded reachable-graph capture, proven-terminal facts, complete successor-vector provenance, deterministic cutoff accounting, and the sealed M75 validator;
-- complete captures delegate directly to the M75 captured-graph evaluator, preserving exact state sets, all-initial status, graph accounting, and fixpoint-iteration observations;
-- incomplete captures interpret every subformula as conservative lower/upper state sets;
-- lexically scoped μ/ν variables are themselves bound to lower/upper approximation pairs, with nearest-binder shadowing and environment restoration;
-- constants/atoms remain exact, negation swaps/complements upper/lower sets, and Boolean composition preserves lower⊆upper;
-- modal diamond/box preserve unknown outgoing behavior at cut states and totalize only proven terminals;
-- least/greatest fixpoints iterate deterministically to equality on the finite retained approximation lattice;
-- a retained definitely-false initial state is enough for conclusive all-initial violation, while conclusive satisfaction additionally requires all unique initial states to be retained and definitely true;
-- zero-state budgets cannot vacuously prove all-initial satisfaction;
-- focused regressions cover validation-before-capture, depth-cut terminal uncertainty including negation, retained existential satisfaction, retained universal violation, zero-state budgets, unbounded exact collapse, lexical shadowing, and nested/alternating μ/ν formulas;
-- an independent bitset fixpoint interpreter checks **15,360** two-state graph × proposition-valuation × native μ-formula × deterministic-limit cases and rejects any bounded True/False or whole-query conclusion contradicting full-graph semantics.
+- typed/text bounded declarative adapters preserve M76 parse → lexical/monotonicity validation → proposition resolution order, then delegate exclusively to `evaluate_mu_with_limits`;
+- unknown propositions still fail before bounded graph capture, including zero-state budgets;
+- unbounded/generous bounded execution collapses to M76 complete execution for state sets, all-initial status, graph accounting, and fixpoint-iteration observations;
+- deterministic bounded reports include canonical formula, original state/transition/depth cutoff reason, complete-initial flag, discovered/checked/transition/depth accounting, fixpoint iterations, lower/upper satisfying-state counts, and per-initial True/False/Unknown;
+- only proven terminals are reported as totalized; cut states remain semantically unknown;
+- `fvlab mu file <path> <expression>` preserves the historical M76 complete path when no limit option is present;
+- supplying `--max-states`, `--max-transitions`, or `--max-depth` routes through M77, with exit 0 conclusive satisfied, 15 conclusive violated, 3 inconclusive, and 2 malformed/invalid input;
+- regressions cover direct-vs-M77 equality, unbounded collapse, exact-bound completion, all three cutoff classes, retained conclusive existential satisfaction, unknown proposition fail-closed behavior, proven-terminal totalization, zero-state budgets, complete/no-option compatibility, and built-binary exits/reporting.
 
-Implementation candidate `43ca87569fc879801e8de490ff2203f6897ee0f7` passed CI #636 (format, all-target build, Clippy with `-D warnings`, full tests including the 15,360-case bounded μ oracle and M75 90,112-case CTL→μ differential, plus every historical CLI gate) and Bounded state-property CLI #486. Closure metadata changes must pass the same exact-head gates before merge.
+Implementation candidate `8759ba897c0eee793d24959a5547e5df71ddd96d` passed CI #643 (format, all-target build, Clippy with `-D warnings`, full tests including M78 integration/built-binary regressions, the M77 15,360-case bounded μ oracle, the M75 90,112-case CTL→μ differential, and every historical CLI gate) and Bounded state-property CLI #493. Closure metadata changes must pass the same exact-head gates before merge.
 
-M77 is a typed semantic kernel only. It does not yet expose bounded textual/declarative μ execution, μ verification jobs/suites, fairness, symbolic fixpoint algorithms, proof certificates, or performance claims.
+M78 adds no μ verification-job/suite protocol, fairness, symbolic fixpoint algorithm, proof certificate, or performance claim.
 
-## Next frontier — Milestone 78: bounded declarative modal mu-calculus file frontend
+## Next frontier — Milestone 79: reproducible modal mu-calculus verification jobs
 
-Expose the sealed M77 proof boundary through the existing M76 named-proposition parser/frontend without duplicating bounded semantics.
+Promote the sealed M76–M78 external μ-calculus surface into the existing heterogeneous verification-job protocol without creating another parser, evaluator, or job runner.
 
 Acceptance criteria:
 
-- add typed/text bounded declarative adapters that parse/validate/bind exactly as M76, then delegate exclusively to `evaluate_mu_with_limits`;
-- preserve validation-before-exploration and fail closed on unknown propositions before bounded graph capture;
-- add deterministic bounded reporting with original cutoff reason, complete-initial flag, lower/upper satisfying-state counts, per-initial True/False/Unknown, graph accounting, and fixpoint-iteration observations;
-- extend `fvlab mu file <path> <expression>` with the existing model-space `--max-states`, `--max-transitions`, and `--max-depth` options while preserving the no-option complete M76 path;
-- use stable exits: 0 conclusive satisfied, 15 conclusive violated, 3 inconclusive, 2 malformed/invalid input;
-- add direct-vs-M77, exact-bound completion, all cutoff classes, unknown proposition, terminal totalization, zero-budget, retained conclusive result, and built-binary regressions;
-- ensure generous/unbounded bounded execution collapses exactly to M76 complete execution;
-- keep μ verification jobs/suites, fairness, symbolic algorithms, and proof certificates out of this phase;
-- preserve the M77 15,360-case soundness oracle, M75 90,112-case CTL→μ differential, and all historical verification/suite/reduction/fairness/CTL gates.
+- add μ-calculus as a first-class verification-job analysis family carrying one textual expression plus the existing model-space limits;
+- parse/validate/bind through the sealed M76 declarative frontend and execute complete/bounded cases exclusively through M75/M77 authorities;
+- preserve manifest-relative model loading and the existing deterministic job-runner error boundary;
+- extend the machine-readable result schema with explicit μ-calculus details: canonical formula, complete/bounded outcome, lower/upper satisfying-state counts, per-initial True/False/Unknown, cutoff provenance, graph accounting, and fixpoint-iteration observations;
+- keep complete results two-valued while bounded incomplete results remain explicitly three-valued/inconclusive;
+- make malformed formula, unbound/non-monotone variable, unknown proposition, bad limit, missing model, and model parse errors fail closed as ordinary job error envelopes;
+- add direct single-job vs job-runner differential tests, complete/bounded/zero-budget cases, all cutoff classes, deterministic JSON, and built `fvlab temporal job` or the repository's canonical job CLI integration path as appropriate to the existing protocol;
+- do not add a μ-specific suite engine: generic verification suites should consume the new job envelope in a later integration audit or dedicated slice;
+- keep fairness, symbolic algorithms, proof certificates, and performance claims out of this phase;
+- preserve M78 built-binary coverage, the M77 15,360-case oracle, M75 90,112-case CTL→μ differential, and every historical verification/suite/reduction/fairness/CTL gate.
