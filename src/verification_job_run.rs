@@ -141,10 +141,13 @@ pub fn run_verification_job_json(manifest_path: impl AsRef<Path>) -> Verificatio
             Ok(run) => run,
             Err(error) => error_run(ctl_error(error)),
         },
-        VerificationJobAnalysis::MuCalculus => match run_mu_job_json(manifest_path, job) {
-            Ok(run) => run,
-            Err(error) => error_run(mu_error(error)),
-        },
+        VerificationJobAnalysis::MuCalculus => {
+            let backend = job.mu_backend();
+            match run_mu_job_json(manifest_path, job) {
+                Ok(run) => run,
+                Err(error) => error_run(mu_error(backend, error)),
+            }
+        }
     }
 }
 
