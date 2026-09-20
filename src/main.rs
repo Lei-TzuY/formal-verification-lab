@@ -18,9 +18,7 @@ use formal_verification_lab::declarative_ctl::{
 use formal_verification_lab::declarative_ctl_report::{
     render_bounded_declarative_ctl_report, render_declarative_ctl_report,
 };
-use formal_verification_lab::declarative_mu::{
-    check_declarative_mu_text, DeclarativeMuStatus,
-};
+use formal_verification_lab::declarative_mu::{check_declarative_mu_text, DeclarativeMuStatus};
 use formal_verification_lab::declarative_mu_report::render_declarative_mu_report;
 use formal_verification_lab::eventuality::{
     check_eventuality, EventualityProperty, EventualityStatus,
