@@ -76,7 +76,7 @@ fn certificate_render_parse_round_trip_is_exact_and_deterministic() {
     assert_eq!(parsed, certificate);
     assert_eq!(second, first);
     assert!(first.starts_with("fvlab-mu-parity-certificate 1\n"));
-    assert!(first.contains("model-binding \"model \\"certificate-model\\\""));
+    assert!(first.contains(r#"model-binding "model \"certificate-model\""#));
     assert!(first.contains("formula \""));
     assert!(first.contains("winning even "));
     assert!(first.contains("choices odd "));
