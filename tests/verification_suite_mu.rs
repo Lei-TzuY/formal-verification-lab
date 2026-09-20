@@ -198,7 +198,7 @@ fn expectation_suite_compares_only_outcomes_and_keeps_full_mu_details() {
             .as_ref()
             .unwrap()
             .fixpoint_iterations
-            > 0
+            .is_some_and(|iterations| iterations > 0)
     );
 
     fs::remove_dir_all(root).unwrap();
