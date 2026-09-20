@@ -14,6 +14,9 @@ pub mod buchi_examples;
 pub mod buchi_report;
 pub mod builder;
 pub mod checker;
+pub mod certificate_verification_job;
+pub mod certificate_verification_job_run;
+pub mod certificate_verification_result;
 pub mod combined_fairness;
 pub mod ctl;
 pub mod ctl_bounded;
@@ -107,6 +110,18 @@ pub use builder::TransitionSystemBuilder;
 pub use checker::{
     check, check_with_limits, CheckResult, Counterexample, ExplorationLimits, InconclusiveReason,
     TraceStep, VerificationStatus,
+};
+pub use certificate_verification_job::{
+    parse_certificate_verification_job, CertificateVerificationJob,
+    CertificateVerificationJobParseError, CertificateVerificationJobParseErrorKind,
+};
+pub use certificate_verification_job_run::{
+    run_certificate_verification_job_json, CertificateVerificationJobJsonRun,
+    CERTIFICATE_VERIFICATION_ERROR_EXIT_CODE, CERTIFICATE_VERIFICATION_REJECTED_EXIT_CODE,
+};
+pub use certificate_verification_result::{
+    CertificateVerificationJobOutcome, CertificateVerificationJobResultEnvelope,
+    CERTIFICATE_VERIFICATION_JOB_RESULT_SCHEMA_VERSION,
 };
 pub use combined_fairness::{
     check_buchi_with_fairness_profile, FairnessProfile, FairnessProfileError,
