@@ -159,9 +159,9 @@ use formal_verification_lab::verification_job_run::{
     load_verification_job, run_verification_job_json,
 };
 use formal_verification_lab::{
-    create_declarative_mu_parity_certificate, parse_declarative_document,
-    parse_declarative_model, parse_declarative_mu_parity_certificate,
-    render_declarative_mu_parity_certificate, verify_declarative_mu_parity_certificate,
+    create_declarative_mu_parity_certificate, parse_declarative_document, parse_declarative_model,
+    parse_declarative_mu_parity_certificate, render_declarative_mu_parity_certificate,
+    verify_declarative_mu_parity_certificate,
 };
 use std::env;
 use std::fs;
@@ -1562,8 +1562,9 @@ fn run_mu_certificate_create(
     let certificate = create_declarative_mu_parity_certificate(&document, expression)
         .map_err(|error| error.to_string())?;
     let rendered = render_declarative_mu_parity_certificate(&certificate);
-    fs::write(certificate_path, rendered)
-        .map_err(|error| format!("failed to write mu parity certificate '{certificate_path}': {error}"))?;
+    fs::write(certificate_path, rendered).map_err(|error| {
+        format!("failed to write mu parity certificate '{certificate_path}': {error}")
+    })?;
 
     println!("MU PARITY CERTIFICATE: WRITTEN");
     println!("model: {}", document.model().name());
@@ -1580,8 +1581,9 @@ fn run_mu_certificate_verify(
     let input = fs::read_to_string(model_path)
         .map_err(|error| format!("failed to read declarative model '{model_path}': {error}"))?;
     let document = parse_declarative_document(&input).map_err(|error| error.to_string())?;
-    let certificate_text = fs::read_to_string(certificate_path)
-        .map_err(|error| format!("failed to read mu parity certificate '{certificate_path}': {error}"))?;
+    let certificate_text = fs::read_to_string(certificate_path).map_err(|error| {
+        format!("failed to read mu parity certificate '{certificate_path}': {error}")
+    })?;
     let certificate = parse_declarative_mu_parity_certificate(&certificate_text)
         .map_err(|error| error.to_string())?;
     verify_declarative_mu_parity_certificate(&document, expression, &certificate)
