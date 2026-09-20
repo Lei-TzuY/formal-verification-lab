@@ -141,11 +141,11 @@ pub fn run_verification_job_json_with_provider(
             if let Err(error) = validate_model_only_job(&job, "safety") {
                 return error_run(VerificationJobResultEnvelope::safety_error(error));
             }
-            match read_job_sources(provider, manifest_source_id, &job, "safety property")
-                .and_then(|(model_input, property_input)| {
+            match read_job_sources(provider, manifest_source_id, &job, "safety property").and_then(
+                |(model_input, property_input)| {
                     run_safety_job_json_from_text(job, &model_input, &property_input)
-                })
-            {
+                },
+            ) {
                 Ok(run) => run,
                 Err(error) => error_run(VerificationJobResultEnvelope::safety_error(error)),
             }
@@ -157,8 +157,7 @@ pub fn run_verification_job_json_with_provider(
             match read_job_sources(provider, manifest_source_id, &job, "deadlock property")
                 .and_then(|(model_input, property_input)| {
                     run_deadlock_job_json_from_text(job, &model_input, &property_input)
-                })
-            {
+                }) {
                 Ok(run) => run,
                 Err(error) => error_run(VerificationJobResultEnvelope::deadlock_error(error)),
             }
@@ -170,8 +169,7 @@ pub fn run_verification_job_json_with_provider(
             match read_job_sources(provider, manifest_source_id, &job, "exact-state property")
                 .and_then(|(model_input, property_input)| {
                     run_exact_state_job_json_from_text(job, &model_input, &property_input)
-                })
-            {
+                }) {
                 Ok(run) => run,
                 Err(error) => error_run(VerificationJobResultEnvelope::exact_state_error(error)),
             }
@@ -194,11 +192,15 @@ pub fn run_verification_job_json_with_provider(
             }
         }
         VerificationJobAnalysis::ActionTemporal => {
-            match read_job_sources(provider, manifest_source_id, &job, "action-temporal property")
-                .and_then(|(model_input, property_input)| {
-                    run_action_temporal_job_json_from_text(job, &model_input, &property_input)
-                })
-            {
+            match read_job_sources(
+                provider,
+                manifest_source_id,
+                &job,
+                "action-temporal property",
+            )
+            .and_then(|(model_input, property_input)| {
+                run_action_temporal_job_json_from_text(job, &model_input, &property_input)
+            }) {
                 Ok(run) => run,
                 Err(error) => error_run(action_temporal_error(error)),
             }
@@ -207,11 +209,11 @@ pub fn run_verification_job_json_with_provider(
             if let Err(error) = validate_ctl_job(&job) {
                 return error_run(ctl_error(error));
             }
-            match read_job_sources(provider, manifest_source_id, &job, "CTL property")
-                .and_then(|(model_input, property_input)| {
+            match read_job_sources(provider, manifest_source_id, &job, "CTL property").and_then(
+                |(model_input, property_input)| {
                     run_ctl_job_json_from_text(job, &model_input, &property_input)
-                })
-            {
+                },
+            ) {
                 Ok(run) => run,
                 Err(error) => error_run(ctl_error(error)),
             }
@@ -572,9 +574,13 @@ fn load_multi_response_job_with_provider(
     manifest_source_id: &str,
     job: VerificationJob,
 ) -> Result<LoadedVerificationJob, VerificationJobLoadError> {
-    let (model_input, property_input) =
-        read_job_sources(provider, manifest_source_id, &job, "multi-response property")
-            .map_err(VerificationJobLoadError::new)?;
+    let (model_input, property_input) = read_job_sources(
+        provider,
+        manifest_source_id,
+        &job,
+        "multi-response property",
+    )
+    .map_err(VerificationJobLoadError::new)?;
     load_multi_response_job_from_text(job, &model_input, &property_input)
 }
 
@@ -617,8 +623,8 @@ fn read_job_sources(
     job: &VerificationJob,
     property_kind: &str,
 ) -> Result<(String, String), String> {
-    let model_source_id =
-        resolve_source_id(manifest_source_id, job.model_path()).map_err(|error| error.to_string())?;
+    let model_source_id = resolve_source_id(manifest_source_id, job.model_path())
+        .map_err(|error| error.to_string())?;
     let property_source_id = resolve_source_id(manifest_source_id, job.property_path())
         .map_err(|error| error.to_string())?;
 
