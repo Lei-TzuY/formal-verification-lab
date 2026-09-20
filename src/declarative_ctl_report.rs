@@ -21,10 +21,10 @@ pub fn render_bounded_declarative_ctl_report(
             BoundedOutcome::Inconclusive(_) => "INCONCLUSIVE",
         }
     ));
-    if let BoundedOutcome::Inconclusive(reason) = result.evaluation.outcome {
+    if let BoundedOutcome::Inconclusive(reason) = &result.evaluation.outcome {
         output.push_str(&format!(
             "inconclusive reason: {}\n",
-            format_inconclusive_reason(reason)
+            format_inconclusive_reason(*reason)
         ));
     }
     output.push_str("initial semantics: all initial states must satisfy the formula\n");
