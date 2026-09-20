@@ -197,8 +197,8 @@ pub use mu_parity::{
 pub use mu_parity_certificate::{
     create_declarative_mu_parity_certificate, parse_declarative_mu_parity_certificate,
     render_declarative_mu_parity_certificate, verify_declarative_mu_parity_certificate,
-    DeclarativeMuParityCertificate, DeclarativeMuParityCertificateError,
-    MuParityCertificateChoice, MuParityCertificateInitial, MuParityCertificateParseError,
+    DeclarativeMuParityCertificate, DeclarativeMuParityCertificateError, MuParityCertificateChoice,
+    MuParityCertificateInitial, MuParityCertificateParseError,
     DECLARATIVE_MU_PARITY_CERTIFICATE_SCHEMA_VERSION,
 };
 pub use mu_parse::{parse_mu_formula, render_mu_formula, MuParseError, MuParseErrorKind};
