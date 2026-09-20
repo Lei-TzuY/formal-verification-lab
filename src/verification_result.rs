@@ -6,7 +6,10 @@ use crate::declarative_ctl::{
     BoundedDeclarativeCtlResult, DeclarativeCtlResult, DeclarativeCtlStatus,
 };
 use crate::declarative_deadlock::BoundedDeclarativeDeadlockResult;
-use crate::declarative_mu::{BoundedDeclarativeMuResult, DeclarativeMuResult, DeclarativeMuStatus};
+use crate::declarative_mu::{
+    BoundedDeclarativeMuResult, DeclarativeMuParityResult, DeclarativeMuResult,
+    DeclarativeMuStatus,
+};
 use crate::exact_state::{BoundedExactStateResult, ExactStateEvidence, ExactStateStatus};
 use crate::mu_bounded::{BoundedMuStatus, BoundedMuTruth};
 use crate::multi_response::{
@@ -235,7 +238,9 @@ pub struct VerificationJobMuDetails {
     pub retained_states: usize,
     pub definitely_satisfying_states: usize,
     pub possibly_satisfying_states: usize,
-    pub fixpoint_iterations: usize,
+    pub fixpoint_iterations: Option<usize>,
+    pub parity_game_vertices: Option<usize>,
+    pub max_parity_priority: Option<usize>,
     pub initial: Vec<VerificationJobMuInitial>,
 }
 
@@ -693,7 +698,9 @@ impl VerificationJobResultEnvelope {
                 retained_states: result.evaluation.reachable_states.len(),
                 definitely_satisfying_states: result.evaluation.satisfying_state_indices.len(),
                 possibly_satisfying_states: result.evaluation.satisfying_state_indices.len(),
-                fixpoint_iterations: result.evaluation.fixpoint_iterations,
+                fixpoint_iterations: Some(result.evaluation.fixpoint_iterations),
+                parity_game_vertices: None,
+                max_parity_priority: None,
                 initial: result
                     .evaluation
                     .initial
@@ -761,7 +768,9 @@ impl VerificationJobResultEnvelope {
                     .evaluation
                     .possibly_satisfying_state_indices
                     .len(),
-                fixpoint_iterations: result.evaluation.fixpoint_iterations,
+                fixpoint_iterations: Some(result.evaluation.fixpoint_iterations),
+                parity_game_vertices: None,
+                max_parity_priority: None,
                 initial: result
                     .evaluation
                     .initial
@@ -782,11 +791,73 @@ impl VerificationJobResultEnvelope {
         }
     }
 
+    pub fn from_mu_parity(
+        model: impl Into<String>,
+        result: &DeclarativeMuParityResult,
+    ) -> Self {
+        Self {
+            schema_version: VERIFICATION_JOB_MU_RESULT_SCHEMA_VERSION,
+            analysis: Some("mu-calculus".to_owned()),
+            backend: Some("mu-parity".to_owned()),
+            outcome: match result.status {
+                DeclarativeMuStatus::Satisfied => VerificationJobOutcome::Satisfied,
+                DeclarativeMuStatus::Violated => VerificationJobOutcome::Violated,
+            },
+            model: Some(model.into()),
+            property: Some(result.formula.clone()),
+            weak_fair_actions: Vec::new(),
+            strong_fair_actions: Vec::new(),
+            model_limits: ExplorationLimits::unbounded().into(),
+            product_limits: ExplorationLimits::unbounded().into(),
+            accounting: model_only_accounting(
+                result.evaluation.discovered_states,
+                result.evaluation.discovered_states,
+                result.evaluation.explored_transitions,
+                result.evaluation.max_depth_reached,
+            ),
+            cutoff: None,
+            ctl: None,
+            mu: Some(VerificationJobMuDetails {
+                initial_states_complete: true,
+                retained_states: result.evaluation.reachable_states.len(),
+                definitely_satisfying_states: result.evaluation.satisfying_state_indices.len(),
+                possibly_satisfying_states: result.evaluation.satisfying_state_indices.len(),
+                fixpoint_iterations: None,
+                parity_game_vertices: Some(result.evaluation.parity_game_vertices),
+                max_parity_priority: Some(result.evaluation.max_priority),
+                initial: result
+                    .evaluation
+                    .initial
+                    .iter()
+                    .map(|entry| VerificationJobMuInitial {
+                        state_index: entry.state_index,
+                        state: entry.state.clone(),
+                        truth: if entry.satisfied {
+                            VerificationJobMuTruth::True
+                        } else {
+                            VerificationJobMuTruth::False
+                        },
+                    })
+                    .collect(),
+            }),
+            evidence: None,
+            error: None,
+        }
+    }
+
     pub fn mu_error(message: impl Into<String>) -> Self {
         let mut envelope = Self::error(message);
         envelope.schema_version = VERIFICATION_JOB_MU_RESULT_SCHEMA_VERSION;
         envelope.analysis = Some("mu-calculus".to_owned());
         envelope.backend = Some("mu-fixpoint".to_owned());
+        envelope
+    }
+
+    pub fn mu_parity_error(message: impl Into<String>) -> Self {
+        let mut envelope = Self::error(message);
+        envelope.schema_version = VERIFICATION_JOB_MU_RESULT_SCHEMA_VERSION;
+        envelope.analysis = Some("mu-calculus".to_owned());
+        envelope.backend = Some("mu-parity".to_owned());
         envelope
     }
 
@@ -1122,12 +1193,18 @@ fn write_mu_details(out: &mut String, mu: &VerificationJobMuDetails) {
         mu.possibly_satisfying_states as u64,
         false,
     );
-    field_u64(
+    optional_usize_field(
         out,
         "fixpoint_iterations",
-        mu.fixpoint_iterations as u64,
+        mu.fixpoint_iterations,
         false,
     );
+    if let Some(vertices) = mu.parity_game_vertices {
+        field_u64(out, "parity_game_vertices", vertices as u64, false);
+    }
+    if let Some(priority) = mu.max_parity_priority {
+        field_u64(out, "max_parity_priority", priority as u64, false);
+    }
     out.push_str(",\"initial\":[");
     for (index, initial) in mu.initial.iter().enumerate() {
         if index != 0 {
