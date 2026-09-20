@@ -23,6 +23,8 @@ pub mod declarative_ctl;
 pub mod declarative_ctl_report;
 pub mod declarative_deadlock;
 pub mod declarative_deadlock_report;
+pub mod declarative_mu;
+pub mod declarative_mu_report;
 pub mod eventuality;
 pub mod eventuality_report;
 pub mod exact_state;
@@ -40,6 +42,7 @@ pub mod monitor_fairness;
 pub mod monitor_report;
 pub mod monitor_strong_fairness;
 pub mod mu_calculus;
+pub mod mu_parse;
 pub mod multi_response;
 pub mod multi_response_examples;
 pub mod multi_response_report;
@@ -128,6 +131,11 @@ pub use declarative_deadlock::{
     BoundedDeclarativeDeadlockResult, DeclarativeDeadlockError, DeclarativeDeadlockSpec,
 };
 pub use declarative_deadlock_report::render_declarative_deadlock_report;
+pub use declarative_mu::{
+    check_declarative_mu, check_declarative_mu_text, DeclarativeMuError, DeclarativeMuResult,
+    DeclarativeMuStatus,
+};
+pub use declarative_mu_report::render_declarative_mu_report;
 pub use eventuality::{
     check_eventuality, check_eventuality_with_limits, BoundedEventualityResult,
     EventualityCounterexample, EventualityError, EventualityProperty, EventualityResult,
@@ -167,6 +175,7 @@ pub use mu_calculus::{
     compile_ctl_to_mu, evaluate_mu, validate_mu_formula, MuError, MuEvaluation, MuFormula,
     MuInitialEvaluation, MuTerminalPolicy, MuValidationError,
 };
+pub use mu_parse::{parse_mu_formula, render_mu_formula, MuParseError, MuParseErrorKind};
 pub use multi_response::{
     check_multi_response, check_multi_response_with_limits,
     check_multi_response_with_product_limits, check_multi_response_with_strong_fairness,

@@ -78,6 +78,7 @@ Historical no-fairness behavior remains the default. Fairness is enabled only wh
 | M73 | Reproducible CTL verification jobs with schema-v3 lower/upper state data, normalized evidence, and model-cutoff provenance. |
 | M74 | Generic verification-suite integration audit proving schema-v3 CTL jobs and expectations require no CTL-specific orchestrator. |
 | M75 | Typed modal μ-calculus with validated lexical fixpoint binding, deterministic μ/ν iteration, and complete CTL→μ differential coverage. |
+| M76 | Textual/declarative modal μ-calculus with lexical binder syntax, named-proposition binding, direct file execution, and stable reporting over the M75 authority. |
 
 ### M31 — explicit weak-fairness liveness core
 
@@ -370,6 +371,9 @@ src/monitor.rs                unbounded, product-bounded + staged finite-monitor
 src/monitor_fairness.rs       weak-fair monitor rejection/progress composition
 src/monitor_strong_fairness.rs strong-fair monitor progress composition over sealed Büchi core
 src/mu_calculus.rs            typed modal μ-calculus, monotonicity validation, CTL compilation
+src/mu_parse.rs                textual μ-calculus grammar + canonical rendering
+src/declarative_mu.rs          named-proposition binding onto the typed μ authority
+src/declarative_mu_report.rs   deterministic complete-graph μ-calculus reporting
 src/monitor_combined_fairness.rs combined weak/strong monitor composition over sealed Büchi core
 src/buchi.rs                  unbounded, product-bounded + staged Büchi semantics
 src/temporal.rs               typed response/recurring routing, including weak/strong/combined fairness
@@ -451,6 +455,7 @@ cargo run -- proposition expr path/to/model.fvl reachable '"critical" and not "e
 cargo run -- proposition always path/to/model.fvl 'not "error"' --max-depth 4
 cargo run -- ctl file path/to/model.fvl 'AF "quiescent"'
 cargo run -- ctl file path/to/model.fvl 'EF "pending"' --max-states 20 --max-depth 4
+cargo run -- mu file path/to/model.fvl 'mu X. "done" or diamond $X'
 ```
 
 ### Declarative model file
@@ -485,6 +490,7 @@ The same finite graph can feed action-temporal, exact-state, proposition, Boolea
 - `11`: exact-state or proposition state property is `VIOLATED`;
 - `12`: declarative Boolean safety assertion is `VIOLATED`.
 - `14`: declarative CTL property is conclusively `VIOLATED`;
+- `15`: declarative modal μ-calculus property is `VIOLATED`;
 
 ## Tests and CI
 
@@ -548,28 +554,26 @@ M25–M29 retain product/staged semantic and built-binary regression suites. M32
 - Raw `IndependenceRelation` declarations and the historical `audit_sleep_set_reduction` path remain experimental inputs guarded by exhaustive differential comparison. M68 adds a separate safety-only standalone path that accepts only `ValidatedIndependenceRelation` evidence bound to one complete canonical reachable snapshot and its invariant observations. The validator fails closed on configured same-label nondeterminism, enabledness interference, non-commuting diamonds, and intermediate invariant-observation changes. This does not validate arbitrary POR schemes, liveness reduction, or cross-model certificate reuse.
 - Deterministic witnesses require deterministic successor ordering; declarative models preserve input edge ordering to make this explicit.
 - M66 structural recurrence jobs deliberately do not reuse `satisfied` / `violated`: `cycle_found` and `acyclic` are neutral structural outcomes. M67 preserves those envelopes unchanged in raw suites and keeps regression expectations as a separate contract.
-- M75 adds a typed complete-graph modal μ-calculus with lexical μ/ν binders, modal diamond/box, Boolean composition, fail-closed unbound/non-monotone-variable validation, and a semantics-preserving CTL→μ compiler checked by 90,112 generated comparisons. It does not yet provide textual/declarative μ syntax, bounded μ semantics, μ fairness, μ job/suite protocols, symbolic fixpoint algorithms, or a performance claim from its iteration counter.
+- M75 adds the typed complete-graph modal μ-calculus authority; M76 adds deterministic textual/declarative syntax, named-proposition binding, reporting, and direct file execution while delegating semantics exclusively to M75. Both use the same terminal self-loop policy and fail closed on unbound/non-monotone variables or unknown propositions before graph exploration. Bounded μ-calculus, μ fairness, μ verification-job/suite protocols, symbolic fixpoint algorithms, proof certificates, and performance claims from fixpoint iteration counts remain unsupported.
 - No milestone makes a performance claim from CI timing.
 
 ## Roadmap
 
-Milestones 1–75 now form a coherent explicit-state stack: canonical safety/bounded exploration -> typed finite models and independent graph validation -> reachability/deadlock/recurrence/eventuality -> response obligations, finite monitors and generalized Büchi acceptance -> shared graph/action-product substrates -> typed/textual/declarative property frontends -> proof-honest model/product budgets -> iterative deep-graph SCC traversal -> opt-in weak, strong and combined fairness -> reproducible verification/structural jobs and generic deterministic suites -> validated safety partial-order reduction evidence -> typed CTL branching-time fixpoints -> declarative/bounded CTL -> reproducible CTL jobs -> generic CTL suite integration -> typed modal μ-calculus.
+Milestones 1–76 now form a coherent explicit-state stack: canonical safety/bounded exploration -> typed finite models and independent graph validation -> reachability/deadlock/recurrence/eventuality -> response obligations, finite monitors and generalized Büchi acceptance -> shared graph/action-product substrates -> typed/textual/declarative property frontends -> proof-honest model/product budgets -> iterative deep-graph SCC traversal -> opt-in weak, strong and combined fairness -> reproducible verification/structural jobs and generic deterministic suites -> validated safety partial-order reduction evidence -> typed CTL branching-time fixpoints -> declarative/bounded CTL -> reproducible CTL jobs -> generic CTL suite integration -> typed modal μ-calculus -> textual/declarative μ-calculus.
 
-M74 closes without a duplicate CTL suite engine: the historical suite abstraction already nests complete verification-job envelopes and compares only canonical outcomes. Dedicated integration regressions now prove schema-v3 CTL payload preservation, heterogeneous ordering, expectation behavior, and built-binary JSON composition.
+M74 closes without a duplicate CTL suite engine: the generic suite abstraction already preserves arbitrary verification-job envelopes and compares only canonical outcomes. M75 then introduces the general typed fixpoint authority with lexical μ/ν binding and a 90,112-case CTL→μ cross-semantic differential. M76 exposes that authority externally through deterministic syntax, declarative proposition binding, complete-graph reporting, and `fvlab mu file`, while preserving validation-before-exploration and without adding a second fixpoint engine.
 
-M75 introduces the first general fixpoint logic authority. It validates lexical fixpoint binding and monotonicity before exploration, evaluates μ/ν formulas over one complete canonical reachable graph, shares CTL's terminal-totalization policy, and compiles every M69 CTL operator into the μ-calculus. The 90,112-case CTL→μ differential is a cross-semantic consistency gate, not a performance benchmark.
+The next high-value slice is **Milestone 77: proof-honest bounded modal μ-calculus semantics**. Complete-graph μ-calculus is now executable, but a cutoff prefix cannot soundly be treated as a total Kripke structure.
 
-The next high-value slice is **Milestone 76: textual/declarative modal μ-calculus frontend**. The typed authority is now strong enough to expose named propositions and fixpoint binders externally without duplicating semantics.
+Acceptance criteria for M77:
 
-Acceptance criteria for M76:
-
-- add deterministic textual syntax and canonical rendering for constants, quoted atoms, variables, Boolean composition, diamond/box, and μ/ν binders;
-- specify precedence and lexical scope explicitly, including nested same-name binder shadowing;
-- reject malformed, unbound, and non-monotone formulas before model graph capture;
-- bind atoms through existing declarative proposition metadata and reject unknown names before backend execution;
-- delegate semantic execution exclusively to M75 `evaluate_mu`;
-- add direct complete-graph file execution/reporting with stable all-initial satisfied/violated status;
-- add parser round-trip/error, lexical scope, monotonicity, terminal, nested-fixpoint, direct-vs-kernel, and built-binary tests;
-- preserve CTL→μ generated differential coverage as an integration gate;
-- defer bounded μ semantics, μ jobs/suites, fairness, and symbolic algorithms to later phases;
-- preserve all historical verification, structural, reduction, fairness, suite, and CTL gates.
+- reuse the canonical bounded reachable-graph capture, proven-terminal facts, complete-successor provenance, cutoff accounting, and M75 validator;
+- evaluate arbitrary validated μ-calculus formulas using conservative lower/upper state sets and lower/upper environments for lexically scoped fixpoint variables;
+- preserve sound negation duality and Boolean composition over approximation pairs;
+- interpret diamond/box conservatively under unknown outgoing behavior and synthesize self-loops only for proven terminals;
+- iterate least/greatest fixpoints monotonically to convergence over approximation pairs, including nested shadowing and μ/ν alternation;
+- return conclusive all-initial satisfaction/violation only when justified; otherwise surface explicit `INCONCLUSIVE` with the original state/transition/depth cutoff reason;
+- make complete/unbounded captures collapse exactly to M75 state sets, all-initial status, and accounting;
+- add independent generated small-graph × formula × deterministic-limit soundness coverage plus focused negation, alternation, terminal-unknown, zero-budget, and each cutoff-class regression;
+- defer bounded textual/CLI/job/suite exposure until the semantic kernel is sealed;
+- preserve every historical verification, structural, suite, reduction, fairness, CTL, M74 integration, and M75 CTL→μ gate.

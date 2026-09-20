@@ -18,6 +18,8 @@ use formal_verification_lab::declarative_ctl::{
 use formal_verification_lab::declarative_ctl_report::{
     render_bounded_declarative_ctl_report, render_declarative_ctl_report,
 };
+use formal_verification_lab::declarative_mu::{check_declarative_mu_text, DeclarativeMuStatus};
+use formal_verification_lab::declarative_mu_report::render_declarative_mu_report;
 use formal_verification_lab::eventuality::{
     check_eventuality, EventualityProperty, EventualityStatus,
 };
@@ -187,6 +189,7 @@ fn run(args: Vec<String>) -> Result<ExitCode, String> {
         [command, rest @ ..] if command == "state" => state_command(rest),
         [command, rest @ ..] if command == "proposition" => proposition_command(rest),
         [command, rest @ ..] if command == "ctl" => ctl_command(rest),
+        [command, rest @ ..] if command == "mu" => mu_command(rest),
         _ => Err(usage()),
     }
 }
@@ -1503,6 +1506,34 @@ fn run_ctl_file(path: &str, expression: &str, option_args: &[String]) -> Result<
     })
 }
 
+fn mu_command(args: &[String]) -> Result<ExitCode, String> {
+    match args {
+        [command, path, expression] if command == "file" => run_mu_file(path, expression),
+        [query, ..] => Err(format!(
+            "unknown mu-calculus query '{query}'; expected 'file <path> <expression>'"
+        )),
+        _ => Err(usage()),
+    }
+}
+
+fn run_mu_file(path: &str, expression: &str) -> Result<ExitCode, String> {
+    let input = fs::read_to_string(path)
+        .map_err(|error| format!("failed to read declarative model '{path}': {error}"))?;
+    let document = parse_declarative_document(&input).map_err(|error| error.to_string())?;
+    let result =
+        check_declarative_mu_text(&document, expression).map_err(|error| error.to_string())?;
+
+    print!(
+        "{}",
+        render_declarative_mu_report(document.model().name(), &result)
+    );
+
+    Ok(match result.status {
+        DeclarativeMuStatus::Satisfied => ExitCode::SUCCESS,
+        DeclarativeMuStatus::Violated => ExitCode::from(15),
+    })
+}
+
 fn proposition_command(args: &[String]) -> Result<ExitCode, String> {
     match args {
         [command, path, mode, proposition, option_args @ ..] if command == "file" => {
@@ -1878,7 +1909,7 @@ fn status_exit_code(status: VerificationStatus) -> ExitCode {
 }
 
 fn usage() -> String {
-    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | scc file <path> [--max-states N] [--max-transitions N] [--max-depth N] | scc job <manifest-path> [--format json] | eventually <counter-three|counter-four|traffic-never> | respond <request-grant|request-grant-unfair|request-grant-terminal> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | respond <dual-grant|dual-grant-unfair-b|dual-grant-terminal-b> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | monitor <session-ok|session-double-open|session-stuck|session-unfair-close|session-open-terminal> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | buchi <pulses|pulses-unfair|finite-ignore|finite-strict> [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal <request-grant|request-grant-unfair|pulses|pulses-unfair> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal check <request-grant|request-grant-unfair|pulses|pulses-unfair> <expression> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal file <path> <expression> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal multi-file <model-path> <property-path> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal job <manifest-path> | state file <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition file <path> <reachable|all-eventually> <proposition> [--max-states N] [--max-transitions N] [--max-depth N] | proposition expr <path> <reachable|all-eventually> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition always <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | ctl file <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N]]"
+    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | scc file <path> [--max-states N] [--max-transitions N] [--max-depth N] | scc job <manifest-path> [--format json] | eventually <counter-three|counter-four|traffic-never> | respond <request-grant|request-grant-unfair|request-grant-terminal> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | respond <dual-grant|dual-grant-unfair-b|dual-grant-terminal-b> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | monitor <session-ok|session-double-open|session-stuck|session-unfair-close|session-open-terminal> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | buchi <pulses|pulses-unfair|finite-ignore|finite-strict> [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal <request-grant|request-grant-unfair|pulses|pulses-unfair> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal check <request-grant|request-grant-unfair|pulses|pulses-unfair> <expression> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal file <path> <expression> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal multi-file <model-path> <property-path> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal job <manifest-path> | state file <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition file <path> <reachable|all-eventually> <proposition> [--max-states N] [--max-transitions N] [--max-depth N] | proposition expr <path> <reachable|all-eventually> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition always <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | ctl file <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | mu file <path> <expression>]"
         .to_owned()
 }
 
