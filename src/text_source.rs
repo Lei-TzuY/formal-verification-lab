@@ -227,13 +227,14 @@ pub fn normalize_source_id(source_id: &str) -> Result<String, TextSourceIdError>
         match component {
             "" | "." => {}
             ".." => {
-                if components.pop().is_none() {
-                    if absolute || drive_prefix.is_some() {
-                        return Err(TextSourceIdError::new(
-                            source_id,
-                            TextSourceIdErrorKind::EscapesRoot,
-                        ));
-                    }
+                if components.last().is_some_and(|component| *component != "..") {
+                    components.pop();
+                } else if absolute || drive_prefix.is_some() {
+                    return Err(TextSourceIdError::new(
+                        source_id,
+                        TextSourceIdErrorKind::EscapesRoot,
+                    ));
+                } else {
                     components.push("..");
                 }
             }
@@ -255,6 +256,10 @@ pub fn normalize_source_id(source_id: &str) -> Result<String, TextSourceIdError>
     } else {
         Ok(joined)
     }
+}
+
+pub fn path_source_id(path: &Path) -> Result<String, TextSourceIdError> {
+    normalize_source_id(&path.to_string_lossy())
 }
 
 pub fn resolve_source_id(
