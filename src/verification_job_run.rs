@@ -15,13 +15,18 @@ use crate::proposition_expr::{
     PropositionExpressionPropertySpec,
 };
 use crate::safety::{check_safety_assertion_with_limits, PropositionSafetySpec, SafetyStatus};
-use crate::verification_action_temporal::{action_temporal_error, run_action_temporal_job_json};
-use crate::verification_ctl::{ctl_error, run_ctl_job_json};
+use crate::text_source::{
+    path_source_id, resolve_source_id, FileSystemTextSourceProvider, TextSourceProvider,
+};
+use crate::verification_action_temporal::{
+    action_temporal_error, run_action_temporal_job_json_from_text,
+};
+use crate::verification_ctl::{ctl_error, run_ctl_job_json_from_text, validate_ctl_job};
 use crate::verification_execution::{
     execute_multi_response, MultiResponseExecutionConfig, MultiResponseExecutionResult,
 };
 use crate::verification_job::{parse_verification_job, VerificationJob, VerificationJobAnalysis};
-use crate::verification_mu::{mu_error, run_mu_job_json};
+use crate::verification_mu::{mu_error, run_mu_job_json_from_text, validate_mu_job};
 use crate::verification_result::{
     VerificationJobAccounting, VerificationJobCutoff, VerificationJobCutoffKind,
     VerificationJobCutoffStage, VerificationJobEvidence, VerificationJobOutcome,
@@ -33,8 +38,7 @@ use crate::{
     TransitionSystem,
 };
 use std::fmt;
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 /// Historical typed loader for the M55 multi-response job family.
 ///
@@ -83,8 +87,16 @@ impl VerificationJobJsonRun {
 pub fn load_verification_job(
     manifest_path: impl AsRef<Path>,
 ) -> Result<LoadedVerificationJob, VerificationJobLoadError> {
-    let manifest_path = manifest_path.as_ref();
-    let input = read_job_manifest(manifest_path)?;
+    let manifest_source_id = path_source_id(manifest_path.as_ref())
+        .map_err(|error| VerificationJobLoadError::new(error.to_string()))?;
+    load_verification_job_with_provider(&FileSystemTextSourceProvider, &manifest_source_id)
+}
+
+pub fn load_verification_job_with_provider(
+    provider: &dyn TextSourceProvider,
+    manifest_source_id: &str,
+) -> Result<LoadedVerificationJob, VerificationJobLoadError> {
+    let input = read_job_manifest(provider, manifest_source_id)?;
     let job = parse_verification_job(&input)
         .map_err(|error| VerificationJobLoadError::new(error.to_string()))?;
     if job.analysis() != VerificationJobAnalysis::MultiResponse {
@@ -92,12 +104,24 @@ pub fn load_verification_job(
             "typed load_verification_job supports only multi-response jobs; use run_verification_job_json for heterogeneous execution",
         ));
     }
-    load_multi_response_job(manifest_path, job)
+    load_multi_response_job_with_provider(provider, manifest_source_id, job)
 }
 
 pub fn run_verification_job_json(manifest_path: impl AsRef<Path>) -> VerificationJobJsonRun {
-    let manifest_path = manifest_path.as_ref();
-    let input = match read_job_manifest(manifest_path) {
+    let manifest_source_id = match path_source_id(manifest_path.as_ref()) {
+        Ok(source_id) => source_id,
+        Err(error) => {
+            return error_run(VerificationJobResultEnvelope::error(error.to_string()));
+        }
+    };
+    run_verification_job_json_with_provider(&FileSystemTextSourceProvider, &manifest_source_id)
+}
+
+pub fn run_verification_job_json_with_provider(
+    provider: &dyn TextSourceProvider,
+    manifest_source_id: &str,
+) -> VerificationJobJsonRun {
+    let input = match read_job_manifest(provider, manifest_source_id) {
         Ok(input) => input,
         Err(error) => return error_run(VerificationJobResultEnvelope::error(error.to_string())),
     };
@@ -108,42 +132,104 @@ pub fn run_verification_job_json(manifest_path: impl AsRef<Path>) -> Verificatio
 
     match job.analysis() {
         VerificationJobAnalysis::MultiResponse => {
-            match run_multi_response_job_json(manifest_path, job) {
+            match run_multi_response_job_json_with_provider(provider, manifest_source_id, job) {
                 Ok(run) => run,
                 Err(error) => error_run(VerificationJobResultEnvelope::error(error)),
             }
         }
-        VerificationJobAnalysis::Safety => match run_safety_job_json(manifest_path, job) {
-            Ok(run) => run,
-            Err(error) => error_run(VerificationJobResultEnvelope::safety_error(error)),
-        },
-        VerificationJobAnalysis::Deadlock => match run_deadlock_job_json(manifest_path, job) {
-            Ok(run) => run,
-            Err(error) => error_run(VerificationJobResultEnvelope::deadlock_error(error)),
-        },
-        VerificationJobAnalysis::ExactState => match run_exact_state_job_json(manifest_path, job) {
-            Ok(run) => run,
-            Err(error) => error_run(VerificationJobResultEnvelope::exact_state_error(error)),
-        },
+        VerificationJobAnalysis::Safety => {
+            if let Err(error) = validate_model_only_job(&job, "safety") {
+                return error_run(VerificationJobResultEnvelope::safety_error(error));
+            }
+            match read_job_sources(provider, manifest_source_id, &job, "safety property")
+                .and_then(|(model_input, property_input)| {
+                    run_safety_job_json_from_text(job, &model_input, &property_input)
+                })
+            {
+                Ok(run) => run,
+                Err(error) => error_run(VerificationJobResultEnvelope::safety_error(error)),
+            }
+        }
+        VerificationJobAnalysis::Deadlock => {
+            if let Err(error) = validate_model_only_job(&job, "deadlock") {
+                return error_run(VerificationJobResultEnvelope::deadlock_error(error));
+            }
+            match read_job_sources(provider, manifest_source_id, &job, "deadlock property")
+                .and_then(|(model_input, property_input)| {
+                    run_deadlock_job_json_from_text(job, &model_input, &property_input)
+                })
+            {
+                Ok(run) => run,
+                Err(error) => error_run(VerificationJobResultEnvelope::deadlock_error(error)),
+            }
+        }
+        VerificationJobAnalysis::ExactState => {
+            if let Err(error) = validate_model_only_job(&job, "exact-state") {
+                return error_run(VerificationJobResultEnvelope::exact_state_error(error));
+            }
+            match read_job_sources(provider, manifest_source_id, &job, "exact-state property")
+                .and_then(|(model_input, property_input)| {
+                    run_exact_state_job_json_from_text(job, &model_input, &property_input)
+                })
+            {
+                Ok(run) => run,
+                Err(error) => error_run(VerificationJobResultEnvelope::exact_state_error(error)),
+            }
+        }
         VerificationJobAnalysis::PropositionExpression => {
-            match run_proposition_expression_job_json(manifest_path, job) {
+            if let Err(error) = validate_model_only_job(&job, "proposition-expression") {
+                return error_run(proposition_expression_error(error));
+            }
+            match read_job_sources(
+                provider,
+                manifest_source_id,
+                &job,
+                "proposition-expression property",
+            )
+            .and_then(|(model_input, property_input)| {
+                run_proposition_expression_job_json_from_text(job, &model_input, &property_input)
+            }) {
                 Ok(run) => run,
                 Err(error) => error_run(proposition_expression_error(error)),
             }
         }
         VerificationJobAnalysis::ActionTemporal => {
-            match run_action_temporal_job_json(manifest_path, job) {
+            match read_job_sources(provider, manifest_source_id, &job, "action-temporal property")
+                .and_then(|(model_input, property_input)| {
+                    run_action_temporal_job_json_from_text(job, &model_input, &property_input)
+                })
+            {
                 Ok(run) => run,
                 Err(error) => error_run(action_temporal_error(error)),
             }
         }
-        VerificationJobAnalysis::Ctl => match run_ctl_job_json(manifest_path, job) {
-            Ok(run) => run,
-            Err(error) => error_run(ctl_error(error)),
-        },
+        VerificationJobAnalysis::Ctl => {
+            if let Err(error) = validate_ctl_job(&job) {
+                return error_run(ctl_error(error));
+            }
+            match read_job_sources(provider, manifest_source_id, &job, "CTL property")
+                .and_then(|(model_input, property_input)| {
+                    run_ctl_job_json_from_text(job, &model_input, &property_input)
+                })
+            {
+                Ok(run) => run,
+                Err(error) => error_run(ctl_error(error)),
+            }
+        }
         VerificationJobAnalysis::MuCalculus => {
             let backend = job.mu_backend();
-            match run_mu_job_json(manifest_path, job) {
+            if let Err(error) = validate_mu_job(&job) {
+                return error_run(mu_error(backend, error));
+            }
+            match read_job_sources(
+                provider,
+                manifest_source_id,
+                &job,
+                "modal mu-calculus property",
+            )
+            .and_then(|(model_input, property_input)| {
+                run_mu_job_json_from_text(job, &model_input, &property_input)
+            }) {
                 Ok(run) => run,
                 Err(error) => error_run(mu_error(backend, error)),
             }
@@ -151,11 +237,13 @@ pub fn run_verification_job_json(manifest_path: impl AsRef<Path>) -> Verificatio
     }
 }
 
-fn run_multi_response_job_json(
-    manifest_path: &Path,
+fn run_multi_response_job_json_with_provider(
+    provider: &dyn TextSourceProvider,
+    manifest_source_id: &str,
     job: VerificationJob,
 ) -> Result<VerificationJobJsonRun, String> {
-    let loaded = load_multi_response_job(manifest_path, job).map_err(|error| error.to_string())?;
+    let loaded = load_multi_response_job_with_provider(provider, manifest_source_id, job)
+        .map_err(|error| error.to_string())?;
     let config =
         MultiResponseExecutionConfig::from_job(&loaded.job).map_err(|error| error.to_string())?;
     let result = execute_multi_response(&loaded.model, &loaded.property, &config)
@@ -210,29 +298,15 @@ fn run_multi_response_job_json(
     })
 }
 
-fn run_safety_job_json(
-    manifest_path: &Path,
+fn run_safety_job_json_from_text(
     job: VerificationJob,
+    model_input: &str,
+    property_input: &str,
 ) -> Result<VerificationJobJsonRun, String> {
     validate_model_only_job(&job, "safety")?;
-    let (model_path, property_path) = resolve_job_paths(manifest_path, &job);
-
-    let model_input = fs::read_to_string(&model_path).map_err(|error| {
-        format!(
-            "failed to read declarative model '{}': {error}",
-            model_path.display()
-        )
-    })?;
-    let document = parse_declarative_document(&model_input).map_err(|error| error.to_string())?;
-
-    let property_input = fs::read_to_string(&property_path).map_err(|error| {
-        format!(
-            "failed to read safety property '{}': {error}",
-            property_path.display()
-        )
-    })?;
+    let document = parse_declarative_document(model_input).map_err(|error| error.to_string())?;
     let expression =
-        parse_proposition_expression(&property_input).map_err(|error| error.to_string())?;
+        parse_proposition_expression(property_input).map_err(|error| error.to_string())?;
     let spec = PropositionSafetySpec::always("verification-job-safety", expression)
         .map_err(|error| error.to_string())?;
     let result = check_safety_assertion_with_limits(&document, &spec, job.model_limits())
@@ -254,28 +328,14 @@ fn run_safety_job_json(
     })
 }
 
-fn run_deadlock_job_json(
-    manifest_path: &Path,
+fn run_deadlock_job_json_from_text(
     job: VerificationJob,
+    model_input: &str,
+    property_input: &str,
 ) -> Result<VerificationJobJsonRun, String> {
     validate_model_only_job(&job, "deadlock")?;
-    let (model_path, property_path) = resolve_job_paths(manifest_path, &job);
-
-    let model_input = fs::read_to_string(&model_path).map_err(|error| {
-        format!(
-            "failed to read declarative model '{}': {error}",
-            model_path.display()
-        )
-    })?;
-    let document = parse_declarative_document(&model_input).map_err(|error| error.to_string())?;
-
-    let property_input = fs::read_to_string(&property_path).map_err(|error| {
-        format!(
-            "failed to read deadlock property '{}': {error}",
-            property_path.display()
-        )
-    })?;
-    let spec = parse_declarative_deadlock_spec("verification-job-deadlock", &property_input)
+    let document = parse_declarative_document(model_input).map_err(|error| error.to_string())?;
+    let spec = parse_declarative_deadlock_spec("verification-job-deadlock", property_input)
         .map_err(|error| error.to_string())?;
     let result = check_declarative_deadlock_with_limits(&document, &spec, job.model_limits())
         .map_err(|error| error.to_string())?;
@@ -299,28 +359,14 @@ fn run_deadlock_job_json(
     })
 }
 
-fn run_exact_state_job_json(
-    manifest_path: &Path,
+fn run_exact_state_job_json_from_text(
     job: VerificationJob,
+    model_input: &str,
+    property_input: &str,
 ) -> Result<VerificationJobJsonRun, String> {
     validate_model_only_job(&job, "exact-state")?;
-    let (model_path, property_path) = resolve_job_paths(manifest_path, &job);
-
-    let model_input = fs::read_to_string(&model_path).map_err(|error| {
-        format!(
-            "failed to read declarative model '{}': {error}",
-            model_path.display()
-        )
-    })?;
-    let model = parse_declarative_model(&model_input).map_err(|error| error.to_string())?;
-
-    let property_input = fs::read_to_string(&property_path).map_err(|error| {
-        format!(
-            "failed to read exact-state property '{}': {error}",
-            property_path.display()
-        )
-    })?;
-    let spec = parse_exact_state_property("verification-job-exact-state", &property_input)
+    let model = parse_declarative_model(model_input).map_err(|error| error.to_string())?;
+    let spec = parse_exact_state_property("verification-job-exact-state", property_input)
         .map_err(|error| error.to_string())?;
     let canonical_property = spec.canonical_expression();
     let result = check_exact_state_property_with_limits(&model, &spec, job.model_limits())
@@ -346,28 +392,14 @@ fn run_exact_state_job_json(
     })
 }
 
-fn run_proposition_expression_job_json(
-    manifest_path: &Path,
+fn run_proposition_expression_job_json_from_text(
     job: VerificationJob,
+    model_input: &str,
+    property_input: &str,
 ) -> Result<VerificationJobJsonRun, String> {
     validate_model_only_job(&job, "proposition-expression")?;
-    let (model_path, property_path) = resolve_job_paths(manifest_path, &job);
-
-    let model_input = fs::read_to_string(&model_path).map_err(|error| {
-        format!(
-            "failed to read declarative model '{}': {error}",
-            model_path.display()
-        )
-    })?;
-    let document = parse_declarative_document(&model_input).map_err(|error| error.to_string())?;
-
-    let property_input = fs::read_to_string(&property_path).map_err(|error| {
-        format!(
-            "failed to read proposition-expression property '{}': {error}",
-            property_path.display()
-        )
-    })?;
-    let (canonical_property, spec) = parse_proposition_job_property(&property_input)?;
+    let document = parse_declarative_document(model_input).map_err(|error| error.to_string())?;
+    let (canonical_property, spec) = parse_proposition_job_property(property_input)?;
     let result =
         check_proposition_expression_property_with_limits(&document, &spec, job.model_limits())
             .map_err(|error| error.to_string())?;
@@ -535,28 +567,25 @@ fn convert_state_step(step: &crate::checker::TraceStep<String>) -> VerificationJ
     }
 }
 
-fn load_multi_response_job(
-    manifest_path: &Path,
+fn load_multi_response_job_with_provider(
+    provider: &dyn TextSourceProvider,
+    manifest_source_id: &str,
     job: VerificationJob,
 ) -> Result<LoadedVerificationJob, VerificationJobLoadError> {
-    let (model_path, property_path) = resolve_job_paths(manifest_path, &job);
+    let (model_input, property_input) =
+        read_job_sources(provider, manifest_source_id, &job, "multi-response property")
+            .map_err(VerificationJobLoadError::new)?;
+    load_multi_response_job_from_text(job, &model_input, &property_input)
+}
 
-    let model_input = fs::read_to_string(&model_path).map_err(|error| {
-        VerificationJobLoadError::new(format!(
-            "failed to read declarative model '{}': {error}",
-            model_path.display()
-        ))
-    })?;
-    let model = parse_declarative_model(&model_input)
+fn load_multi_response_job_from_text(
+    job: VerificationJob,
+    model_input: &str,
+    property_input: &str,
+) -> Result<LoadedVerificationJob, VerificationJobLoadError> {
+    let model = parse_declarative_model(model_input)
         .map_err(|error| VerificationJobLoadError::new(error.to_string()))?;
-
-    let property_input = fs::read_to_string(&property_path).map_err(|error| {
-        VerificationJobLoadError::new(format!(
-            "failed to read multi-response property '{}': {error}",
-            property_path.display()
-        ))
-    })?;
-    let spec = parse_multi_response_temporal("cli-multi-response", &property_input)
+    let spec = parse_multi_response_temporal("cli-multi-response", property_input)
         .map_err(|error| VerificationJobLoadError::new(error.to_string()))?;
     let property = spec
         .to_property()
@@ -569,13 +598,45 @@ fn load_multi_response_job(
     })
 }
 
-fn read_job_manifest(manifest_path: &Path) -> Result<String, VerificationJobLoadError> {
-    fs::read_to_string(manifest_path).map_err(|error| {
+fn read_job_manifest(
+    provider: &dyn TextSourceProvider,
+    manifest_source_id: &str,
+) -> Result<String, VerificationJobLoadError> {
+    provider.read_text(manifest_source_id).map_err(|error| {
         VerificationJobLoadError::new(format!(
-            "failed to read verification job '{}': {error}",
-            manifest_path.display()
+            "failed to read verification job '{}': {}",
+            manifest_source_id,
+            error.kind().as_str()
         ))
     })
+}
+
+fn read_job_sources(
+    provider: &dyn TextSourceProvider,
+    manifest_source_id: &str,
+    job: &VerificationJob,
+    property_kind: &str,
+) -> Result<(String, String), String> {
+    let model_source_id =
+        resolve_source_id(manifest_source_id, job.model_path()).map_err(|error| error.to_string())?;
+    let property_source_id = resolve_source_id(manifest_source_id, job.property_path())
+        .map_err(|error| error.to_string())?;
+
+    let model_input = provider.read_text(&model_source_id).map_err(|error| {
+        format!(
+            "failed to read declarative model '{}': {}",
+            model_source_id,
+            error.kind().as_str()
+        )
+    })?;
+    let property_input = provider.read_text(&property_source_id).map_err(|error| {
+        format!(
+            "failed to read {property_kind} '{}': {}",
+            property_source_id,
+            error.kind().as_str()
+        )
+    })?;
+    Ok((model_input, property_input))
 }
 
 fn validate_model_only_job(job: &VerificationJob, family: &str) -> Result<(), String> {
@@ -600,22 +661,6 @@ fn error_run(envelope: VerificationJobResultEnvelope) -> VerificationJobJsonRun 
     VerificationJobJsonRun {
         envelope,
         exit_code: 2,
-    }
-}
-
-fn resolve_job_paths(manifest_path: &Path, job: &VerificationJob) -> (PathBuf, PathBuf) {
-    let base = manifest_path.parent().unwrap_or_else(|| Path::new(""));
-    (
-        resolve_path(base, Path::new(job.model_path())),
-        resolve_path(base, Path::new(job.property_path())),
-    )
-}
-
-fn resolve_path(base: &Path, path: &Path) -> PathBuf {
-    if path.is_absolute() {
-        path.to_path_buf()
-    } else {
-        base.join(path)
     }
 }
 
