@@ -1,7 +1,7 @@
 use formal_verification_lab::{
     run_verification_job_json, run_verification_suite_expectations_json,
     run_verification_suite_json, VerificationJobOutcome, VerificationRegressionSuiteOutcome,
-    VerificationSuiteOutcome, VERIFICATION_JOB_CTL_RESULT_SCHEMA_VERSION,
+    VerificationJobCtlTruth, VerificationSuiteOutcome, VERIFICATION_JOB_CTL_RESULT_SCHEMA_VERSION,
 };
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -143,7 +143,7 @@ fn generic_suite_runner_preserves_schema_v3_ctl_envelopes_and_heterogeneous_orde
     let json = run.to_json();
     let ctl_details = run.envelope.jobs[1].result.ctl.as_ref().unwrap();
     assert!(!ctl_details.initial_states_complete);
-    assert_eq!(ctl_details.initial[0].truth.as_str(), "unknown");
+    assert_eq!(ctl_details.initial[0].truth, VerificationJobCtlTruth::Unknown);
     assert!(json.contains("\"schema_version\":3,\"analysis\":\"ctl\""));
     assert!(json.contains("\"kind\":\"state_limit\""));
     assert!(json.contains("\"truth\":\"unknown\""));
@@ -193,10 +193,8 @@ fn expectation_suite_compares_only_outcomes_and_preserves_full_ctl_details() {
         .evidence
         .is_some());
     assert_eq!(
-        run.envelope.jobs[2].result.ctl.as_ref().unwrap().initial[0]
-            .truth
-            .as_str(),
-        "unknown"
+        run.envelope.jobs[2].result.ctl.as_ref().unwrap().initial[0].truth,
+        VerificationJobCtlTruth::Unknown
     );
 
     fs::remove_dir_all(root).unwrap();
@@ -206,16 +204,11 @@ fn expectation_suite_compares_only_outcomes_and_preserves_full_ctl_details() {
 fn built_binary_ctl_suite_and_expectation_json_embed_direct_job_payloads() {
     let root = fixture_dir("binary");
     let satisfied = write_ctl_job(&root, "ctl-satisfied", r#"EX "ready""#, "");
-    let terminal = write_ctl_job(
-        &root,
-        "ctl-terminal",
-        r#"EG "ready""#,
-        "max-model-states 2\n",
-    );
+    let lasso = write_ctl_job(&root, "ctl-lasso", r#"EG "ready""#, "");
     let suite = root.join("suite.fvs");
     fs::write(
         &suite,
-        "suite \"ctl-binary\"\njob \"ctl-satisfied.fvj\" expect \"satisfied\"\njob \"ctl-terminal.fvj\" expect \"satisfied\"\n",
+        "suite \"ctl-binary\"\njob \"ctl-satisfied.fvj\" expect \"satisfied\"\njob \"ctl-lasso.fvj\" expect \"satisfied\"\n",
     )
     .unwrap();
 
@@ -223,7 +216,7 @@ fn built_binary_ctl_suite_and_expectation_json_embed_direct_job_payloads() {
     assert_eq!(raw.status.code(), Some(0));
     let raw_json = String::from_utf8(raw.stdout).unwrap();
     assert!(raw_json.contains(&run_verification_job_json(&satisfied).to_json()));
-    assert!(raw_json.contains(&run_verification_job_json(&terminal).to_json()));
+    assert!(raw_json.contains(&run_verification_job_json(&lasso).to_json()));
 
     let checked = run_suite_binary(&expectation_args(&suite));
     assert_eq!(checked.status.code(), Some(0));
