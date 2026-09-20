@@ -533,10 +533,7 @@ impl<'a> LineParser<'a> {
                 '\\' => {
                     let escape_position = self.position;
                     let Some(escape) = self.peek() else {
-                        return Err((
-                            start,
-                            OrchestrationSuiteParseErrorKind::UnterminatedString,
-                        ));
+                        return Err((start, OrchestrationSuiteParseErrorKind::UnterminatedString));
                     };
                     self.position += escape.len_utf8();
                     match escape {
