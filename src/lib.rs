@@ -398,9 +398,8 @@ pub use verification_suite_run::{
 };
 pub use workspace_snapshot::{
     create_workspace_snapshot, parse_workspace_snapshot, render_workspace_snapshot,
-    replay_workspace_snapshot_expectations_json, replay_workspace_snapshot_json,
-    WorkspaceSnapshot, WorkspaceSnapshotBuildError, WorkspaceSnapshotParseError,
-    WorkspaceSnapshotParseErrorKind, MAX_WORKSPACE_SNAPSHOT_ENTRIES,
-    MAX_WORKSPACE_SNAPSHOT_SOURCE_BYTES, MAX_WORKSPACE_SNAPSHOT_SOURCE_ID_BYTES,
-    WORKSPACE_SNAPSHOT_SCHEMA_VERSION,
+    replay_workspace_snapshot_expectations_json, replay_workspace_snapshot_json, WorkspaceSnapshot,
+    WorkspaceSnapshotBuildError, WorkspaceSnapshotParseError, WorkspaceSnapshotParseErrorKind,
+    MAX_WORKSPACE_SNAPSHOT_ENTRIES, MAX_WORKSPACE_SNAPSHOT_SOURCE_BYTES,
+    MAX_WORKSPACE_SNAPSHOT_SOURCE_ID_BYTES, WORKSPACE_SNAPSHOT_SCHEMA_VERSION,
 };
