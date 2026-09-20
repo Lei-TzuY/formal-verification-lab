@@ -8,8 +8,10 @@ use crate::mu_parity_certificate::{
     parse_declarative_mu_parity_certificate, verify_declarative_mu_parity_certificate,
 };
 use crate::mu_parse::{parse_mu_formula, render_mu_formula};
-use std::fs;
-use std::path::{Path, PathBuf};
+use crate::text_source::{
+    path_source_id, resolve_source_id, FileSystemTextSourceProvider, TextSourceProvider,
+};
+use std::path::Path;
 
 pub const CERTIFICATE_VERIFICATION_REJECTED_EXIT_CODE: u8 = 16;
 pub const CERTIFICATE_VERIFICATION_ERROR_EXIT_CODE: u8 = 2;
@@ -29,15 +31,29 @@ impl CertificateVerificationJobJsonRun {
 pub fn run_certificate_verification_job_json(
     manifest_path: impl AsRef<Path>,
 ) -> CertificateVerificationJobJsonRun {
-    let manifest_path = manifest_path.as_ref();
-    let manifest_text = match fs::read_to_string(manifest_path) {
+    let manifest_source_id = match path_source_id(manifest_path.as_ref()) {
+        Ok(source_id) => source_id,
+        Err(error) => return error_run(None, error.to_string()),
+    };
+    run_certificate_verification_job_json_with_provider(
+        &FileSystemTextSourceProvider,
+        &manifest_source_id,
+    )
+}
+
+pub fn run_certificate_verification_job_json_with_provider(
+    provider: &dyn TextSourceProvider,
+    manifest_source_id: &str,
+) -> CertificateVerificationJobJsonRun {
+    let manifest_text = match provider.read_text(manifest_source_id) {
         Ok(value) => value,
         Err(error) => {
             return error_run(
                 None,
                 format!(
-                    "failed to read certificate verification job '{}': {error}",
-                    manifest_path.display()
+                    "failed to read certificate verification job '{}': {}",
+                    manifest_source_id,
+                    error.kind().as_str()
                 ),
             )
         }
@@ -47,27 +63,37 @@ pub fn run_certificate_verification_job_json(
         Err(error) => return error_run(None, error.to_string()),
     };
 
-    run_loaded_job(manifest_path, &job)
+    run_loaded_job_with_provider(provider, manifest_source_id, &job)
 }
 
-fn run_loaded_job(
-    manifest_path: &Path,
+fn run_loaded_job_with_provider(
+    provider: &dyn TextSourceProvider,
+    manifest_source_id: &str,
     job: &CertificateVerificationJob,
 ) -> CertificateVerificationJobJsonRun {
-    let base = manifest_path.parent().unwrap_or_else(|| Path::new("."));
-    let model_path = resolve_path(base, Path::new(job.model_path()));
-    let property_path = resolve_path(base, Path::new(job.property_path()));
-    let certificate_path = resolve_path(base, Path::new(job.certificate_path()));
+    let model_source_id = match resolve_source_id(manifest_source_id, job.model_path()) {
+        Ok(value) => value,
+        Err(error) => return setup_error(job, None, error.to_string()),
+    };
+    let property_source_id = match resolve_source_id(manifest_source_id, job.property_path()) {
+        Ok(value) => value,
+        Err(error) => return setup_error(job, None, error.to_string()),
+    };
+    let certificate_source_id = match resolve_source_id(manifest_source_id, job.certificate_path()) {
+        Ok(value) => value,
+        Err(error) => return setup_error(job, None, error.to_string()),
+    };
 
-    let model_text = match fs::read_to_string(&model_path) {
+    let model_text = match provider.read_text(&model_source_id) {
         Ok(value) => value,
         Err(error) => {
             return setup_error(
                 job,
                 None,
                 format!(
-                    "failed to read declarative model '{}': {error}",
-                    job.model_path()
+                    "failed to read declarative model '{}': {}",
+                    model_source_id,
+                    error.kind().as_str()
                 ),
             )
         }
@@ -77,15 +103,16 @@ fn run_loaded_job(
         Err(error) => return setup_error(job, None, error.to_string()),
     };
 
-    let property_text = match fs::read_to_string(&property_path) {
+    let property_text = match provider.read_text(&property_source_id) {
         Ok(value) => value,
         Err(error) => {
             return setup_error(
                 job,
                 None,
                 format!(
-                    "failed to read mu-calculus property '{}': {error}",
-                    job.property_path()
+                    "failed to read mu-calculus property '{}': {}",
+                    property_source_id,
+                    error.kind().as_str()
                 ),
             )
         }
@@ -99,15 +126,16 @@ fn run_loaded_job(
     }
     let canonical_formula = render_mu_formula(&formula);
 
-    let certificate_text = match fs::read_to_string(&certificate_path) {
+    let certificate_text = match provider.read_text(&certificate_source_id) {
         Ok(value) => value,
         Err(error) => {
             return setup_error(
                 job,
                 Some(canonical_formula),
                 format!(
-                    "failed to read mu parity certificate '{}': {error}",
-                    job.certificate_path()
+                    "failed to read mu parity certificate '{}': {}",
+                    certificate_source_id,
+                    error.kind().as_str()
                 ),
             )
         }
@@ -208,12 +236,4 @@ fn certificate_schema_hint(input: &str) -> Option<u32> {
         let rest = line.strip_prefix("fvlab-mu-parity-certificate ")?;
         rest.trim().parse::<u32>().ok()
     })
-}
-
-fn resolve_path(base: &Path, path: &Path) -> PathBuf {
-    if path.is_absolute() {
-        path.to_owned()
-    } else {
-        base.join(path)
-    }
 }
