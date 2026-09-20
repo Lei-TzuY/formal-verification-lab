@@ -4,6 +4,7 @@ use crate::mu_bounded::{evaluate_mu_with_limits, BoundedMuError, BoundedMuEvalua
 use crate::mu_calculus::{
     evaluate_mu, validate_mu_formula, MuError, MuEvaluation, MuFormula, MuValidationError,
 };
+use crate::mu_parity::{evaluate_mu_via_parity, MuParityError, MuParityEvaluation};
 use crate::mu_parse::{collect_mu_atoms, parse_mu_formula, render_mu_formula, MuParseError};
 use std::collections::HashSet;
 use std::fmt;
@@ -27,6 +28,13 @@ pub struct BoundedDeclarativeMuResult {
     pub evaluation: BoundedMuEvaluation<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeclarativeMuParityResult {
+    pub formula: String,
+    pub status: DeclarativeMuStatus,
+    pub evaluation: MuParityEvaluation<String>,
+}
+
 #[derive(Debug)]
 pub enum DeclarativeMuError {
     Parse(MuParseError),
@@ -34,6 +42,7 @@ pub enum DeclarativeMuError {
     UnknownProposition { proposition: String },
     Backend(MuError<String>),
     BoundedBackend(BoundedMuError<String>),
+    ParityBackend(MuParityError<String>),
 }
 
 impl fmt::Display for DeclarativeMuError {
@@ -47,6 +56,9 @@ impl fmt::Display for DeclarativeMuError {
             Self::Backend(error) => write!(f, "mu-calculus backend failed: {error}"),
             Self::BoundedBackend(error) => {
                 write!(f, "bounded mu-calculus backend failed: {error}")
+            }
+            Self::ParityBackend(error) => {
+                write!(f, "mu-calculus parity backend failed: {error}")
             }
         }
     }
@@ -75,6 +87,12 @@ impl From<MuError<String>> for DeclarativeMuError {
 impl From<BoundedMuError<String>> for DeclarativeMuError {
     fn from(value: BoundedMuError<String>) -> Self {
         Self::BoundedBackend(value)
+    }
+}
+
+impl From<MuParityError<String>> for DeclarativeMuError {
+    fn from(value: MuParityError<String>) -> Self {
+        Self::ParityBackend(value)
     }
 }
 
@@ -109,6 +127,37 @@ pub fn check_declarative_mu_text(
 ) -> Result<DeclarativeMuResult, DeclarativeMuError> {
     let formula = parse_mu_formula(input)?;
     check_declarative_mu(document, &formula)
+}
+
+pub fn check_declarative_mu_via_parity(
+    document: &DeclarativeDocument,
+    formula: &MuFormula<String, String>,
+) -> Result<DeclarativeMuParityResult, DeclarativeMuError> {
+    validate_mu_formula(formula)?;
+    validate_atoms(document, formula)?;
+
+    let evaluation = evaluate_mu_via_parity(document.model(), formula, |atom, state| {
+        document.state_has_proposition(state, atom)
+    })?;
+    let status = if evaluation.all_initial_states_satisfy() {
+        DeclarativeMuStatus::Satisfied
+    } else {
+        DeclarativeMuStatus::Violated
+    };
+
+    Ok(DeclarativeMuParityResult {
+        formula: render_mu_formula(formula),
+        status,
+        evaluation,
+    })
+}
+
+pub fn check_declarative_mu_text_via_parity(
+    document: &DeclarativeDocument,
+    input: &str,
+) -> Result<DeclarativeMuParityResult, DeclarativeMuError> {
+    let formula = parse_mu_formula(input)?;
+    check_declarative_mu_via_parity(document, &formula)
 }
 
 /// Validate, resolve, and evaluate one typed textual-surface formula through
