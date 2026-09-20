@@ -165,11 +165,7 @@ fn universal_until_failure_reports_bad_prefix_or_nonterminating_avoidance() {
 
 #[test]
 fn nested_formula_reuses_structurally_identical_subformula_sets() {
-    let model = model_from_edges([
-        vec![(0, 1)],
-        vec![(0, 2)],
-        Vec::new(),
-    ]);
+    let model = model_from_edges([vec![(0, 1)], vec![(0, 2)], Vec::new()]);
     let eventually_p = CtlFormula::ef(CtlFormula::atom(Atom::P));
     let formula = CtlFormula::and(eventually_p.clone(), eventually_p);
     let atom = |_atom: &Atom, state: &u8| *state == 2;
