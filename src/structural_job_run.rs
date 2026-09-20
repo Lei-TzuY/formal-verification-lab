@@ -3,8 +3,10 @@ use crate::parse_declarative_model;
 use crate::recurrence::{analyze_recurrence_with_limits, RecurrenceStatus};
 use crate::structural_job::{parse_structural_job, StructuralJobAnalysis};
 use crate::structural_result::{StructuralJobOutcome, StructuralJobResultEnvelope};
-use std::fs;
-use std::path::{Path, PathBuf};
+use crate::text_source::{
+    path_source_id, resolve_source_id, FileSystemTextSourceProvider, TextSourceProvider,
+};
+use std::path::Path;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StructuralJobJsonRun {
@@ -19,13 +21,24 @@ impl StructuralJobJsonRun {
 }
 
 pub fn run_structural_job_json(manifest_path: impl AsRef<Path>) -> StructuralJobJsonRun {
-    let manifest_path = manifest_path.as_ref();
-    let input = match fs::read_to_string(manifest_path) {
+    let manifest_source_id = match path_source_id(manifest_path.as_ref()) {
+        Ok(source_id) => source_id,
+        Err(error) => return error_run(error.to_string()),
+    };
+    run_structural_job_json_with_provider(&FileSystemTextSourceProvider, &manifest_source_id)
+}
+
+pub fn run_structural_job_json_with_provider(
+    provider: &dyn TextSourceProvider,
+    manifest_source_id: &str,
+) -> StructuralJobJsonRun {
+    let input = match provider.read_text(manifest_source_id) {
         Ok(input) => input,
         Err(error) => {
             return error_run(format!(
-                "failed to read structural job manifest '{}': {error}",
-                manifest_path.display()
+                "failed to read structural job manifest '{}': {}",
+                manifest_source_id,
+                error.kind().as_str()
             ));
         }
     };
@@ -36,21 +49,28 @@ pub fn run_structural_job_json(manifest_path: impl AsRef<Path>) -> StructuralJob
     };
 
     match job.analysis() {
-        StructuralJobAnalysis::Recurrence => run_recurrence_job(manifest_path, &job),
+        StructuralJobAnalysis::Recurrence => {
+            run_recurrence_job_with_provider(provider, manifest_source_id, &job)
+        }
     }
 }
 
-fn run_recurrence_job(
-    manifest_path: &Path,
+fn run_recurrence_job_with_provider(
+    provider: &dyn TextSourceProvider,
+    manifest_source_id: &str,
     job: &crate::structural_job::StructuralJob,
 ) -> StructuralJobJsonRun {
-    let model_path = resolve_path(manifest_path, job.model_path());
-    let model_input = match fs::read_to_string(&model_path) {
+    let model_source_id = match resolve_source_id(manifest_source_id, job.model_path()) {
+        Ok(source_id) => source_id,
+        Err(error) => return error_run(error.to_string()),
+    };
+    let model_input = match provider.read_text(&model_source_id) {
         Ok(input) => input,
         Err(error) => {
             return error_run(format!(
-                "failed to read declarative model '{}': {error}",
-                model_path.display()
+                "failed to read declarative model '{}': {}",
+                model_source_id,
+                error.kind().as_str()
             ));
         }
     };
@@ -86,17 +106,6 @@ fn run_recurrence_job(
         envelope,
         exit_code,
     }
-}
-
-fn resolve_path(manifest_path: &Path, declared: &str) -> PathBuf {
-    let declared = Path::new(declared);
-    if declared.is_absolute() {
-        return declared.to_path_buf();
-    }
-    manifest_path
-        .parent()
-        .unwrap_or_else(|| Path::new("."))
-        .join(declared)
 }
 
 fn error_run(message: impl Into<String>) -> StructuralJobJsonRun {
