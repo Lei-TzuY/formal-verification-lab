@@ -144,41 +144,45 @@ M83 carries M82's explicit complete parity backend into the existing M79 heterog
 
 ## Milestone 84 — certified positional parity strategies
 
-**Status: implementation candidate complete on PR #83.**
+**Status: sealed in `main` at `e8c6571d805020194095c8bcf69e84427316ea19`.**
 
-M84 promotes the sealed M81 parity kernel from winning-region classification to deterministic positional strategy evidence with an independent verifier while preserving the historical winning-region API.
+M84 promotes the sealed M81 parity kernel from winning-region classification to deterministic positional strategy evidence with an independent fail-closed verifier while preserving the historical region API. Solver strategies are composed through Zielonka recursion, and verification independently checks ownership, real-edge selection, region closure, totality, and recurrent parity. The generated certification gate covers all 324 two-vertex total games across owner assignments, priorities 0..2, and non-empty successor subsets. Exact closure candidate `af818c5064c3e3c6c177e37498f6eafb5b92d245` passed CI #686 and Bounded state-property CLI #536 before squash integration.
+
+## Milestone 85 — typed modal mu-calculus parity strategy evidence
+
+**Status: implementation candidate complete on PR #84.**
+
+M85 bridges the sealed M84 generic strategy certificates back into the M81 μ-calculus evaluation game without changing schema-v4, verification jobs, suites, or CLI behavior.
 
 Implemented contract:
 
-- `ParitySolution` still exposes the existing Even/Odd winning-region methods and now also carries deterministic positional strategies for both players;
-- winner-owned choices use stable successor ordering and are composed through both Zielonka recursion branches rather than reconstructed from the final region alone;
-- `ParityStrategy` exposes the claimed player, winning vertices, and optional successor choices without assigning moves to opponent-owned or losing vertices;
-- `verify_parity_strategy` does not trust the solver result: it validates choice-vector shape, winning-vertex range/uniqueness, ownership, real-edge selection, region closure under chosen moves, closure under every opponent move, and totality of the strategy-restricted subgame;
-- parity correctness is independently checked on the strategy-restricted graph by rejecting any recurrent cycle whose maximum priority belongs to the opponent;
-- Even and Odd evidence are verified symmetrically;
-- malformed/tampered strategies fail closed for missing, unexpected, invalid, out-of-region, escaping, or losing-cycle choices;
-- generated exhaustive coverage certifies both solver strategies for all 324 two-vertex total games across every owner assignment, priorities 0..2, and every non-empty successor subset;
-- existing M81/M82/M83 callers that consume only winning regions remain source-compatible;
-- no μ-level witness/schema surface is introduced in this milestone.
+- `MuParityEvaluation<S>` keeps its existing generic shape and adds typed normalized evaluation-game positions rather than introducing atom/variable generic parameters into downstream declarative/job APIs;
+- each position records reachable model-state index, normalized formula-node index/kind, owner, and priority;
+- certified Even/Odd strategies are mapped to semantic moves: Boolean left/right branch, model successor, terminal modal self-loop, fixpoint body, bound-variable return, or outcome self-loop;
+- every initial root position records its truth and certified winning player;
+- `evaluate_mu_via_parity` now verifies the M84 Even and Odd strategies before exposing typed evidence;
+- `verify_mu_parity_evidence` validates formula binding/monotonicity first, recaptures the canonical complete graph, rebuilds the normalized evaluation game, checks canonical position metadata and semantic move labels, reconstructs generic `ParityStrategy` values, delegates parity correctness to the sealed M84 verifier, requires the two winning regions to partition the game, and revalidates satisfying/initial state results and model accounting;
+- focused regressions cover outcome, Boolean, modal successor, terminal modal self-loop, fixpoint-body and variable-return moves, plus nested alternation and lexical shadowing;
+- tamper regressions reject altered position kinds, semantic move labels, missing winner moves, incomplete winning partitions, and altered initial winners;
+- a generated 3,584-case two-state graph × P/Q valuation × native μ-formula gate requires the typed evidence verifier to accept every produced certificate and requires truth/initial results to match M75/M81.
 
-Implementation candidate `9fff451e4684da8075f412e8b485fbcd938d53bc` passed CI #684 (format, all-target build, Clippy with `-D warnings`, full tests including the 324-case certification gate and every historical CTL/μ/parity/job/suite test, plus all historical CLI gates) and Bounded state-property CLI #534. Closure metadata changes must pass the same exact-head gates before merge.
+Implementation candidate `4d4a256d2af1b757a61505a1c5ea3dd250836fd0` passed CI #690 (format, all-target build, Clippy with `-D warnings`, full tests including the generated M85 evidence gate and all historical CTL/μ/parity/job/suite tests, plus every historical CLI gate) and Bounded state-property CLI #540. Closure metadata changes must pass the same exact-head gates before merge.
 
-M84 adds no modal μ-calculus proof-witness claim, bounded-parity semantics, symbolic representation, fairness semantics, or performance claim.
+M85 remains typed/in-memory and makes no portable proof-certificate, bounded-parity, symbolic, fairness, or performance claim.
 
-## Next frontier — Milestone 85: typed modal mu-calculus parity strategy evidence
+## Next frontier — Milestone 86: versioned declarative modal mu-calculus parity certificate
 
-Bridge the sealed generic M84 strategy certificates back into the M81 μ-calculus evaluation game without jumping directly to verification-job JSON. The current μ parity backend flattens each evaluation-game position to an opaque vertex id and discards the formula-position mapping after solving; M85 should make that semantic mapping explicit and independently checkable.
+Promote the sealed M85 typed evidence into a deterministic, versioned artifact only for the declarative complete-parity surface. Do not expose raw Rust debug output or silently reinterpret schema-v4 verification-job results as proof certificates.
 
 Acceptance criteria:
 
-- introduce a typed evaluation-game position description that identifies the reachable model-state index plus the normalized μ formula position/kind represented by each parity vertex;
-- preserve the exact M81 game construction, priorities, terminal self-loop policy, winning regions, and default satisfaction semantics;
-- expose certified Even/Odd positional strategy evidence through the typed μ parity result without changing the default fixpoint backend or M82/M83 external behavior;
-- map each strategy choice back to a semantic move: Boolean branch, modal successor/terminal self-loop, fixpoint body, or bound-variable return; do not expose unexplained raw vertex ids as proof evidence;
-- retain enough canonical game/certificate data for an independent verifier to reconstruct the selected parity edges and invoke the sealed M84 generic strategy verifier rather than trusting rendered evidence;
-- for every initial state, associate the truth value with the corresponding certified winner strategy at the root formula position;
-- add focused terminal, negation, shadowing, nested alternation, and tamper regressions plus generated differential checks showing evidence truth agrees with M75 and M81 winning regions;
-- keep the first slice typed/in-memory; do not change schema-v4 or claim a portable proof certificate until the μ evidence mapping is sealed;
-- preserve M75's 90,112-case CTL→μ differential, M77's 15,360-case bounded oracle, M81's 3,584-case parity differential, M84's strategy certification gate, and every historical job/suite/CLI gate;
-- make no bounded-parity, symbolic, fairness, or performance claim.
+- define an explicit certificate schema/version whose fields are derived from M85 typed position/strategy/initial evidence and are sufficient to reconstruct that evidence without relying on Rust type/debug formatting;
+- bind the artifact to the canonical declarative model identity/state ordering and canonical rendered μ formula; reject certificate reuse against a different model/formula;
+- deterministic render + parse must round-trip exactly and preserve strategy player, winning positions, semantic choices, priorities, and initial-root winners;
+- certificate verification must parse/validate the model and μ formula through the sealed M76/M82 frontend, rebuild the canonical complete evaluation game, reconstruct M85 typed evidence, and invoke `verify_mu_parity_evidence`; it must not call the parity solver to decide whether the submitted certificate is correct;
+- malformed, truncated, duplicate, out-of-range, wrong-model, wrong-formula, and semantically tampered certificates must fail closed with stable errors;
+- add an explicit direct CLI verification path for certificate files only after the library parser/verifier is sealed; keep ordinary `mu file` output and M83 verification-job schema unchanged in this milestone;
+- add deterministic parser/render roundtrip, independent verification, tamper, manifest-relative/built-binary, and representative alternation/shadowing regressions;
+- preserve M75's 90,112-case CTL→μ differential, M77's 15,360-case bounded oracle, M81/M85's parity/evidence generated gates, M84's strategy certification gate, and every historical job/suite/CLI gate;
+- make no cryptographic authenticity, bounded-parity, symbolic, fairness, or performance claim.
 
