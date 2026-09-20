@@ -21,10 +21,10 @@ pub mod ctl_parse;
 pub mod declarative;
 pub mod declarative_ctl;
 pub mod declarative_ctl_report;
-pub mod declarative_mu;
-pub mod declarative_mu_report;
 pub mod declarative_deadlock;
 pub mod declarative_deadlock_report;
+pub mod declarative_mu;
+pub mod declarative_mu_report;
 pub mod eventuality;
 pub mod eventuality_report;
 pub mod exact_state;
@@ -126,16 +126,16 @@ pub use declarative_ctl::{
 pub use declarative_ctl_report::{
     render_bounded_declarative_ctl_report, render_declarative_ctl_report,
 };
-pub use declarative_mu::{
-    check_declarative_mu, check_declarative_mu_text, DeclarativeMuError, DeclarativeMuResult,
-    DeclarativeMuStatus,
-};
-pub use declarative_mu_report::render_declarative_mu_report;
 pub use declarative_deadlock::{
     check_declarative_deadlock_with_limits, parse_declarative_deadlock_spec,
     BoundedDeclarativeDeadlockResult, DeclarativeDeadlockError, DeclarativeDeadlockSpec,
 };
 pub use declarative_deadlock_report::render_declarative_deadlock_report;
+pub use declarative_mu::{
+    check_declarative_mu, check_declarative_mu_text, DeclarativeMuError, DeclarativeMuResult,
+    DeclarativeMuStatus,
+};
+pub use declarative_mu_report::render_declarative_mu_report;
 pub use eventuality::{
     check_eventuality, check_eventuality_with_limits, BoundedEventualityResult,
     EventualityCounterexample, EventualityError, EventualityProperty, EventualityResult,
