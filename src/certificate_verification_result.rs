@@ -97,12 +97,7 @@ impl CertificateVerificationJobResultEnvelope {
         field_string(&mut out, "outcome", self.outcome.as_str(), false);
         field_optional_string(&mut out, "model", self.model.as_deref(), false);
         field_optional_string(&mut out, "property", self.property.as_deref(), false);
-        field_optional_string(
-            &mut out,
-            "certificate",
-            self.certificate.as_deref(),
-            false,
-        );
+        field_optional_string(&mut out, "certificate", self.certificate.as_deref(), false);
         field_optional_string(
             &mut out,
             "canonical_formula",
