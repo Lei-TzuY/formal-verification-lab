@@ -1,8 +1,6 @@
 use crate::bounded::BoundedOutcome;
 use crate::bounded_report::format_inconclusive_reason;
-use crate::declarative_mu::{
-    BoundedDeclarativeMuResult, DeclarativeMuResult, DeclarativeMuStatus,
-};
+use crate::declarative_mu::{BoundedDeclarativeMuResult, DeclarativeMuResult, DeclarativeMuStatus};
 use crate::mu_bounded::{BoundedMuStatus, BoundedMuTruth};
 
 pub fn render_bounded_declarative_mu_report(
