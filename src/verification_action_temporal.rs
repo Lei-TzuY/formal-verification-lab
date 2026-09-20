@@ -14,29 +14,14 @@ use crate::verification_result::{
     VERIFICATION_JOB_HETEROGENEOUS_RESULT_SCHEMA_VERSION,
 };
 use crate::{parse_declarative_model, InconclusiveReason, TraceStep};
-use std::fs;
-use std::path::{Path, PathBuf};
 
-pub(crate) fn run_action_temporal_job_json(
-    manifest_path: &Path,
+pub(crate) fn run_action_temporal_job_json_from_text(
     job: VerificationJob,
+    model_input: &str,
+    property_input: &str,
 ) -> Result<VerificationJobJsonRun, String> {
-    let (model_path, property_path) = resolve_job_paths(manifest_path, &job);
-    let model_input = fs::read_to_string(&model_path).map_err(|error| {
-        format!(
-            "failed to read declarative model '{}': {error}",
-            model_path.display()
-        )
-    })?;
-    let model = parse_declarative_model(&model_input).map_err(|error| error.to_string())?;
-
-    let property_input = fs::read_to_string(&property_path).map_err(|error| {
-        format!(
-            "failed to read action-temporal property '{}': {error}",
-            property_path.display()
-        )
-    })?;
-    let spec = parse_action_temporal("verification-job-action-temporal", &property_input)
+    let model = parse_declarative_model(model_input).map_err(|error| error.to_string())?;
+    let spec = parse_action_temporal("verification-job-action-temporal", property_input)
         .map_err(|error| error.to_string())?;
     let canonical_property = spec.canonical_expression();
 
@@ -191,21 +176,5 @@ fn analysis_cutoff(stage: AnalysisStage, reason: InconclusiveReason) -> Verifica
             kind: VerificationJobCutoffKind::DepthLimit,
             limit,
         },
-    }
-}
-
-fn resolve_job_paths(manifest_path: &Path, job: &VerificationJob) -> (PathBuf, PathBuf) {
-    let base = manifest_path.parent().unwrap_or_else(|| Path::new("."));
-    (
-        resolve_path(base, Path::new(job.model_path())),
-        resolve_path(base, Path::new(job.property_path())),
-    )
-}
-
-fn resolve_path(base: &Path, path: &Path) -> PathBuf {
-    if path.is_absolute() {
-        path.to_path_buf()
-    } else {
-        base.join(path)
     }
 }
