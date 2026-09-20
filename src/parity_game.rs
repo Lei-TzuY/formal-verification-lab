@@ -65,14 +65,14 @@ impl std::error::Error for ParityGameError {}
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParityGame {
     owners: Vec<ParityPlayer>,
-    priorities: Vec<u32>,
+    priorities: Vec<usize>,
     edges: Vec<Vec<usize>>,
 }
 
 impl ParityGame {
     pub fn new(
         owners: Vec<ParityPlayer>,
-        priorities: Vec<u32>,
+        priorities: Vec<usize>,
         edges: Vec<Vec<usize>>,
     ) -> Result<Self, ParityGameError> {
         let vertices = owners.len();
@@ -115,7 +115,7 @@ impl ParityGame {
         self.owners[vertex]
     }
 
-    pub fn priority(&self, vertex: usize) -> u32 {
+    pub fn priority(&self, vertex: usize) -> usize {
         self.priorities[vertex]
     }
 
