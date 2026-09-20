@@ -12,7 +12,6 @@ use formal_verification_lab::buchi_report::{
 use formal_verification_lab::checker::{check_with_limits, ExplorationLimits, VerificationStatus};
 use formal_verification_lab::combined_fairness::FairnessProfile;
 use formal_verification_lab::ctl_bounded::BoundedCtlStatus;
-use formal_verification_lab::mu_bounded::BoundedMuStatus;
 use formal_verification_lab::declarative_ctl::{
     check_declarative_ctl_text, check_declarative_ctl_text_with_limits, DeclarativeCtlStatus,
 };
@@ -81,6 +80,7 @@ use formal_verification_lab::monitor_strong_fairness::{
     check_monitor_with_strong_fairness, check_monitor_with_strong_fairness_and_limits,
     check_monitor_with_strong_fairness_and_product_limits,
 };
+use formal_verification_lab::mu_bounded::BoundedMuStatus;
 use formal_verification_lab::multi_response::{
     check_multi_response, check_multi_response_with_fairness_profile,
     check_multi_response_with_fairness_profile_and_limits,
@@ -1523,11 +1523,7 @@ fn mu_command(args: &[String]) -> Result<ExitCode, String> {
     }
 }
 
-fn run_mu_file(
-    path: &str,
-    expression: &str,
-    option_args: &[String],
-) -> Result<ExitCode, String> {
+fn run_mu_file(path: &str, expression: &str, option_args: &[String]) -> Result<ExitCode, String> {
     let input = fs::read_to_string(path)
         .map_err(|error| format!("failed to read declarative model '{path}': {error}"))?;
     let document = parse_declarative_document(&input).map_err(|error| error.to_string())?;
