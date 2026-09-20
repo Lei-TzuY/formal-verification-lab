@@ -326,10 +326,9 @@ fn built_binary_certificate_create_and_verify_support_relative_paths_and_fail_cl
         .lines()
         .map(|line| {
             if let Some(rest) = line.strip_prefix("accounting ") {
-                let mut fields = rest.split_whitespace().collect::<Vec<_>>();
+                let fields = rest.split_whitespace().collect::<Vec<_>>();
                 let discovered = fields[0].parse::<usize>().unwrap();
-                fields[0] = Box::leak((discovered + 1).to_string().into_boxed_str());
-                format!("accounting {}", fields.join(" "))
+                format!("accounting {} {}", discovered + 1, fields[1..].join(" "))
             } else {
                 line.to_owned()
             }
