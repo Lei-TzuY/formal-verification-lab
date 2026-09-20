@@ -338,7 +338,7 @@ fn quote(value: &str) -> String {
     for ch in value.chars() {
         match ch {
             '\\' => output.push_str("\\\\"),
-            '"' => output.push_str("\\""),
+            '"' => output.push_str("\\\""),
             '\n' => output.push_str("\\n"),
             '\r' => output.push_str("\\r"),
             '\t' => output.push_str("\\t"),
