@@ -42,6 +42,7 @@ pub mod monitor_strong_fairness;
 pub mod multi_response;
 pub mod multi_response_examples;
 pub mod multi_response_report;
+pub mod mu_calculus;
 pub mod multi_temporal;
 mod product;
 pub mod property;
@@ -161,6 +162,10 @@ pub use monitor_report::{render_bounded_monitor_report, render_monitor_report};
 pub use monitor_strong_fairness::{
     check_monitor_with_strong_fairness, check_monitor_with_strong_fairness_and_limits,
     check_monitor_with_strong_fairness_and_product_limits,
+};
+pub use mu_calculus::{
+    compile_ctl_to_mu, evaluate_mu, validate_mu_formula, MuError, MuEvaluation, MuFormula,
+    MuInitialEvaluation, MuTerminalPolicy, MuValidationError,
 };
 pub use multi_response::{
     check_multi_response, check_multi_response_with_limits,
