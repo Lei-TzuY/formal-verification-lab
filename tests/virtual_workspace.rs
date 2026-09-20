@@ -2,9 +2,9 @@ use formal_verification_lab::{
     create_declarative_mu_parity_certificate, normalize_source_id, parse_declarative_document,
     render_declarative_mu_parity_certificate, resolve_source_id,
     run_certificate_verification_job_json, run_certificate_verification_job_json_with_provider,
-    run_orchestration_suite_expectations_json_with_provider,
-    run_orchestration_suite_json, run_orchestration_suite_json_with_provider,
-    run_structural_job_json, run_structural_job_json_with_provider, run_verification_job_json,
+    run_orchestration_suite_expectations_json_with_provider, run_orchestration_suite_json,
+    run_orchestration_suite_json_with_provider, run_structural_job_json,
+    run_structural_job_json_with_provider, run_verification_job_json,
     run_verification_job_json_with_provider, MapTextSourceProvider,
     RootedFileSystemTextSourceProvider, VerificationJobOutcome,
 };
@@ -83,8 +83,7 @@ fn map_and_rooted_filesystem_providers_match_representative_outcomes() {
     let rooted = RootedFileSystemTextSourceProvider::new(&fixture.root);
     let map = fixture.map_provider();
 
-    let verified_fs =
-        run_verification_job_json_with_provider(&rooted, "jobs/verify.job");
+    let verified_fs = run_verification_job_json_with_provider(&rooted, "jobs/verify.job");
     let verified_map = run_verification_job_json_with_provider(&map, "jobs/verify.job");
     assert_eq!(verified_fs.to_json(), verified_map.to_json());
     assert_eq!(
@@ -92,8 +91,7 @@ fn map_and_rooted_filesystem_providers_match_representative_outcomes() {
         VerificationJobOutcome::Satisfied
     );
 
-    let violated_fs =
-        run_verification_job_json_with_provider(&rooted, "jobs/violate.job");
+    let violated_fs = run_verification_job_json_with_provider(&rooted, "jobs/violate.job");
     let violated_map = run_verification_job_json_with_provider(&map, "jobs/violate.job");
     assert_eq!(violated_fs.to_json(), violated_map.to_json());
     assert_eq!(
@@ -101,10 +99,8 @@ fn map_and_rooted_filesystem_providers_match_representative_outcomes() {
         VerificationJobOutcome::Violated
     );
 
-    let structural_fs =
-        run_structural_job_json_with_provider(&rooted, "jobs/structure.job");
-    let structural_map =
-        run_structural_job_json_with_provider(&map, "jobs/structure.job");
+    let structural_fs = run_structural_job_json_with_provider(&rooted, "jobs/structure.job");
+    let structural_map = run_structural_job_json_with_provider(&map, "jobs/structure.job");
     assert_eq!(structural_fs.to_json(), structural_map.to_json());
     assert_eq!(structural_map.envelope.outcome.as_str(), "cycle_found");
 
@@ -147,8 +143,7 @@ fn certificate_rejection_is_identical_across_providers() {
 
     let fs_run =
         run_certificate_verification_job_json_with_provider(&rooted, "jobs/certificate.job");
-    let map_run =
-        run_certificate_verification_job_json_with_provider(&map, "jobs/certificate.job");
+    let map_run = run_certificate_verification_job_json_with_provider(&map, "jobs/certificate.job");
     assert_eq!(fs_run.to_json(), map_run.to_json());
     assert_eq!(map_run.envelope.outcome.as_str(), "rejected");
 
@@ -212,8 +207,7 @@ impl Fixture {
 
 fn fixture_sources() -> Vec<(String, String)> {
     let document = parse_declarative_document(MODEL).unwrap();
-    let certificate =
-        create_declarative_mu_parity_certificate(&document, REACH_FORMULA).unwrap();
+    let certificate = create_declarative_mu_parity_certificate(&document, REACH_FORMULA).unwrap();
     let certificate_text = render_declarative_mu_parity_certificate(&certificate);
 
     vec![
