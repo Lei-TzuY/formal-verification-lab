@@ -1,8 +1,6 @@
 use crate::structural_job_run::run_structural_job_json;
 use crate::structural_result::{StructuralJobOutcome, StructuralJobResultEnvelope};
-use crate::structural_suite::{
-    parse_structural_suite, StructuralExpectedOutcome, StructuralSuite,
-};
+use crate::structural_suite::{parse_structural_suite, StructuralExpectedOutcome, StructuralSuite};
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -244,8 +242,7 @@ pub fn load_structural_suite(
             manifest_path.display()
         ))
     })?;
-    parse_structural_suite(&input)
-        .map_err(|error| StructuralSuiteLoadError::new(error.to_string()))
+    parse_structural_suite(&input).map_err(|error| StructuralSuiteLoadError::new(error.to_string()))
 }
 
 pub fn run_structural_suite_json(manifest_path: impl AsRef<Path>) -> StructuralSuiteJsonRun {
@@ -272,9 +269,7 @@ pub fn run_structural_suite_expectations_json(
     }
 }
 
-fn run_structural_suite_json_inner(
-    manifest_path: &Path,
-) -> Result<StructuralSuiteJsonRun, String> {
+fn run_structural_suite_json_inner(manifest_path: &Path) -> Result<StructuralSuiteJsonRun, String> {
     let suite = load_structural_suite(manifest_path).map_err(|error| error.to_string())?;
     let base = manifest_path.parent().unwrap_or_else(|| Path::new(""));
     let mut jobs = Vec::with_capacity(suite.job_paths().len());
