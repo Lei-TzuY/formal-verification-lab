@@ -48,9 +48,9 @@ impl OrchestrationSuiteStatus {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OrchestrationNestedResult {
-    Verification(VerificationJobResultEnvelope),
-    Structural(StructuralJobResultEnvelope),
-    CertificateVerification(CertificateVerificationJobResultEnvelope),
+    Verification(Box<VerificationJobResultEnvelope>),
+    Structural(Box<StructuralJobResultEnvelope>),
+    CertificateVerification(Box<CertificateVerificationJobResultEnvelope>),
 }
 
 impl OrchestrationNestedResult {
@@ -431,14 +431,14 @@ fn run_entry(family: OrchestrationJobFamily, manifest: &Path) -> (u8, Orchestrat
             let run: VerificationJobJsonRun = run_verification_job_json(manifest);
             (
                 run.exit_code,
-                OrchestrationNestedResult::Verification(run.envelope),
+                OrchestrationNestedResult::Verification(Box::new(run.envelope)),
             )
         }
         OrchestrationJobFamily::Structural => {
             let run: StructuralJobJsonRun = run_structural_job_json(manifest);
             (
                 run.exit_code,
-                OrchestrationNestedResult::Structural(run.envelope),
+                OrchestrationNestedResult::Structural(Box::new(run.envelope)),
             )
         }
         OrchestrationJobFamily::CertificateVerification => {
@@ -446,7 +446,7 @@ fn run_entry(family: OrchestrationJobFamily, manifest: &Path) -> (u8, Orchestrat
                 run_certificate_verification_job_json(manifest);
             (
                 run.exit_code,
-                OrchestrationNestedResult::CertificateVerification(run.envelope),
+                OrchestrationNestedResult::CertificateVerification(Box::new(run.envelope)),
             )
         }
     }
