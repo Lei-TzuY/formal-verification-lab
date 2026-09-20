@@ -84,10 +84,11 @@ impl FixpointKind {
         }
     }
 
-    fn priority(self, alternation_level: usize) -> usize {
+    fn priority(self, alternation_level: usize, max_alternation_level: usize) -> usize {
+        let outer_rank = max_alternation_level - alternation_level;
         match self {
-            Self::Mu => alternation_level * 2 + 1,
-            Self::Nu => alternation_level * 2,
+            Self::Mu => outer_rank * 2 + 1,
+            Self::Nu => outer_rank * 2,
         }
     }
 }
@@ -102,7 +103,11 @@ enum EvalNode<A> {
     Or { left: usize, right: usize },
     Diamond { inner: usize },
     Box { inner: usize },
-    Fix { body: usize, priority: usize },
+    Fix {
+        body: usize,
+        kind: FixpointKind,
+        alternation_level: usize,
+    },
 }
 
 pub fn evaluate_mu_via_parity<S, A, V, F>(
@@ -124,7 +129,22 @@ where
     let root = lower_formula(formula, true, &mut bindings, None, &mut nodes);
     debug_assert!(bindings.is_empty());
 
-    let game = build_evaluation_game(&captured.graph, &nodes, &atom_holds)?;
+    let max_alternation_level = nodes
+        .iter()
+        .filter_map(|node| match node {
+            EvalNode::Fix {
+                alternation_level, ..
+            } => Some(*alternation_level),
+            _ => None,
+        })
+        .max()
+        .unwrap_or(0);
+    let game = build_evaluation_game(
+        &captured.graph,
+        &nodes,
+        max_alternation_level,
+        &atom_holds,
+    )?;
     let solution = solve_parity_game(&game);
     let node_count = nodes.len();
 
@@ -144,7 +164,11 @@ where
     let max_priority = nodes
         .iter()
         .filter_map(|node| match node {
-            EvalNode::Fix { priority, .. } => Some(*priority),
+            EvalNode::Fix {
+                kind,
+                alternation_level,
+                ..
+            } => Some(kind.priority(*alternation_level, max_alternation_level)),
             _ => None,
         })
         .max()
@@ -308,7 +332,8 @@ where
     bindings.pop();
     nodes[binder] = EvalNode::Fix {
         body,
-        priority: kind.priority(alternation_level),
+        kind,
+        alternation_level,
     };
     binder
 }
@@ -322,6 +347,7 @@ fn push_node<A>(nodes: &mut Vec<EvalNode<A>>, node: EvalNode<A>) -> usize {
 fn build_evaluation_game<S, A, F, V>(
     graph: &ReachableGraph<S>,
     nodes: &[EvalNode<A>],
+    max_alternation_level: usize,
     atom_holds: &F,
 ) -> Result<ParityGame, MuParityError<V>>
 where
@@ -389,9 +415,13 @@ where
                     priorities.push(0);
                     edges.push(modal_successors(graph, state, *inner, node_count));
                 }
-                EvalNode::Fix { body, priority } => {
+                EvalNode::Fix {
+                    body,
+                    kind,
+                    alternation_level,
+                } => {
                     owners.push(ParityPlayer::Even);
-                    priorities.push(*priority);
+                    priorities.push(kind.priority(*alternation_level, max_alternation_level));
                     edges.push(vec![position(state, *body, node_count)]);
                 }
             }
