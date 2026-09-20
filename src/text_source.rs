@@ -92,9 +92,8 @@ impl RootedFileSystemTextSourceProvider {
 
 impl TextSourceProvider for RootedFileSystemTextSourceProvider {
     fn read_text(&self, source_id: &str) -> Result<String, TextSourceError> {
-        let normalized = normalize_source_id(source_id).map_err(|_| {
-            TextSourceError::new(source_id, TextSourceErrorKind::InvalidData)
-        })?;
+        let normalized = normalize_source_id(source_id)
+            .map_err(|_| TextSourceError::new(source_id, TextSourceErrorKind::InvalidData))?;
         if is_absolute_source_id(&normalized) || escapes_logical_root(&normalized) {
             return Err(TextSourceError::new(
                 normalized,
@@ -147,12 +146,12 @@ impl MapTextSourceProvider {
 
 impl TextSourceProvider for MapTextSourceProvider {
     fn read_text(&self, source_id: &str) -> Result<String, TextSourceError> {
-        let normalized = normalize_source_id(source_id).map_err(|_| {
-            TextSourceError::new(source_id, TextSourceErrorKind::InvalidData)
-        })?;
-        self.sources.get(&normalized).cloned().ok_or_else(|| {
-            TextSourceError::new(normalized, TextSourceErrorKind::NotFound)
-        })
+        let normalized = normalize_source_id(source_id)
+            .map_err(|_| TextSourceError::new(source_id, TextSourceErrorKind::InvalidData))?;
+        self.sources
+            .get(&normalized)
+            .cloned()
+            .ok_or_else(|| TextSourceError::new(normalized, TextSourceErrorKind::NotFound))
     }
 }
 
@@ -227,7 +226,10 @@ pub fn normalize_source_id(source_id: &str) -> Result<String, TextSourceIdError>
         match component {
             "" | "." => {}
             ".." => {
-                if components.last().is_some_and(|component| *component != "..") {
+                if components
+                    .last()
+                    .is_some_and(|component| *component != "..")
+                {
                     components.pop();
                 } else if absolute || drive_prefix.is_some() {
                     return Err(TextSourceIdError::new(
