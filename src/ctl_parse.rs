@@ -128,10 +128,7 @@ pub fn render_ctl_formula(formula: &CtlFormula<String>) -> String {
     }
 }
 
-pub(crate) fn collect_ctl_atoms<'a>(
-    formula: &'a CtlFormula<String>,
-    atoms: &mut Vec<&'a str>,
-) {
+pub(crate) fn collect_ctl_atoms<'a>(formula: &'a CtlFormula<String>, atoms: &mut Vec<&'a str>) {
     match formula {
         CtlFormula::Atom(atom) => atoms.push(atom),
         CtlFormula::Not(inner)
