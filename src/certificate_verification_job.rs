@@ -56,11 +56,7 @@ pub struct CertificateVerificationJobParseError {
 }
 
 impl CertificateVerificationJobParseError {
-    fn new(
-        line: usize,
-        column: usize,
-        kind: CertificateVerificationJobParseErrorKind,
-    ) -> Self {
+    fn new(line: usize, column: usize, kind: CertificateVerificationJobParseErrorKind) -> Self {
         Self { line, column, kind }
     }
 
@@ -136,11 +132,7 @@ pub fn parse_certificate_verification_job(
         let mut parser = LineParser::new(trimmed);
         let directive_start = parser.position;
         let directive = parser.parse_directive().map_err(|kind| {
-            CertificateVerificationJobParseError::new(
-                line,
-                leading + directive_start + 1,
-                kind,
-            )
+            CertificateVerificationJobParseError::new(line, leading + directive_start + 1, kind)
         })?;
         if !matches!(directive.as_str(), MODEL | PROPERTY | CERTIFICATE) {
             return Err(CertificateVerificationJobParseError::new(
@@ -247,15 +239,13 @@ impl<'a> LineParser<'a> {
     }
 
     fn skip_whitespace(&mut self) {
-        while self.peek().is_some_and(char::is_ascii_whitespace) {
+        while self.peek().is_some_and(|ch| ch.is_ascii_whitespace()) {
             let ch = self.peek().expect("peeked character exists");
             self.position += ch.len_utf8();
         }
     }
 
-    fn parse_directive(
-        &mut self,
-    ) -> Result<String, CertificateVerificationJobParseErrorKind> {
+    fn parse_directive(&mut self) -> Result<String, CertificateVerificationJobParseErrorKind> {
         let start = self.position;
         while let Some(ch) = self.peek() {
             if ch.is_ascii_whitespace() {
