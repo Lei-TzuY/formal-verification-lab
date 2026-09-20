@@ -80,40 +80,46 @@ The exact integration evidence on candidate `40cda5996b3392de7ce597fce654c8d384a
 
 ## Milestone 75 — typed modal mu-calculus kernel
 
-**Status: integration candidate complete on PR #75.**
+**Status: sealed in `main` at `8842c1ebd47499f3adae8d48db1abb9cacd9f31d`.**
 
-M75 promotes the branching-time logic layer beyond the fixed CTL operator set to a general typed modal μ-calculus authority over complete finite graphs.
+M75 adds a typed complete-graph modal μ-calculus authority with lexical μ/ν binding, fail-closed unbound/non-monotone-variable validation, deterministic fixpoint iteration, the shared terminal self-loop policy, and a semantics-preserving CTL→μ compiler. The generated cross-semantic gate performs 90,112 CTL→μ comparisons over all 512 directed three-state graphs. Exact candidate `40cda5996b3392de7ce597fce654c8d384a3ff4e` passed CI #625 and Bounded state-property CLI #475 before integration.
+
+## Milestone 76 — textual/declarative modal mu-calculus frontend
+
+**Status: implementation candidate complete on PR #76.**
+
+M76 exposes the sealed M75 authority as an external named-proposition language without introducing a second fixpoint or graph engine.
 
 Implemented contract:
 
-- typed constants, atoms, fixpoint variables, Boolean negation/conjunction/disjunction, modal diamond/box, least fixpoint `μ`, and greatest fixpoint `ν`;
-- lexical nearest-binder scoping with shadowing;
-- fail-closed pre-exploration validation rejects unbound variables and occurrences that are negative relative to their nearest fixpoint binder, preserving monotonic fixpoint iteration;
-- complete canonical reachable-graph capture remains the only traversal authority;
-- modal predecessor semantics use the same proven-terminal synthetic self-loop policy as M69 CTL;
-- least fixpoints start at the empty state set and greatest fixpoints at the full retained state set, iterating deterministically to equality;
-- general Boolean negation around a fixpoint is supported when bound-variable polarity remains monotone;
-- `compile_ctl_to_mu` translates the complete M69 CTL surface to μ-calculus with fresh internal variables;
-- focused regressions cover validation, lexical shadowing, native μ/ν execution, terminal totalization, general negation, and nested CTL compilation;
-- generated CTL→μ differential coverage performs **90,112** comparisons over all 512 directed three-state graphs: 24,576 unary-operator comparisons plus 65,536 `E[U]`/`A[U]` comparisons.
+- deterministic textual syntax for `true`/`false`, quoted proposition atoms, explicit `$variable` references, `not`, `and`, `or`, modal `diamond`/`box`, and `mu`/`nu` binders;
+- precedence is explicit: binders/modal/not are unary, `and` binds tighter than `or`, grouping is parenthesized, and canonical rendering is stable and fully explicit;
+- nested same-name binder shadowing is lexical and resolved by the M75 nearest-binder validator;
+- parsing is syntax-only; M75 binding/monotonicity validation runs before proposition resolution and before model graph capture;
+- empty/unknown proposition names fail closed before μ-calculus execution;
+- declarative execution delegates exclusively to `evaluate_mu`;
+- deterministic complete-graph reports preserve the canonical formula, terminal policy, discovered/explored accounting, initial-state satisfaction, and fixpoint-iteration observations without treating iteration counts as a benchmark;
+- direct `fvlab mu file <model-path> <expression>` execution returns 0 for satisfied, 15 for violated, and the existing malformed-input exit 2;
+- regressions cover parser precedence/round-trip/errors, binder shadowing, unbound/non-monotone formulas, unknown propositions, terminal totalization, direct-vs-M75 equality, textual CTL-compatible fixpoints, and built-binary success/violation/error paths;
+- all historical M75 generated CTL→μ differential and earlier verification/suite/fairness/CTL gates remain active.
 
-Implementation candidate `40cda5996b3392de7ce597fce654c8d384a3ff4e` passed CI #625 (format, all-target build, Clippy with `-D warnings`, full tests including the 90,112 CTL→μ differential and M74 suite-integration regressions, plus every historical CLI gate) and Bounded state-property CLI #475. Closure metadata changes must pass the same exact-head gates before merge.
+Implementation candidate `527e7c7efde76b314ef67c165afd8ede001af37e` passed CI #631 (format, all-target build, Clippy with `-D warnings`, full tests, and every historical CLI gate) and Bounded state-property CLI #481. Closure metadata changes must pass the same exact-head gates before merge.
 
-M75 is a typed complete-graph semantic kernel. It does not yet expose a textual/declarative μ-calculus language, bounded-prefix μ-calculus, μ-calculus fairness, verification jobs/suites, symbolic model checking, or a performance claim from fixpoint iteration counts.
+M76 remains complete-graph μ-calculus. It makes no bounded-prefix μ-calculus, μ verification-job/suite, fairness, symbolic fixpoint, proof-certificate, or performance claim.
 
-## Next frontier — Milestone 76: textual/declarative modal mu-calculus frontend
+## Next frontier — Milestone 77: proof-honest bounded modal mu-calculus semantics
 
-Promote the sealed typed M75 authority to an external named-proposition language without duplicating its semantics.
+Promote the complete-graph M75/M76 authority to deterministic model-space cutoffs without treating an incomplete graph prefix as a complete Kripke structure.
 
 Acceptance criteria:
 
-- define a deterministic textual grammar for constants, quoted proposition atoms, variables, `not`, `and`, `or`, modal diamond/box, `mu`/ `nu` binders, explicit grouping, and stable canonical rendering;
-- make lexical binding and precedence unambiguous, including nested binder shadowing;
-- parse first, then run the M75 binding/monotonicity validator before any model graph capture;
-- bind formula atoms to existing declarative named propositions and fail closed on unknown propositions before backend exploration;
-- execute exclusively through `evaluate_mu`; introduce no second fixpoint or graph engine;
-- add a direct complete-graph model-file CLI/report surface with stable all-initial satisfaction/violation exits and explicit terminal policy/accounting;
-- add parser round-trip/error, unbound/non-monotone, shadowing, terminal, nested alternation, direct-vs-kernel, and built-binary regressions;
-- differentially verify the textual CTL-compatible subset by parsing representative μ encodings and comparing them with M75 typed execution;
-- keep bounded μ-calculus, μ verification jobs/suites, fairness, and symbolic algorithms out of this phase;
-- preserve all historical verification, suite, reduction, fairness, CTL, and M75 generated differential gates.
+- reuse the canonical bounded reachable-graph capture, proven-terminal facts, complete-successor provenance, deterministic cutoff accounting, and M75 formula validator; add no second traversal;
+- interpret every μ-calculus subformula under conservative lower/upper state sets, including environments for lexically scoped fixpoint variables;
+- exact atoms/constants and Boolean negation/composition must preserve sound lower/upper duality;
+- modal diamond/box must keep unknown outgoing behavior at cut states and totalize only proven terminals;
+- least/greatest fixpoint iteration must be monotone over approximation pairs, including nested and alternating μ/ν binders, and must terminate on the finite retained graph;
+- whole all-initial queries may report conclusive satisfied/violated only when justified; unresolved retained or missing initial behavior must remain explicit `INCONCLUSIVE` with original cutoff provenance;
+- complete/unbounded captures must collapse exactly to sealed M75 state sets/status and deterministic accounting;
+- add an independent generated small-graph × formula × deterministic-limit soundness oracle, plus focused negation, shadowing, alternation, terminal-unknown, state/transition/depth-cutoff, and zero-state-budget regressions;
+- keep bounded textual/CLI/job/suite exposure out until this semantic kernel is sealed;
+- preserve M75's 90,112 CTL→μ differential plus all historical verification, suite, reduction, fairness, and CTL gates.
