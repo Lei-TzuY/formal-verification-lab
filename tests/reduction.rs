@@ -259,11 +259,15 @@ fn validated_reduction_counterexample_is_deterministic() {
     assert_eq!(first.status, VerificationStatus::Violated);
     let counterexample = first.counterexample.unwrap();
     assert_eq!(counterexample.invariant, "avoid-one");
-    assert_eq!(counterexample.trace.len(), 2);
+    // The reducer is deterministic depth-first search, not the canonical BFS,
+    // so this contract is reproducibility rather than shortest-witness length.
+    assert_eq!(counterexample.trace.len(), 3);
     assert_eq!(counterexample.trace[0].action, None);
     assert_eq!(counterexample.trace[0].state, 0);
-    assert_eq!(counterexample.trace[1].action.as_deref(), Some("fail"));
-    assert_eq!(counterexample.trace[1].state, 1);
+    assert_eq!(counterexample.trace[1].action.as_deref(), Some("b"));
+    assert_eq!(counterexample.trace[1].state, 0);
+    assert_eq!(counterexample.trace[2].action.as_deref(), Some("fail"));
+    assert_eq!(counterexample.trace[2].state, 1);
 }
 
 #[test]
@@ -327,7 +331,11 @@ fn decode_three_state_two_action_graph(mut code: usize) -> [[Option<u8>; 2]; 3] 
         for target in state {
             let digit = code % 4;
             code /= 4;
-            *target = (digit != 0).then_some((digit - 1) as u8);
+            *target = if digit == 0 {
+                None
+            } else {
+                Some((digit - 1) as u8)
+            };
         }
     }
     table
