@@ -116,14 +116,7 @@ fn run_loaded_job(
     let schema_hint = certificate_schema_hint(&certificate_text);
     let certificate = match parse_declarative_mu_parity_certificate(&certificate_text) {
         Ok(value) => value,
-        Err(error) => {
-            return rejected_run(
-                job,
-                canonical_formula,
-                schema_hint,
-                error.to_string(),
-            )
-        }
+        Err(error) => return rejected_run(job, canonical_formula, schema_hint, error.to_string()),
     };
 
     if let Err(error) =
@@ -224,4 +217,3 @@ fn resolve_path(base: &Path, path: &Path) -> PathBuf {
         base.join(path)
     }
 }
-
