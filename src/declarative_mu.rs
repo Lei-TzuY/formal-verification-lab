@@ -102,8 +102,7 @@ pub fn check_declarative_mu(
     document: &DeclarativeDocument,
     formula: &MuFormula<String, String>,
 ) -> Result<DeclarativeMuResult, DeclarativeMuError> {
-    validate_mu_formula(formula)?;
-    validate_atoms(document, formula)?;
+    validate_declarative_mu_formula(document, formula)?;
 
     let evaluation = evaluate_mu(document.model(), formula, |atom, state| {
         document.state_has_proposition(state, atom)
@@ -133,8 +132,7 @@ pub fn check_declarative_mu_via_parity(
     document: &DeclarativeDocument,
     formula: &MuFormula<String, String>,
 ) -> Result<DeclarativeMuParityResult, DeclarativeMuError> {
-    validate_mu_formula(formula)?;
-    validate_atoms(document, formula)?;
+    validate_declarative_mu_formula(document, formula)?;
 
     let evaluation = evaluate_mu_via_parity(document.model(), formula, |atom, state| {
         document.state_has_proposition(state, atom)
@@ -167,8 +165,7 @@ pub fn check_declarative_mu_with_limits(
     formula: &MuFormula<String, String>,
     limits: ExplorationLimits,
 ) -> Result<BoundedDeclarativeMuResult, DeclarativeMuError> {
-    validate_mu_formula(formula)?;
-    validate_atoms(document, formula)?;
+    validate_declarative_mu_formula(document, formula)?;
 
     let evaluation = evaluate_mu_with_limits(
         document.model(),
@@ -193,10 +190,11 @@ pub fn check_declarative_mu_text_with_limits(
     check_declarative_mu_with_limits(document, &formula, limits)
 }
 
-fn validate_atoms(
+pub(crate) fn validate_declarative_mu_formula(
     document: &DeclarativeDocument,
     formula: &MuFormula<String, String>,
 ) -> Result<(), DeclarativeMuError> {
+    validate_mu_formula(formula)?;
     let mut atoms = Vec::new();
     collect_mu_atoms(formula, &mut atoms);
     let mut seen = HashSet::new();
