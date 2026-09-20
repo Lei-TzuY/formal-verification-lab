@@ -188,7 +188,11 @@ pub use mu_calculus::{
     compile_ctl_to_mu, evaluate_mu, validate_mu_formula, MuError, MuEvaluation, MuFormula,
     MuInitialEvaluation, MuTerminalPolicy, MuValidationError,
 };
-pub use mu_parity::{evaluate_mu_via_parity, MuParityError, MuParityEvaluation};
+pub use mu_parity::{
+    evaluate_mu_via_parity, verify_mu_parity_evidence, MuParityError, MuParityEvaluation,
+    MuParityEvidenceError, MuParityFixpointKind, MuParityInitialEvidence, MuParityMove,
+    MuParityPosition, MuParityPositionKind, MuParityStrategyChoice, MuParityStrategyEvidence,
+};
 pub use mu_parse::{parse_mu_formula, render_mu_formula, MuParseError, MuParseErrorKind};
 pub use multi_response::{
     check_multi_response, check_multi_response_with_limits,
