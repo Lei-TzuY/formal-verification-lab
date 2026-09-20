@@ -191,10 +191,7 @@ impl<'a> Parser<'a> {
         self.parse_primary()
     }
 
-    fn parse_binder(
-        &mut self,
-        greatest: bool,
-    ) -> Result<MuFormula<String, String>, MuParseError> {
+    fn parse_binder(&mut self, greatest: bool) -> Result<MuFormula<String, String>, MuParseError> {
         self.skip_whitespace();
         let variable = self.parse_identifier()?;
         self.skip_whitespace();
@@ -247,7 +244,10 @@ impl<'a> Parser<'a> {
                 self.position += 1;
                 Ok(formula)
             }
-            _ => Err(MuParseError::new(start, MuParseErrorKind::ExpectedExpression)),
+            _ => Err(MuParseError::new(
+                start,
+                MuParseErrorKind::ExpectedExpression,
+            )),
         }
     }
 
