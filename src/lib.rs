@@ -401,10 +401,11 @@ pub use workspace_replay_lock::{
     create_workspace_replay_lock, create_workspace_replay_lock_from_text,
     parse_workspace_replay_lock, render_workspace_replay_lock, verify_workspace_replay_lock,
     verify_workspace_replay_lock_text, WorkspaceReplayLock, WorkspaceReplayLockJsonRun,
-    WorkspaceReplayLockParseError, WorkspaceReplayLockParseErrorKind, WorkspaceReplayLockVerificationEnvelope,
-    WorkspaceReplayLockVerificationStatus, WorkspaceReplayMode,
-    MAX_WORKSPACE_REPLAY_LOCK_RESULT_BYTES, MAX_WORKSPACE_REPLAY_LOCK_SNAPSHOT_BYTES,
-    WORKSPACE_REPLAY_LOCK_MISMATCH_EXIT_CODE, WORKSPACE_REPLAY_LOCK_SCHEMA_VERSION,
+    WorkspaceReplayLockParseError, WorkspaceReplayLockParseErrorKind,
+    WorkspaceReplayLockVerificationEnvelope, WorkspaceReplayLockVerificationStatus,
+    WorkspaceReplayMode, MAX_WORKSPACE_REPLAY_LOCK_RESULT_BYTES,
+    MAX_WORKSPACE_REPLAY_LOCK_SNAPSHOT_BYTES, WORKSPACE_REPLAY_LOCK_MISMATCH_EXIT_CODE,
+    WORKSPACE_REPLAY_LOCK_SCHEMA_VERSION,
 };
 pub use workspace_snapshot::{
     create_workspace_snapshot, parse_workspace_snapshot, render_workspace_snapshot,
