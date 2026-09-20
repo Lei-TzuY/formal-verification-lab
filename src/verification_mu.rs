@@ -104,9 +104,7 @@ pub(crate) fn mu_error(
 ) -> VerificationJobResultEnvelope {
     match backend {
         VerificationJobMuBackend::Fixpoint => VerificationJobResultEnvelope::mu_error(message),
-        VerificationJobMuBackend::Parity => {
-            VerificationJobResultEnvelope::mu_parity_error(message)
-        }
+        VerificationJobMuBackend::Parity => VerificationJobResultEnvelope::mu_parity_error(message),
     }
 }
 
@@ -128,7 +126,8 @@ fn validate_mu_job(job: &VerificationJob) -> Result<(), String> {
     {
         return Err("mu-calculus verification jobs do not support max-product-* limits".to_owned());
     }
-    if job.mu_backend() == VerificationJobMuBackend::Parity && has_model_limits(job.model_limits()) {
+    if job.mu_backend() == VerificationJobMuBackend::Parity && has_model_limits(job.model_limits())
+    {
         return Err(
             "mu-calculus parity verification jobs do not support max-model-* limits".to_owned(),
         );
