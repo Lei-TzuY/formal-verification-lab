@@ -137,10 +137,7 @@ label "done" "complete"
     match result.evaluation.initial[0].evidence.as_ref().unwrap() {
         CtlEvidence::Finite { trace } => {
             assert_eq!(trace.len(), 2);
-            assert_eq!(
-                trace[1].action,
-                Some(CtlEvidenceAction::TerminalSelfLoop)
-            );
+            assert_eq!(trace[1].action, Some(CtlEvidenceAction::TerminalSelfLoop));
             assert_eq!(trace[1].state, "done");
         }
         other => panic!("expected finite terminal-loop evidence, got {other:?}"),
@@ -218,10 +215,7 @@ label "done" "complete"
 
 fn fixture_dir(kind: &str) -> PathBuf {
     let id = NEXT_DIR.fetch_add(1, Ordering::Relaxed);
-    let root = std::env::temp_dir().join(format!(
-        "fvlab-m70-{kind}-{}-{id}",
-        std::process::id()
-    ));
+    let root = std::env::temp_dir().join(format!("fvlab-m70-{kind}-{}-{id}", std::process::id()));
     fs::create_dir_all(&root).unwrap();
     root
 }
