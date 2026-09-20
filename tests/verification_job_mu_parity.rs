@@ -1,9 +1,9 @@
 use formal_verification_lab::{
     check_declarative_mu_text_via_parity, parse_declarative_document, parse_verification_job,
-    run_verification_job_json, run_verification_suite_expectations_json, run_verification_suite_json,
-    VerificationJobMuBackend, VerificationJobMuTruth, VerificationJobOutcome,
-    VerificationJobParseErrorKind, VerificationRegressionSuiteOutcome, VerificationSuiteOutcome,
-    VERIFICATION_JOB_MU_RESULT_SCHEMA_VERSION,
+    run_verification_job_json, run_verification_suite_expectations_json,
+    run_verification_suite_json, VerificationJobMuBackend, VerificationJobMuTruth,
+    VerificationJobOutcome, VerificationJobParseErrorKind, VerificationRegressionSuiteOutcome,
+    VerificationSuiteOutcome, VERIFICATION_JOB_MU_RESULT_SCHEMA_VERSION,
 };
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -139,7 +139,10 @@ fn parity_job_matches_m82_frontend_and_preserves_backend_specific_details() {
     let run = run_verification_job_json(&manifest);
 
     assert_eq!(run.exit_code, 0);
-    assert_eq!(run.envelope.schema_version, VERIFICATION_JOB_MU_RESULT_SCHEMA_VERSION);
+    assert_eq!(
+        run.envelope.schema_version,
+        VERIFICATION_JOB_MU_RESULT_SCHEMA_VERSION
+    );
     assert_eq!(run.envelope.analysis.as_deref(), Some("mu-calculus"));
     assert_eq!(run.envelope.backend.as_deref(), Some("mu-parity"));
     assert_eq!(run.envelope.outcome, VerificationJobOutcome::Satisfied);
@@ -163,10 +166,7 @@ fn parity_job_matches_m82_frontend_and_preserves_backend_specific_details() {
         mu.parity_game_vertices,
         Some(direct.evaluation.parity_game_vertices)
     );
-    assert_eq!(
-        mu.max_parity_priority,
-        Some(direct.evaluation.max_priority)
-    );
+    assert_eq!(mu.max_parity_priority, Some(direct.evaluation.max_priority));
     assert_eq!(mu.initial[0].truth, VerificationJobMuTruth::True);
     assert_eq!(
         run.envelope.accounting.model_states,
@@ -201,7 +201,10 @@ fn parity_and_fixpoint_complete_jobs_agree_semantically_without_faking_iteration
     assert_eq!(parity_run.exit_code, fixpoint_run.exit_code);
     assert_eq!(parity_run.envelope.outcome, fixpoint_run.envelope.outcome);
     assert_eq!(parity_run.envelope.property, fixpoint_run.envelope.property);
-    assert_eq!(parity_run.envelope.accounting, fixpoint_run.envelope.accounting);
+    assert_eq!(
+        parity_run.envelope.accounting,
+        fixpoint_run.envelope.accounting
+    );
 
     let parity_mu = parity_run.envelope.mu.as_ref().unwrap();
     let fixpoint_mu = fixpoint_run.envelope.mu.as_ref().unwrap();
@@ -331,7 +334,10 @@ fn generic_suites_preserve_mixed_parity_and_fixpoint_mu_envelopes() {
     for (entry, direct) in raw.envelope.jobs.iter().zip(&direct) {
         assert_eq!(entry.result, direct.envelope);
     }
-    assert_eq!(raw.envelope.jobs[0].result.backend.as_deref(), Some("mu-parity"));
+    assert_eq!(
+        raw.envelope.jobs[0].result.backend.as_deref(),
+        Some("mu-parity")
+    );
     assert_eq!(
         raw.envelope.jobs[1].result.backend.as_deref(),
         Some("mu-fixpoint")
