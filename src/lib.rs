@@ -280,9 +280,9 @@ pub use verification_job_run::{
     VerificationJobJsonRun, VerificationJobLoadError,
 };
 pub use verification_result::{
-    VerificationJobAccounting, VerificationJobCutoff, VerificationJobCutoffKind,
-    VerificationJobCtlAction, VerificationJobCtlDetails, VerificationJobCtlEvidence,
-    VerificationJobCtlInitial, VerificationJobCtlTraceStep, VerificationJobCtlTruth,
+    VerificationJobAccounting, VerificationJobCtlAction, VerificationJobCtlDetails,
+    VerificationJobCtlEvidence, VerificationJobCtlInitial, VerificationJobCtlTraceStep,
+    VerificationJobCtlTruth, VerificationJobCutoff, VerificationJobCutoffKind,
     VerificationJobCutoffStage, VerificationJobEvidence, VerificationJobLimits,
     VerificationJobOutcome, VerificationJobResultEnvelope, VerificationJobSafetyTraceStep,
     VerificationJobStateTraceStep, VerificationJobTraceStep,
