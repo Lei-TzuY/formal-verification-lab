@@ -58,39 +58,62 @@ M72 exposes M71 through the declarative named-proposition frontend and `fvlab ct
 
 ## Milestone 73 — reproducible CTL verification jobs
 
-**Status: implementation candidate complete on PR #74.**
+**Status: sealed in `main` at `9b0f0c3589115f9278d4ea40d9c41e7e665f9585`.**
 
-M73 adds CTL as a first-class family in the existing heterogeneous verification-job protocol without creating a second parser, semantic engine, or job runner.
+M73 adds CTL as a first-class family in the existing heterogeneous verification-job protocol without introducing a second parser, semantic engine, or job runner. Schema-v3 result envelopes preserve complete/bounded CTL outcomes, lower/upper state data, per-initial three-valued truth, cutoff provenance, and normalized finite/lasso evidence. Exact candidate `925b3140485e80511324669d0473e04bdbfed94f` passed CI #617 and Bounded state-property CLI #467 before integration.
+
+## Milestone 74 — generic CTL suite/expectation integration audit
+
+**Status: architecture requirement satisfied by the existing generic verification-suite abstraction; regression evidence is carried by PR #75.**
+
+The M74 audit found no missing production orchestrator: verification suites already execute arbitrary verification jobs through `run_verification_job_json`, preserve the complete nested `VerificationJobResultEnvelope`, aggregate only canonical job outcomes, and compare regression expectations only against explicit `VerificationJobOutcome`. Adding a CTL-specific suite engine would duplicate an already-correct abstraction.
+
+Integration evidence added with the next production milestone proves:
+
+- raw suites preserve schema-v3 CTL envelopes exactly against direct single-job execution;
+- `satisfied`, `violated`, `inconclusive`, and `error` remain ordinary generic suite outcomes;
+- expectation mode compares only explicit expected outcomes and retains CTL cutoff, lower/upper state counts, per-initial truth, and evidence;
+- heterogeneous suite ordering remains deterministic when CTL and existing verification families are mixed;
+- built `fvlab-suite` raw and expectation JSON embed the direct CTL job payloads without a CTL-specific path.
+
+The exact integration evidence on candidate `40cda5996b3392de7ce597fce654c8d384a3ff4e` passed CI #625 together with all historical suite gates.
+
+## Milestone 75 — typed modal mu-calculus kernel
+
+**Status: integration candidate complete on PR #75.**
+
+M75 promotes the branching-time logic layer beyond the fixed CTL operator set to a general typed modal μ-calculus authority over complete finite graphs.
 
 Implemented contract:
 
-- `analysis "ctl"` is accepted by the existing verification-job manifest grammar while historical manifests without an analysis directive remain multi-response jobs;
-- manifest-relative `model` and `property` files carry the declarative model and textual CTL formula;
-- jobs with no model limits delegate to the sealed M70 complete frontend; configured `max-model-states`, `max-model-transitions`, or `max-model-depth` delegate to M72/M71 bounded semantics;
-- CTL jobs reject weak/strong fairness and all `max-product-*` directives before reading referenced input files;
-- schema-v3 CTL result envelopes preserve canonical `satisfied`, `violated`, `inconclusive`, and `error` outcomes, model-stage cutoff provenance, model accounting, and the canonical CTL property text;
-- CTL-specific machine-readable details preserve retained/lower/upper state-set counts, whether all initial states were retained, per-initial `true`/`false`/`unknown`, and normalized finite/lasso evidence;
-- synthetic terminal self-loops remain explicitly distinguishable from real model actions in JSON;
-- non-CTL envelopes retain their historical JSON shape because the CTL extension is emitted only for CTL results;
-- the existing `fvlab temporal job <manifest> --format json` route remains the sole built-binary job runner;
-- regressions cover analysis round-trip, complete direct-vs-job satisfaction/violation, all three model cutoff classes, early conclusive bounded evidence, terminal-loop normalization, manifest-relative execution, malformed/unknown properties, unsupported fairness/product limits, and built-binary JSON outcomes.
+- typed constants, atoms, fixpoint variables, Boolean negation/conjunction/disjunction, modal diamond/box, least fixpoint `μ`, and greatest fixpoint `ν`;
+- lexical nearest-binder scoping with shadowing;
+- fail-closed pre-exploration validation rejects unbound variables and occurrences that are negative relative to their nearest fixpoint binder, preserving monotonic fixpoint iteration;
+- complete canonical reachable-graph capture remains the only traversal authority;
+- modal predecessor semantics use the same proven-terminal synthetic self-loop policy as M69 CTL;
+- least fixpoints start at the empty state set and greatest fixpoints at the full retained state set, iterating deterministically to equality;
+- general Boolean negation around a fixpoint is supported when bound-variable polarity remains monotone;
+- `compile_ctl_to_mu` translates the complete M69 CTL surface to μ-calculus with fresh internal variables;
+- focused regressions cover validation, lexical shadowing, native μ/ν execution, terminal totalization, general negation, and nested CTL compilation;
+- generated CTL→μ differential coverage performs **90,112** comparisons over all 512 directed three-state graphs: 24,576 unary-operator comparisons plus 65,536 `E[U]`/`A[U]` comparisons.
 
-Implementation candidate `d4a172cf354c23ff38c3b12197783390e43bb7b7` passed CI #615 (format, all-target build, Clippy with `-D warnings`, full tests including M73 direct/binary coverage, and every historical CLI gate) and Bounded state-property CLI #465. Closure metadata changes must pass the same exact-head gates before merge.
+Implementation candidate `40cda5996b3392de7ce597fce654c8d384a3ff4e` passed CI #625 (format, all-target build, Clippy with `-D warnings`, full tests including the 90,112 CTL→μ differential and M74 suite-integration regressions, plus every historical CLI gate) and Bounded state-property CLI #475. Closure metadata changes must pass the same exact-head gates before merge.
 
-M73 does not claim CTL suite/expectation orchestration, CTL fairness, symbolic checking, or globally shortest CTL evidence.
+M75 is a typed complete-graph semantic kernel. It does not yet expose a textual/declarative μ-calculus language, bounded-prefix μ-calculus, μ-calculus fairness, verification jobs/suites, symbolic model checking, or a performance claim from fixpoint iteration counts.
 
-## Next frontier — Milestone 74: deterministic CTL verification suites and expectations
+## Next frontier — Milestone 76: textual/declarative modal mu-calculus frontend
 
-Promote the sealed single-job CTL protocol into the existing deterministic verification-suite/regression-expectation layer without changing CTL semantics or the schema-v3 job payload.
+Promote the sealed typed M75 authority to an external named-proposition language without duplicating its semantics.
 
 Acceptance criteria:
 
-- execute CTL jobs through the existing verification-suite runner rather than introducing a CTL-specific orchestrator;
-- preserve each nested schema-v3 CTL job envelope byte-for-byte apart from suite framing and manifest identity;
-- raw suites must retain `satisfied`, `violated`, `inconclusive`, and `error` outcomes without reinterpretation;
-- expectation-aware suites must compare only the explicit expected outcome and must not discard CTL lower/upper counts, per-initial three-valued data, cutoff provenance, or evidence;
-- support heterogeneous suites mixing CTL with the already sealed verification families while preserving deterministic job order and fail-closed path handling;
-- add direct-single-job-vs-suite differential regressions for complete CTL, each cutoff class, early conclusive evidence, terminal self-loop/lasso evidence, and error envelopes;
-- add built-binary raw-suite and expectation-suite JSON coverage;
-- do not add CTL fairness, symbolic checking, or new CTL semantics in this phase;
-- preserve all historical verification, structural, reduction, fairness, M69–M73 CTL, and suite gates.
+- define a deterministic textual grammar for constants, quoted proposition atoms, variables, `not`, `and`, `or`, modal diamond/box, `mu`/ `nu` binders, explicit grouping, and stable canonical rendering;
+- make lexical binding and precedence unambiguous, including nested binder shadowing;
+- parse first, then run the M75 binding/monotonicity validator before any model graph capture;
+- bind formula atoms to existing declarative named propositions and fail closed on unknown propositions before backend exploration;
+- execute exclusively through `evaluate_mu`; introduce no second fixpoint or graph engine;
+- add a direct complete-graph model-file CLI/report surface with stable all-initial satisfaction/violation exits and explicit terminal policy/accounting;
+- add parser round-trip/error, unbound/non-monotone, shadowing, terminal, nested alternation, direct-vs-kernel, and built-binary regressions;
+- differentially verify the textual CTL-compatible subset by parsing representative μ encodings and comparing them with M75 typed execution;
+- keep bounded μ-calculus, μ verification jobs/suites, fairness, and symbolic algorithms out of this phase;
+- preserve all historical verification, suite, reduction, fairness, CTL, and M75 generated differential gates.
