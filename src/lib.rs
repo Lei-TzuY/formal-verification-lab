@@ -136,12 +136,14 @@ pub use declarative_deadlock::{
 };
 pub use declarative_deadlock_report::render_declarative_deadlock_report;
 pub use declarative_mu::{
-    check_declarative_mu, check_declarative_mu_text, check_declarative_mu_text_with_limits,
+    check_declarative_mu, check_declarative_mu_text, check_declarative_mu_text_via_parity,
+    check_declarative_mu_text_with_limits, check_declarative_mu_via_parity,
     check_declarative_mu_with_limits, BoundedDeclarativeMuResult, DeclarativeMuError,
-    DeclarativeMuResult, DeclarativeMuStatus,
+    DeclarativeMuParityResult, DeclarativeMuResult, DeclarativeMuStatus,
 };
 pub use declarative_mu_report::{
-    render_bounded_declarative_mu_report, render_declarative_mu_report,
+    render_bounded_declarative_mu_report, render_declarative_mu_parity_report,
+    render_declarative_mu_report,
 };
 pub use eventuality::{
     check_eventuality, check_eventuality_with_limits, BoundedEventualityResult,
