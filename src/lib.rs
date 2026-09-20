@@ -79,6 +79,7 @@ pub mod structural_suite_run;
 pub mod temporal;
 pub mod temporal_parse;
 pub mod temporal_report;
+pub mod text_source;
 mod verification_action_temporal;
 mod verification_ctl;
 pub mod verification_execution;
@@ -114,8 +115,9 @@ pub use certificate_verification_job::{
     CertificateVerificationJobParseError, CertificateVerificationJobParseErrorKind,
 };
 pub use certificate_verification_job_run::{
-    run_certificate_verification_job_json, CertificateVerificationJobJsonRun,
-    CERTIFICATE_VERIFICATION_ERROR_EXIT_CODE, CERTIFICATE_VERIFICATION_REJECTED_EXIT_CODE,
+    run_certificate_verification_job_json, run_certificate_verification_job_json_with_provider,
+    CertificateVerificationJobJsonRun, CERTIFICATE_VERIFICATION_ERROR_EXIT_CODE,
+    CERTIFICATE_VERIFICATION_REJECTED_EXIT_CODE,
 };
 pub use certificate_verification_result::{
     CertificateVerificationJobOutcome, CertificateVerificationJobResultEnvelope,
@@ -246,12 +248,14 @@ pub use orchestration_suite::{
     OrchestrationSuiteParseErrorKind, MAX_ORCHESTRATION_SUITE_JOBS,
 };
 pub use orchestration_suite_run::{
-    load_orchestration_suite, run_orchestration_suite_expectations_json,
-    run_orchestration_suite_json, OrchestrationNestedResult, OrchestrationRegressionEntryResult,
-    OrchestrationRegressionOutcome, OrchestrationRegressionSuiteJsonRun,
-    OrchestrationRegressionSuiteResultEnvelope, OrchestrationSuiteEntryResult,
-    OrchestrationSuiteJsonRun, OrchestrationSuiteLoadError, OrchestrationSuiteResultEnvelope,
-    OrchestrationSuiteStatus, ORCHESTRATION_ATTENTION_EXIT_CODE,
+    load_orchestration_suite, load_orchestration_suite_with_provider,
+    run_orchestration_suite_expectations_json,
+    run_orchestration_suite_expectations_json_with_provider, run_orchestration_suite_json,
+    run_orchestration_suite_json_with_provider, OrchestrationNestedResult,
+    OrchestrationRegressionEntryResult, OrchestrationRegressionOutcome,
+    OrchestrationRegressionSuiteJsonRun, OrchestrationRegressionSuiteResultEnvelope,
+    OrchestrationSuiteEntryResult, OrchestrationSuiteJsonRun, OrchestrationSuiteLoadError,
+    OrchestrationSuiteResultEnvelope, OrchestrationSuiteStatus, ORCHESTRATION_ATTENTION_EXIT_CODE,
     ORCHESTRATION_REGRESSION_MISMATCH_EXIT_CODE,
     ORCHESTRATION_REGRESSION_SUITE_RESULT_SCHEMA_VERSION,
     ORCHESTRATION_SUITE_RESULT_SCHEMA_VERSION,
@@ -311,7 +315,9 @@ pub use structural_job::{
     parse_structural_job, StructuralJob, StructuralJobAnalysis, StructuralJobParseError,
     StructuralJobParseErrorKind,
 };
-pub use structural_job_run::{run_structural_job_json, StructuralJobJsonRun};
+pub use structural_job_run::{
+    run_structural_job_json, run_structural_job_json_with_provider, StructuralJobJsonRun,
+};
 pub use structural_result::{
     StructuralJobAccounting, StructuralJobComponent, StructuralJobCutoff, StructuralJobCutoffKind,
     StructuralJobCycleEvidence, StructuralJobLimits, StructuralJobOutcome,
@@ -345,6 +351,11 @@ pub use temporal::{
 };
 pub use temporal_parse::{parse_action_temporal, TemporalParseError, TemporalParseErrorKind};
 pub use temporal_report::{render_bounded_temporal_report, render_temporal_report};
+pub use text_source::{
+    normalize_source_id, path_source_id, resolve_source_id, FileSystemTextSourceProvider,
+    MapTextSourceProvider, RootedFileSystemTextSourceProvider, TextSourceError,
+    TextSourceErrorKind, TextSourceIdError, TextSourceIdErrorKind, TextSourceProvider,
+};
 pub use verification_execution::{
     execute_multi_response, MultiResponseExecutionConfig, MultiResponseExecutionResult,
 };
@@ -353,8 +364,9 @@ pub use verification_job::{
     VerificationJobParseError, VerificationJobParseErrorKind,
 };
 pub use verification_job_run::{
-    load_verification_job, run_verification_job_json, LoadedVerificationJob,
-    VerificationJobJsonRun, VerificationJobLoadError,
+    load_verification_job, load_verification_job_with_provider, run_verification_job_json,
+    run_verification_job_json_with_provider, LoadedVerificationJob, VerificationJobJsonRun,
+    VerificationJobLoadError,
 };
 pub use verification_result::{
     VerificationJobAccounting, VerificationJobCtlAction, VerificationJobCtlDetails,

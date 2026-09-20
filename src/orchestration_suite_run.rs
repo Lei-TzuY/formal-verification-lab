@@ -1,5 +1,5 @@
 use crate::certificate_verification_job_run::{
-    run_certificate_verification_job_json, CertificateVerificationJobJsonRun,
+    run_certificate_verification_job_json_with_provider, CertificateVerificationJobJsonRun,
 };
 use crate::certificate_verification_result::{
     CertificateVerificationJobOutcome, CertificateVerificationJobResultEnvelope,
@@ -8,13 +8,17 @@ use crate::orchestration_suite::{
     parse_orchestration_suite, OrchestrationExpectedOutcome, OrchestrationJobFamily,
     OrchestrationSuite,
 };
-use crate::structural_job_run::{run_structural_job_json, StructuralJobJsonRun};
+use crate::structural_job_run::{run_structural_job_json_with_provider, StructuralJobJsonRun};
 use crate::structural_result::{StructuralJobOutcome, StructuralJobResultEnvelope};
-use crate::verification_job_run::{run_verification_job_json, VerificationJobJsonRun};
+use crate::text_source::{
+    path_source_id, resolve_source_id, FileSystemTextSourceProvider, TextSourceProvider,
+};
+use crate::verification_job_run::{
+    run_verification_job_json_with_provider, VerificationJobJsonRun,
+};
 use crate::verification_result::{VerificationJobOutcome, VerificationJobResultEnvelope};
 use std::fmt;
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 pub const ORCHESTRATION_SUITE_RESULT_SCHEMA_VERSION: u32 = 1;
 pub const ORCHESTRATION_REGRESSION_SUITE_RESULT_SCHEMA_VERSION: u32 = 1;
@@ -316,11 +320,20 @@ impl std::error::Error for OrchestrationSuiteLoadError {}
 pub fn load_orchestration_suite(
     manifest_path: impl AsRef<Path>,
 ) -> Result<OrchestrationSuite, OrchestrationSuiteLoadError> {
-    let manifest_path = manifest_path.as_ref();
-    let input = fs::read_to_string(manifest_path).map_err(|error| {
+    let manifest_source_id = path_source_id(manifest_path.as_ref())
+        .map_err(|error| OrchestrationSuiteLoadError::new(error.to_string()))?;
+    load_orchestration_suite_with_provider(&FileSystemTextSourceProvider, &manifest_source_id)
+}
+
+pub fn load_orchestration_suite_with_provider(
+    provider: &dyn TextSourceProvider,
+    manifest_source_id: &str,
+) -> Result<OrchestrationSuite, OrchestrationSuiteLoadError> {
+    let input = provider.read_text(manifest_source_id).map_err(|error| {
         OrchestrationSuiteLoadError::new(format!(
-            "failed to read orchestration suite '{}': {error}",
-            manifest_path.display()
+            "failed to read orchestration suite '{}': {}",
+            manifest_source_id,
+            error.kind().as_str()
         ))
     })?;
     parse_orchestration_suite(&input)
@@ -328,8 +341,23 @@ pub fn load_orchestration_suite(
 }
 
 pub fn run_orchestration_suite_json(manifest_path: impl AsRef<Path>) -> OrchestrationSuiteJsonRun {
-    let manifest_path = manifest_path.as_ref();
-    match run_orchestration_suite_json_inner(manifest_path) {
+    let manifest_source_id = match path_source_id(manifest_path.as_ref()) {
+        Ok(source_id) => source_id,
+        Err(error) => {
+            return OrchestrationSuiteJsonRun {
+                envelope: OrchestrationSuiteResultEnvelope::error(error.to_string()),
+                exit_code: 2,
+            };
+        }
+    };
+    run_orchestration_suite_json_with_provider(&FileSystemTextSourceProvider, &manifest_source_id)
+}
+
+pub fn run_orchestration_suite_json_with_provider(
+    provider: &dyn TextSourceProvider,
+    manifest_source_id: &str,
+) -> OrchestrationSuiteJsonRun {
+    match run_orchestration_suite_json_inner(provider, manifest_source_id) {
         Ok(run) => run,
         Err(error) => OrchestrationSuiteJsonRun {
             envelope: OrchestrationSuiteResultEnvelope::error(error),
@@ -341,8 +369,26 @@ pub fn run_orchestration_suite_json(manifest_path: impl AsRef<Path>) -> Orchestr
 pub fn run_orchestration_suite_expectations_json(
     manifest_path: impl AsRef<Path>,
 ) -> OrchestrationRegressionSuiteJsonRun {
-    let manifest_path = manifest_path.as_ref();
-    match run_orchestration_suite_expectations_json_inner(manifest_path) {
+    let manifest_source_id = match path_source_id(manifest_path.as_ref()) {
+        Ok(source_id) => source_id,
+        Err(error) => {
+            return OrchestrationRegressionSuiteJsonRun {
+                envelope: OrchestrationRegressionSuiteResultEnvelope::error(error.to_string()),
+                exit_code: 2,
+            };
+        }
+    };
+    run_orchestration_suite_expectations_json_with_provider(
+        &FileSystemTextSourceProvider,
+        &manifest_source_id,
+    )
+}
+
+pub fn run_orchestration_suite_expectations_json_with_provider(
+    provider: &dyn TextSourceProvider,
+    manifest_source_id: &str,
+) -> OrchestrationRegressionSuiteJsonRun {
+    match run_orchestration_suite_expectations_json_inner(provider, manifest_source_id) {
         Ok(run) => run,
         Err(error) => OrchestrationRegressionSuiteJsonRun {
             envelope: OrchestrationRegressionSuiteResultEnvelope::error(error),
@@ -352,15 +398,17 @@ pub fn run_orchestration_suite_expectations_json(
 }
 
 fn run_orchestration_suite_json_inner(
-    manifest_path: &Path,
+    provider: &dyn TextSourceProvider,
+    manifest_source_id: &str,
 ) -> Result<OrchestrationSuiteJsonRun, String> {
-    let suite = load_orchestration_suite(manifest_path).map_err(|error| error.to_string())?;
-    let base = manifest_path.parent().unwrap_or_else(|| Path::new(""));
+    let suite = load_orchestration_suite_with_provider(provider, manifest_source_id)
+        .map_err(|error| error.to_string())?;
     let mut jobs = Vec::with_capacity(suite.entries().len());
 
     for entry in suite.entries() {
-        let resolved = resolve_path(base, Path::new(entry.job_path()));
-        let (job_exit_code, result) = run_entry(entry.family(), &resolved);
+        let resolved = resolve_source_id(manifest_source_id, entry.job_path())
+            .map_err(|error| error.to_string())?;
+        let (job_exit_code, result) = run_entry(provider, entry.family(), &resolved);
         jobs.push(OrchestrationSuiteEntryResult {
             family: entry.family(),
             manifest: entry.job_path().to_owned(),
@@ -378,9 +426,11 @@ fn run_orchestration_suite_json_inner(
 }
 
 fn run_orchestration_suite_expectations_json_inner(
-    manifest_path: &Path,
+    provider: &dyn TextSourceProvider,
+    manifest_source_id: &str,
 ) -> Result<OrchestrationRegressionSuiteJsonRun, String> {
-    let suite = load_orchestration_suite(manifest_path).map_err(|error| error.to_string())?;
+    let suite = load_orchestration_suite_with_provider(provider, manifest_source_id)
+        .map_err(|error| error.to_string())?;
     if suite
         .entries()
         .iter()
@@ -392,14 +442,14 @@ fn run_orchestration_suite_expectations_json_inner(
         );
     }
 
-    let base = manifest_path.parent().unwrap_or_else(|| Path::new(""));
     let mut jobs = Vec::with_capacity(suite.entries().len());
     for entry in suite.entries() {
         let expected = entry
             .expected()
             .expect("complete expectation validation ran before execution");
-        let resolved = resolve_path(base, Path::new(entry.job_path()));
-        let (job_exit_code, result) = run_entry(entry.family(), &resolved);
+        let resolved = resolve_source_id(manifest_source_id, entry.job_path())
+            .map_err(|error| error.to_string())?;
+        let (job_exit_code, result) = run_entry(provider, entry.family(), &resolved);
         let observed = result.outcome_str().to_owned();
         let matched = expectation_matches(expected, &result);
         jobs.push(OrchestrationRegressionEntryResult {
@@ -425,17 +475,23 @@ fn run_orchestration_suite_expectations_json_inner(
     })
 }
 
-fn run_entry(family: OrchestrationJobFamily, manifest: &Path) -> (u8, OrchestrationNestedResult) {
+fn run_entry(
+    provider: &dyn TextSourceProvider,
+    family: OrchestrationJobFamily,
+    manifest_source_id: &str,
+) -> (u8, OrchestrationNestedResult) {
     match family {
         OrchestrationJobFamily::Verification => {
-            let run: VerificationJobJsonRun = run_verification_job_json(manifest);
+            let run: VerificationJobJsonRun =
+                run_verification_job_json_with_provider(provider, manifest_source_id);
             (
                 run.exit_code,
                 OrchestrationNestedResult::Verification(Box::new(run.envelope)),
             )
         }
         OrchestrationJobFamily::Structural => {
-            let run: StructuralJobJsonRun = run_structural_job_json(manifest);
+            let run: StructuralJobJsonRun =
+                run_structural_job_json_with_provider(provider, manifest_source_id);
             (
                 run.exit_code,
                 OrchestrationNestedResult::Structural(Box::new(run.envelope)),
@@ -443,7 +499,7 @@ fn run_entry(family: OrchestrationJobFamily, manifest: &Path) -> (u8, Orchestrat
         }
         OrchestrationJobFamily::CertificateVerification => {
             let run: CertificateVerificationJobJsonRun =
-                run_certificate_verification_job_json(manifest);
+                run_certificate_verification_job_json_with_provider(provider, manifest_source_id);
             (
                 run.exit_code,
                 OrchestrationNestedResult::CertificateVerification(Box::new(run.envelope)),
@@ -501,14 +557,6 @@ fn verification_outcome_str(outcome: VerificationJobOutcome) -> &'static str {
         VerificationJobOutcome::Violated => "violated",
         VerificationJobOutcome::Inconclusive => "inconclusive",
         VerificationJobOutcome::Error => "error",
-    }
-}
-
-fn resolve_path(base: &Path, path: &Path) -> PathBuf {
-    if path.is_absolute() {
-        path.to_path_buf()
-    } else {
-        base.join(path)
     }
 }
 
