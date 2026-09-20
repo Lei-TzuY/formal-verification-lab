@@ -7,8 +7,7 @@ use crate::declarative_ctl::{
 };
 use crate::declarative_deadlock::BoundedDeclarativeDeadlockResult;
 use crate::declarative_mu::{
-    BoundedDeclarativeMuResult, DeclarativeMuParityResult, DeclarativeMuResult,
-    DeclarativeMuStatus,
+    BoundedDeclarativeMuResult, DeclarativeMuParityResult, DeclarativeMuResult, DeclarativeMuStatus,
 };
 use crate::exact_state::{BoundedExactStateResult, ExactStateEvidence, ExactStateStatus};
 use crate::mu_bounded::{BoundedMuStatus, BoundedMuTruth};
@@ -791,10 +790,7 @@ impl VerificationJobResultEnvelope {
         }
     }
 
-    pub fn from_mu_parity(
-        model: impl Into<String>,
-        result: &DeclarativeMuParityResult,
-    ) -> Self {
+    pub fn from_mu_parity(model: impl Into<String>, result: &DeclarativeMuParityResult) -> Self {
         Self {
             schema_version: VERIFICATION_JOB_MU_RESULT_SCHEMA_VERSION,
             analysis: Some("mu-calculus".to_owned()),
@@ -1193,12 +1189,7 @@ fn write_mu_details(out: &mut String, mu: &VerificationJobMuDetails) {
         mu.possibly_satisfying_states as u64,
         false,
     );
-    optional_usize_field(
-        out,
-        "fixpoint_iterations",
-        mu.fixpoint_iterations,
-        false,
-    );
+    optional_usize_field(out, "fixpoint_iterations", mu.fixpoint_iterations, false);
     if let Some(vertices) = mu.parity_game_vertices {
         field_u64(out, "parity_game_vertices", vertices as u64, false);
     }
