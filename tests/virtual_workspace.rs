@@ -6,7 +6,7 @@ use formal_verification_lab::{
     run_orchestration_suite_json, run_orchestration_suite_json_with_provider,
     run_structural_job_json, run_structural_job_json_with_provider, run_verification_job_json,
     run_verification_job_json_with_provider, MapTextSourceProvider,
-    RootedFileSystemTextSourceProvider,
+    RootedFileSystemTextSourceProvider, VerificationJobOutcome,
 };
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -87,13 +87,19 @@ fn map_and_rooted_filesystem_providers_match_representative_outcomes() {
         run_verification_job_json_with_provider(&rooted, "jobs/verify.job");
     let verified_map = run_verification_job_json_with_provider(&map, "jobs/verify.job");
     assert_eq!(verified_fs.to_json(), verified_map.to_json());
-    assert_eq!(verified_map.envelope.outcome.as_str(), "satisfied");
+    assert_eq!(
+        verified_map.envelope.outcome,
+        VerificationJobOutcome::Satisfied
+    );
 
     let violated_fs =
         run_verification_job_json_with_provider(&rooted, "jobs/violate.job");
     let violated_map = run_verification_job_json_with_provider(&map, "jobs/violate.job");
     assert_eq!(violated_fs.to_json(), violated_map.to_json());
-    assert_eq!(violated_map.envelope.outcome.as_str(), "violated");
+    assert_eq!(
+        violated_map.envelope.outcome,
+        VerificationJobOutcome::Violated
+    );
 
     let structural_fs =
         run_structural_job_json_with_provider(&rooted, "jobs/structure.job");
