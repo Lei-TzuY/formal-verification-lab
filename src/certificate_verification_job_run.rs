@@ -1,9 +1,7 @@
 use crate::certificate_verification_job::{
     parse_certificate_verification_job, CertificateVerificationJob,
 };
-use crate::certificate_verification_result::{
-    CertificateVerificationJobOutcome, CertificateVerificationJobResultEnvelope,
-};
+use crate::certificate_verification_result::CertificateVerificationJobResultEnvelope;
 use crate::declarative::parse_declarative_document;
 use crate::declarative_mu::validate_declarative_mu_formula;
 use crate::mu_parity_certificate::{
@@ -227,7 +225,3 @@ fn resolve_path(base: &Path, path: &Path) -> PathBuf {
     }
 }
 
-#[allow(dead_code)]
-fn _assert_outcome_exhaustive(outcome: CertificateVerificationJobOutcome) -> &'static str {
-    outcome.as_str()
-}
