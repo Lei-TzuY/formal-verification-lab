@@ -1,8 +1,6 @@
 use crate::checker::ExplorationLimits;
 use crate::ctl::{evaluate_ctl, CtlError, CtlEvaluation, CtlFormula};
-use crate::ctl_bounded::{
-    evaluate_ctl_with_limits, BoundedCtlError, BoundedCtlEvaluation,
-};
+use crate::ctl_bounded::{evaluate_ctl_with_limits, BoundedCtlError, BoundedCtlEvaluation};
 use crate::ctl_parse::{collect_ctl_atoms, parse_ctl_formula, render_ctl_formula, CtlParseError};
 use crate::declarative::DeclarativeDocument;
 use std::collections::HashSet;
@@ -105,7 +103,6 @@ pub fn check_declarative_ctl_text(
     let formula = parse_ctl_formula(input)?;
     check_declarative_ctl(document, &formula)
 }
-
 
 /// Evaluate one typed CTL formula through the proof-honest M71 bounded
 /// authority after resolving every named proposition against the declarative
