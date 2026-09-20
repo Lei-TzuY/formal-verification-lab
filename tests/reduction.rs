@@ -216,12 +216,7 @@ fn reducer_preserves_distinct_sleep_contexts_for_the_same_model_state() {
         "sleep-context-self-loops",
         vec![StateVariable::new("state", "single state")],
         vec![0u8],
-        |_state| {
-            Ok(vec![
-                Transition::new("a", 0),
-                Transition::new("b", 0),
-            ])
-        },
+        |_state| Ok(vec![Transition::new("a", 0), Transition::new("b", 0)]),
         vec![Invariant::new("always", |_state: &u8| true)],
     )
     .unwrap();
