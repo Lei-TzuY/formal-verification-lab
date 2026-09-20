@@ -16,6 +16,7 @@ use crate::proposition_expr::{
 };
 use crate::safety::{check_safety_assertion_with_limits, PropositionSafetySpec, SafetyStatus};
 use crate::verification_action_temporal::{action_temporal_error, run_action_temporal_job_json};
+use crate::verification_ctl::{ctl_error, run_ctl_job_json};
 use crate::verification_execution::{
     execute_multi_response, MultiResponseExecutionConfig, MultiResponseExecutionResult,
 };
@@ -135,6 +136,10 @@ pub fn run_verification_job_json(manifest_path: impl AsRef<Path>) -> Verificatio
                 Err(error) => error_run(action_temporal_error(error)),
             }
         }
+        VerificationJobAnalysis::Ctl => match run_ctl_job_json(manifest_path, job) {
+            Ok(run) => run,
+            Err(error) => error_run(ctl_error(error)),
+        },
     }
 }
 
@@ -457,6 +462,7 @@ fn proposition_expression_envelope(
             max_product_depth_reached: None,
         },
         cutoff: result.outcome.inconclusive_reason().map(model_cutoff),
+        ctl: None,
         evidence: result
             .evidence
             .as_ref()

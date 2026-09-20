@@ -67,6 +67,7 @@ pub mod temporal;
 pub mod temporal_parse;
 pub mod temporal_report;
 mod verification_action_temporal;
+mod verification_ctl;
 pub mod verification_execution;
 pub mod verification_job;
 pub mod verification_job_run;
@@ -279,11 +280,13 @@ pub use verification_job_run::{
     VerificationJobJsonRun, VerificationJobLoadError,
 };
 pub use verification_result::{
-    VerificationJobAccounting, VerificationJobCutoff, VerificationJobCutoffKind,
+    VerificationJobAccounting, VerificationJobCtlAction, VerificationJobCtlDetails,
+    VerificationJobCtlEvidence, VerificationJobCtlInitial, VerificationJobCtlTraceStep,
+    VerificationJobCtlTruth, VerificationJobCutoff, VerificationJobCutoffKind,
     VerificationJobCutoffStage, VerificationJobEvidence, VerificationJobLimits,
     VerificationJobOutcome, VerificationJobResultEnvelope, VerificationJobSafetyTraceStep,
     VerificationJobStateTraceStep, VerificationJobTraceStep,
-    VERIFICATION_JOB_EXACT_STATE_RESULT_SCHEMA_VERSION,
+    VERIFICATION_JOB_CTL_RESULT_SCHEMA_VERSION, VERIFICATION_JOB_EXACT_STATE_RESULT_SCHEMA_VERSION,
     VERIFICATION_JOB_HETEROGENEOUS_RESULT_SCHEMA_VERSION, VERIFICATION_JOB_RESULT_SCHEMA_VERSION,
     VERIFICATION_JOB_SAFETY_RESULT_SCHEMA_VERSION,
 };

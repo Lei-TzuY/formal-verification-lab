@@ -1,5 +1,10 @@
 use crate::bounded::{AnalysisOutcome, AnalysisStage, BoundedOutcome};
 use crate::checker::{ExplorationLimits, InconclusiveReason, TraceStep};
+use crate::ctl::{CtlEvidence, CtlEvidenceAction};
+use crate::ctl_bounded::{BoundedCtlStatus, BoundedCtlTruth};
+use crate::declarative_ctl::{
+    BoundedDeclarativeCtlResult, DeclarativeCtlResult, DeclarativeCtlStatus,
+};
 use crate::declarative_deadlock::BoundedDeclarativeDeadlockResult;
 use crate::exact_state::{BoundedExactStateResult, ExactStateEvidence, ExactStateStatus};
 use crate::multi_response::{
@@ -17,6 +22,7 @@ pub const VERIFICATION_JOB_DEADLOCK_RESULT_SCHEMA_VERSION: u32 =
     VERIFICATION_JOB_HETEROGENEOUS_RESULT_SCHEMA_VERSION;
 pub const VERIFICATION_JOB_EXACT_STATE_RESULT_SCHEMA_VERSION: u32 =
     VERIFICATION_JOB_HETEROGENEOUS_RESULT_SCHEMA_VERSION;
+pub const VERIFICATION_JOB_CTL_RESULT_SCHEMA_VERSION: u32 = 3;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VerificationJobOutcome {
@@ -140,6 +146,63 @@ pub struct VerificationJobStateTraceStep {
 pub type VerificationJobSafetyTraceStep = VerificationJobStateTraceStep;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum VerificationJobCtlAction {
+    Model(String),
+    TerminalSelfLoop,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerificationJobCtlTraceStep {
+    pub action: Option<VerificationJobCtlAction>,
+    pub state: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum VerificationJobCtlEvidence {
+    Finite {
+        trace: Vec<VerificationJobCtlTraceStep>,
+    },
+    Lasso {
+        trace: Vec<VerificationJobCtlTraceStep>,
+        cycle_start: usize,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VerificationJobCtlTruth {
+    True,
+    False,
+    Unknown,
+}
+
+impl VerificationJobCtlTruth {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::True => "true",
+            Self::False => "false",
+            Self::Unknown => "unknown",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerificationJobCtlInitial {
+    pub state_index: usize,
+    pub state: String,
+    pub truth: VerificationJobCtlTruth,
+    pub evidence: Option<VerificationJobCtlEvidence>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerificationJobCtlDetails {
+    pub initial_states_complete: bool,
+    pub retained_states: usize,
+    pub definitely_satisfying_states: usize,
+    pub possibly_satisfying_states: usize,
+    pub initial: Vec<VerificationJobCtlInitial>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum VerificationJobEvidence {
     Finite {
         clause: String,
@@ -194,6 +257,7 @@ pub struct VerificationJobResultEnvelope {
     pub product_limits: VerificationJobLimits,
     pub accounting: VerificationJobAccounting,
     pub cutoff: Option<VerificationJobCutoff>,
+    pub ctl: Option<VerificationJobCtlDetails>,
     pub evidence: Option<VerificationJobEvidence>,
     pub error: Option<String>,
 }
@@ -231,6 +295,7 @@ impl VerificationJobResultEnvelope {
                 max_product_depth_reached: None,
             },
             cutoff: None,
+            ctl: None,
             evidence: result.counterexample.as_ref().map(convert_evidence),
             error: None,
         }
@@ -271,6 +336,7 @@ impl VerificationJobResultEnvelope {
                 .outcome
                 .inconclusive_reason()
                 .map(|reason| cutoff(VerificationJobCutoffStage::Product, reason)),
+            ctl: None,
             evidence: result.counterexample.as_ref().map(convert_evidence),
             error: None,
         }
@@ -317,6 +383,7 @@ impl VerificationJobResultEnvelope {
                 max_product_depth_reached: result.max_product_depth_reached,
             },
             cutoff: result_cutoff,
+            ctl: None,
             evidence: result.counterexample.as_ref().map(convert_evidence),
             error: None,
         }
@@ -350,6 +417,7 @@ impl VerificationJobResultEnvelope {
                 .outcome
                 .inconclusive_reason()
                 .map(|reason| cutoff(VerificationJobCutoffStage::Model, reason)),
+            ctl: None,
             evidence: result
                 .counterexample
                 .as_ref()
@@ -389,6 +457,7 @@ impl VerificationJobResultEnvelope {
                 .outcome
                 .inconclusive_reason()
                 .map(|reason| cutoff(VerificationJobCutoffStage::Model, reason)),
+            ctl: None,
             evidence: result
                 .witness
                 .as_ref()
@@ -429,9 +498,133 @@ impl VerificationJobResultEnvelope {
                 .outcome
                 .inconclusive_reason()
                 .map(|reason| cutoff(VerificationJobCutoffStage::Model, reason)),
+            ctl: None,
             evidence: result.evidence.as_ref().map(convert_exact_state_evidence),
             error: None,
         }
+    }
+
+    pub fn from_ctl_complete(model: impl Into<String>, result: &DeclarativeCtlResult) -> Self {
+        Self {
+            schema_version: VERIFICATION_JOB_CTL_RESULT_SCHEMA_VERSION,
+            analysis: Some("ctl".to_owned()),
+            backend: Some("ctl-fixpoint".to_owned()),
+            outcome: match result.status {
+                DeclarativeCtlStatus::Satisfied => VerificationJobOutcome::Satisfied,
+                DeclarativeCtlStatus::Violated => VerificationJobOutcome::Violated,
+            },
+            model: Some(model.into()),
+            property: Some(result.formula.clone()),
+            weak_fair_actions: Vec::new(),
+            strong_fair_actions: Vec::new(),
+            model_limits: ExplorationLimits::unbounded().into(),
+            product_limits: ExplorationLimits::unbounded().into(),
+            accounting: model_only_accounting(
+                result.evaluation.discovered_states,
+                result.evaluation.discovered_states,
+                result.evaluation.explored_transitions,
+                result.evaluation.max_depth_reached,
+            ),
+            cutoff: None,
+            ctl: Some(VerificationJobCtlDetails {
+                initial_states_complete: true,
+                retained_states: result.evaluation.reachable_states.len(),
+                definitely_satisfying_states: result.evaluation.satisfying_state_indices.len(),
+                possibly_satisfying_states: result.evaluation.satisfying_state_indices.len(),
+                initial: result
+                    .evaluation
+                    .initial
+                    .iter()
+                    .map(|entry| VerificationJobCtlInitial {
+                        state_index: entry.state_index,
+                        state: entry.state.clone(),
+                        truth: if entry.satisfied {
+                            VerificationJobCtlTruth::True
+                        } else {
+                            VerificationJobCtlTruth::False
+                        },
+                        evidence: entry.evidence.as_ref().map(convert_ctl_evidence),
+                    })
+                    .collect(),
+            }),
+            evidence: None,
+            error: None,
+        }
+    }
+
+    pub fn from_ctl_bounded(
+        model: impl Into<String>,
+        model_limits: ExplorationLimits,
+        result: &BoundedDeclarativeCtlResult,
+    ) -> Self {
+        Self {
+            schema_version: VERIFICATION_JOB_CTL_RESULT_SCHEMA_VERSION,
+            analysis: Some("ctl".to_owned()),
+            backend: Some("ctl-fixpoint".to_owned()),
+            outcome: match &result.evaluation.outcome {
+                BoundedOutcome::Conclusive(BoundedCtlStatus::Satisfied) => {
+                    VerificationJobOutcome::Satisfied
+                }
+                BoundedOutcome::Conclusive(BoundedCtlStatus::Violated) => {
+                    VerificationJobOutcome::Violated
+                }
+                BoundedOutcome::Inconclusive(_) => VerificationJobOutcome::Inconclusive,
+            },
+            model: Some(model.into()),
+            property: Some(result.formula.clone()),
+            weak_fair_actions: Vec::new(),
+            strong_fair_actions: Vec::new(),
+            model_limits: model_limits.into(),
+            product_limits: ExplorationLimits::unbounded().into(),
+            accounting: model_only_accounting(
+                result.evaluation.discovered_states,
+                result.evaluation.checked_states,
+                result.evaluation.explored_transitions,
+                result.evaluation.max_depth_reached,
+            ),
+            cutoff: result
+                .evaluation
+                .outcome
+                .inconclusive_reason()
+                .map(|reason| cutoff(VerificationJobCutoffStage::Model, reason)),
+            ctl: Some(VerificationJobCtlDetails {
+                initial_states_complete: result.evaluation.initial_states_complete,
+                retained_states: result.evaluation.reachable_states.len(),
+                definitely_satisfying_states: result
+                    .evaluation
+                    .definitely_satisfying_state_indices
+                    .len(),
+                possibly_satisfying_states: result
+                    .evaluation
+                    .possibly_satisfying_state_indices
+                    .len(),
+                initial: result
+                    .evaluation
+                    .initial
+                    .iter()
+                    .map(|entry| VerificationJobCtlInitial {
+                        state_index: entry.state_index,
+                        state: entry.state.clone(),
+                        truth: match entry.truth {
+                            BoundedCtlTruth::True => VerificationJobCtlTruth::True,
+                            BoundedCtlTruth::False => VerificationJobCtlTruth::False,
+                            BoundedCtlTruth::Unknown => VerificationJobCtlTruth::Unknown,
+                        },
+                        evidence: entry.evidence.as_ref().map(convert_ctl_evidence),
+                    })
+                    .collect(),
+            }),
+            evidence: None,
+            error: None,
+        }
+    }
+
+    pub fn ctl_error(message: impl Into<String>) -> Self {
+        let mut envelope = Self::error(message);
+        envelope.schema_version = VERIFICATION_JOB_CTL_RESULT_SCHEMA_VERSION;
+        envelope.analysis = Some("ctl".to_owned());
+        envelope.backend = Some("ctl-fixpoint".to_owned());
+        envelope
     }
 
     pub fn error(message: impl Into<String>) -> Self {
@@ -448,6 +641,7 @@ impl VerificationJobResultEnvelope {
             product_limits: ExplorationLimits::unbounded().into(),
             accounting: VerificationJobAccounting::empty(),
             cutoff: None,
+            ctl: None,
             evidence: None,
             error: Some(message.into()),
         }
@@ -517,6 +711,10 @@ impl VerificationJobResultEnvelope {
         match self.cutoff {
             Some(value) => write_cutoff(&mut out, value),
             None => out.push_str("null"),
+        }
+        if let Some(ctl) = &self.ctl {
+            out.push_str(",\"ctl\":");
+            write_ctl_details(&mut out, ctl);
         }
         out.push_str(",\"evidence\":");
         match &self.evidence {
@@ -703,6 +901,114 @@ fn convert_exact_state_evidence(evidence: &ExactStateEvidence) -> VerificationJo
             }
         }
     }
+}
+
+fn convert_ctl_evidence(evidence: &CtlEvidence<String>) -> VerificationJobCtlEvidence {
+    match evidence {
+        CtlEvidence::Finite { trace } => VerificationJobCtlEvidence::Finite {
+            trace: trace.iter().map(convert_ctl_step).collect(),
+        },
+        CtlEvidence::Lasso { trace, cycle_start } => VerificationJobCtlEvidence::Lasso {
+            trace: trace.iter().map(convert_ctl_step).collect(),
+            cycle_start: *cycle_start,
+        },
+    }
+}
+
+fn convert_ctl_step(step: &crate::ctl::CtlEvidenceStep<String>) -> VerificationJobCtlTraceStep {
+    VerificationJobCtlTraceStep {
+        action: step.action.as_ref().map(|action| match action {
+            CtlEvidenceAction::Model(action) => VerificationJobCtlAction::Model(action.clone()),
+            CtlEvidenceAction::TerminalSelfLoop => VerificationJobCtlAction::TerminalSelfLoop,
+        }),
+        state: step.state.clone(),
+    }
+}
+
+fn write_ctl_details(out: &mut String, ctl: &VerificationJobCtlDetails) {
+    out.push('{');
+    field_bool(
+        out,
+        "initial_states_complete",
+        ctl.initial_states_complete,
+        true,
+    );
+    field_u64(out, "retained_states", ctl.retained_states as u64, false);
+    field_u64(
+        out,
+        "definitely_satisfying_states",
+        ctl.definitely_satisfying_states as u64,
+        false,
+    );
+    field_u64(
+        out,
+        "possibly_satisfying_states",
+        ctl.possibly_satisfying_states as u64,
+        false,
+    );
+    out.push_str(",\"initial\":[");
+    for (index, initial) in ctl.initial.iter().enumerate() {
+        if index != 0 {
+            out.push(',');
+        }
+        out.push('{');
+        field_u64(out, "state_index", initial.state_index as u64, true);
+        field_string(out, "state", &initial.state, false);
+        field_string(out, "truth", initial.truth.as_str(), false);
+        out.push_str(",\"evidence\":");
+        match &initial.evidence {
+            Some(evidence) => write_ctl_evidence(out, evidence),
+            None => out.push_str("null"),
+        }
+        out.push('}');
+    }
+    out.push_str("]}");
+}
+
+fn write_ctl_evidence(out: &mut String, evidence: &VerificationJobCtlEvidence) {
+    match evidence {
+        VerificationJobCtlEvidence::Finite { trace } => {
+            out.push('{');
+            field_string(out, "kind", "finite", true);
+            out.push_str(",\"trace\":");
+            write_ctl_trace(out, trace);
+            out.push('}');
+        }
+        VerificationJobCtlEvidence::Lasso { trace, cycle_start } => {
+            out.push('{');
+            field_string(out, "kind", "lasso", true);
+            field_u64(out, "cycle_start", *cycle_start as u64, false);
+            out.push_str(",\"trace\":");
+            write_ctl_trace(out, trace);
+            out.push('}');
+        }
+    }
+}
+
+fn write_ctl_trace(out: &mut String, trace: &[VerificationJobCtlTraceStep]) {
+    out.push('[');
+    for (index, step) in trace.iter().enumerate() {
+        if index != 0 {
+            out.push(',');
+        }
+        out.push('{');
+        field_name(out, "action", true);
+        match &step.action {
+            None => out.push_str("null"),
+            Some(VerificationJobCtlAction::Model(action)) => write_json_string(out, action),
+            Some(VerificationJobCtlAction::TerminalSelfLoop) => {
+                write_json_string(out, "<terminal-self-loop>")
+            }
+        }
+        field_string(out, "state", &step.state, false);
+        out.push('}');
+    }
+    out.push(']');
+}
+
+fn field_bool(out: &mut String, name: &str, value: bool, first: bool) {
+    field_name(out, name, first);
+    out.push_str(if value { "true" } else { "false" });
 }
 
 fn field_name(out: &mut String, name: &str, first: bool) {
