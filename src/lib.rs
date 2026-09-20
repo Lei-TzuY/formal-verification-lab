@@ -73,6 +73,7 @@ pub mod temporal_parse;
 pub mod temporal_report;
 mod verification_action_temporal;
 mod verification_ctl;
+mod verification_mu;
 pub mod verification_execution;
 pub mod verification_job;
 pub mod verification_job_run;
@@ -306,11 +307,12 @@ pub use verification_result::{
     VerificationJobCtlEvidence, VerificationJobCtlInitial, VerificationJobCtlTraceStep,
     VerificationJobCtlTruth, VerificationJobCutoff, VerificationJobCutoffKind,
     VerificationJobCutoffStage, VerificationJobEvidence, VerificationJobLimits,
+    VerificationJobMuDetails, VerificationJobMuInitial, VerificationJobMuTruth,
     VerificationJobOutcome, VerificationJobResultEnvelope, VerificationJobSafetyTraceStep,
     VerificationJobStateTraceStep, VerificationJobTraceStep,
     VERIFICATION_JOB_CTL_RESULT_SCHEMA_VERSION, VERIFICATION_JOB_EXACT_STATE_RESULT_SCHEMA_VERSION,
-    VERIFICATION_JOB_HETEROGENEOUS_RESULT_SCHEMA_VERSION, VERIFICATION_JOB_RESULT_SCHEMA_VERSION,
-    VERIFICATION_JOB_SAFETY_RESULT_SCHEMA_VERSION,
+    VERIFICATION_JOB_HETEROGENEOUS_RESULT_SCHEMA_VERSION, VERIFICATION_JOB_MU_RESULT_SCHEMA_VERSION,
+    VERIFICATION_JOB_RESULT_SCHEMA_VERSION, VERIFICATION_JOB_SAFETY_RESULT_SCHEMA_VERSION,
 };
 pub use verification_suite::{
     parse_verification_suite, VerificationExpectedOutcome, VerificationSuite,
