@@ -2,8 +2,7 @@ use formal_verification_lab::{
     check_declarative_mu_text, check_declarative_mu_text_with_limits,
     check_declarative_mu_with_limits, evaluate_mu_with_limits, parse_declarative_document,
     parse_mu_formula, render_bounded_declarative_mu_report, BoundedMuStatus, BoundedMuTruth,
-    BoundedOutcome, DeclarativeMuError, DeclarativeMuStatus, ExplorationLimits,
-    InconclusiveReason,
+    BoundedOutcome, DeclarativeMuError, DeclarativeMuStatus, ExplorationLimits, InconclusiveReason,
 };
 use std::fs;
 use std::path::PathBuf;
@@ -319,14 +318,7 @@ fn built_binary_mu_file_preserves_complete_path_and_bounded_exit_contract() {
     assert!(zero_stdout.contains("initial states complete: false"));
 
     let unknown = Command::new(binary)
-        .args([
-            "mu",
-            "file",
-            path,
-            r#""missing""#,
-            "--max-states",
-            "0",
-        ])
+        .args(["mu", "file", path, r#""missing""#, "--max-states", "0"])
         .output()
         .unwrap();
     assert_eq!(unknown.status.code(), Some(2));
