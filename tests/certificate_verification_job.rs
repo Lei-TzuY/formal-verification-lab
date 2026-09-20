@@ -169,8 +169,20 @@ fn loaded_bad_certificate_is_rejected_not_error() {
     );
     assert_eq!(version.envelope.certificate_schema_version, Some(2));
 
-    fs::write(&certificate_path, original.replace("explored_transitions 3", "explored_transitions 4"))
-        .unwrap_or(());
+    let tampered_accounting = original.replacen("accounting 3 3 ", "accounting 3 4 ", 1);
+    assert_ne!(tampered_accounting, original);
+    fs::write(&certificate_path, tampered_accounting).unwrap();
+    let accounting = run_certificate_verification_job_json(&manifest);
+    assert_eq!(
+        accounting.envelope.outcome,
+        CertificateVerificationJobOutcome::Rejected
+    );
+    assert!(accounting
+        .envelope
+        .message
+        .as_deref()
+        .is_some_and(|message| message.contains("canonical evaluation")));
+
     fs::remove_dir_all(root).unwrap();
 }
 
