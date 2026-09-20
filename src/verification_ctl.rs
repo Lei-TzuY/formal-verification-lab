@@ -70,7 +70,7 @@ fn has_model_limits(limits: crate::checker::ExplorationLimits) -> bool {
     limits.max_states.is_some() || limits.max_transitions.is_some() || limits.max_depth.is_some()
 }
 
-fn validate_ctl_job(job: &VerificationJob) -> Result<(), String> {
+pub(crate) fn validate_ctl_job(job: &VerificationJob) -> Result<(), String> {
     if !job.weak_fair_actions().is_empty() || !job.strong_fair_actions().is_empty() {
         return Err(
             "ctl verification jobs do not support weak-fair-action or strong-fair-action directives"
