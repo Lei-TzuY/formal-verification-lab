@@ -158,7 +158,11 @@ use formal_verification_lab::temporal_report::{
 use formal_verification_lab::verification_job_run::{
     load_verification_job, run_verification_job_json,
 };
-use formal_verification_lab::{parse_declarative_document, parse_declarative_model};
+use formal_verification_lab::{
+    create_declarative_mu_parity_certificate, parse_declarative_document,
+    parse_declarative_model, parse_declarative_mu_parity_certificate,
+    render_declarative_mu_parity_certificate, verify_declarative_mu_parity_certificate,
+};
 use std::env;
 use std::fs;
 use std::process::ExitCode;
@@ -1530,11 +1534,64 @@ fn mu_command(args: &[String]) -> Result<ExitCode, String> {
         [command, path, expression, option_args @ ..] if command == "file" => {
             run_mu_file(path, expression, option_args)
         }
+        [command, action, model_path, expression, certificate_path]
+            if command == "certificate" && action == "create" =>
+        {
+            run_mu_certificate_create(model_path, expression, certificate_path)
+        }
+        [command, action, model_path, expression, certificate_path]
+            if command == "certificate" && action == "verify" =>
+        {
+            run_mu_certificate_verify(model_path, expression, certificate_path)
+        }
         [query, ..] => Err(format!(
-            "unknown mu-calculus query '{query}'; expected 'file <path> <expression> [--backend <fixpoint|parity>] [limits]'"
+            "unknown mu-calculus query '{query}'; expected 'file <path> <expression> [--backend <fixpoint|parity>] [limits]', 'certificate create <model-path> <expression> <certificate-path>', or 'certificate verify <model-path> <expression> <certificate-path>'"
         )),
         _ => Err(usage()),
     }
+}
+
+fn run_mu_certificate_create(
+    model_path: &str,
+    expression: &str,
+    certificate_path: &str,
+) -> Result<ExitCode, String> {
+    let input = fs::read_to_string(model_path)
+        .map_err(|error| format!("failed to read declarative model '{model_path}': {error}"))?;
+    let document = parse_declarative_document(&input).map_err(|error| error.to_string())?;
+    let certificate = create_declarative_mu_parity_certificate(&document, expression)
+        .map_err(|error| error.to_string())?;
+    let rendered = render_declarative_mu_parity_certificate(&certificate);
+    fs::write(certificate_path, rendered)
+        .map_err(|error| format!("failed to write mu parity certificate '{certificate_path}': {error}"))?;
+
+    println!("MU PARITY CERTIFICATE: WRITTEN");
+    println!("model: {}", document.model().name());
+    println!("formula: {}", certificate.formula);
+    println!("certificate: {certificate_path}");
+    Ok(ExitCode::SUCCESS)
+}
+
+fn run_mu_certificate_verify(
+    model_path: &str,
+    expression: &str,
+    certificate_path: &str,
+) -> Result<ExitCode, String> {
+    let input = fs::read_to_string(model_path)
+        .map_err(|error| format!("failed to read declarative model '{model_path}': {error}"))?;
+    let document = parse_declarative_document(&input).map_err(|error| error.to_string())?;
+    let certificate_text = fs::read_to_string(certificate_path)
+        .map_err(|error| format!("failed to read mu parity certificate '{certificate_path}': {error}"))?;
+    let certificate = parse_declarative_mu_parity_certificate(&certificate_text)
+        .map_err(|error| error.to_string())?;
+    verify_declarative_mu_parity_certificate(&document, expression, &certificate)
+        .map_err(|error| error.to_string())?;
+
+    println!("MU PARITY CERTIFICATE: VERIFIED");
+    println!("model: {}", document.model().name());
+    println!("formula: {}", certificate.formula);
+    println!("certificate: {certificate_path}");
+    Ok(ExitCode::SUCCESS)
 }
 
 fn run_mu_file(path: &str, expression: &str, option_args: &[String]) -> Result<ExitCode, String> {
@@ -2018,7 +2075,7 @@ fn status_exit_code(status: VerificationStatus) -> ExitCode {
 }
 
 fn usage() -> String {
-    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | scc file <path> [--max-states N] [--max-transitions N] [--max-depth N] | scc job <manifest-path> [--format json] | eventually <counter-three|counter-four|traffic-never> | respond <request-grant|request-grant-unfair|request-grant-terminal> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | respond <dual-grant|dual-grant-unfair-b|dual-grant-terminal-b> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | monitor <session-ok|session-double-open|session-stuck|session-unfair-close|session-open-terminal> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | buchi <pulses|pulses-unfair|finite-ignore|finite-strict> [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal <request-grant|request-grant-unfair|pulses|pulses-unfair> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal check <request-grant|request-grant-unfair|pulses|pulses-unfair> <expression> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal file <path> <expression> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal multi-file <model-path> <property-path> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal job <manifest-path> | state file <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition file <path> <reachable|all-eventually> <proposition> [--max-states N] [--max-transitions N] [--max-depth N] | proposition expr <path> <reachable|all-eventually> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition always <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | ctl file <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | mu file <path> <expression> [--backend <fixpoint|parity>] [--max-states N] [--max-transitions N] [--max-depth N]]"
+    "usage: fvlab [list | run <counter|mutex-bug|traffic-light|peterson|peterson-bug|commuting-counters> [--max-states N] [--max-transitions N] [--max-depth N] | reduce commuting-counters | reach <counter-three|counter-four> | deadlock <counter-terminal-ok|counter-terminal-forbidden> | scc <counter|traffic-light> | scc file <path> [--max-states N] [--max-transitions N] [--max-depth N] | scc job <manifest-path> [--format json] | eventually <counter-three|counter-four|traffic-never> | respond <request-grant|request-grant-unfair|request-grant-terminal> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | respond <dual-grant|dual-grant-unfair-b|dual-grant-terminal-b> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | monitor <session-ok|session-double-open|session-stuck|session-unfair-close|session-open-terminal> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | buchi <pulses|pulses-unfair|finite-ignore|finite-strict> [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal <request-grant|request-grant-unfair|pulses|pulses-unfair> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal check <request-grant|request-grant-unfair|pulses|pulses-unfair> <expression> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal file <path> <expression> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal multi-file <model-path> <property-path> [--weak-fair-action ACTION]... [--strong-fair-action ACTION]... [--max-model-states N] [--max-model-transitions N] [--max-model-depth N] [--max-product-states N] [--max-product-transitions N] [--max-product-depth N] | temporal job <manifest-path> | state file <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition file <path> <reachable|all-eventually> <proposition> [--max-states N] [--max-transitions N] [--max-depth N] | proposition expr <path> <reachable|all-eventually> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | proposition always <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | ctl file <path> <expression> [--max-states N] [--max-transitions N] [--max-depth N] | mu file <path> <expression> [--backend <fixpoint|parity>] [--max-states N] [--max-transitions N] [--max-depth N] | mu certificate create <model-path> <expression> <certificate-path> | mu certificate verify <model-path> <expression> <certificate-path>]"
         .to_owned()
 }
 
