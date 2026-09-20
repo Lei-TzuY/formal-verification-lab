@@ -45,7 +45,10 @@ impl<V: fmt::Debug> fmt::Display for MuParityError<V> {
             Self::Validation(error) => write!(f, "{error}"),
             Self::Model(error) => write!(f, "mu-calculus parity model capture failed: {error}"),
             Self::SnapshotInvariant => {
-                write!(f, "mu-calculus parity reachable-graph snapshot invariant failed")
+                write!(
+                    f,
+                    "mu-calculus parity reachable-graph snapshot invariant failed"
+                )
             }
             Self::GameSizeOverflow => write!(f, "mu-calculus parity evaluation game is too large"),
             Self::Game(error) => write!(f, "mu-calculus parity game construction failed: {error}"),
@@ -99,10 +102,7 @@ enum EvalNode<A> {
     Or { left: usize, right: usize },
     Diamond { inner: usize },
     Box { inner: usize },
-    Fix {
-        body: usize,
-        priority: usize,
-    },
+    Fix { body: usize, priority: usize },
 }
 
 pub fn evaluate_mu_via_parity<S, A, V, F>(
@@ -121,13 +121,7 @@ where
 
     let mut nodes = Vec::new();
     let mut bindings = Vec::new();
-    let root = lower_formula(
-        formula,
-        true,
-        &mut bindings,
-        None,
-        &mut nodes,
-    );
+    let root = lower_formula(formula, true, &mut bindings, None, &mut nodes);
     debug_assert!(bindings.is_empty());
 
     let game = build_evaluation_game(&captured.graph, &nodes, &atom_holds)?;
@@ -222,9 +216,7 @@ where
                 .expect("validated mu-calculus variables are lexically bound");
             push_node(nodes, EvalNode::Var { binder })
         }
-        MuFormula::Not(inner) => {
-            lower_formula(inner, !positive, bindings, parent_fixpoint, nodes)
-        }
+        MuFormula::Not(inner) => lower_formula(inner, !positive, bindings, parent_fixpoint, nodes),
         MuFormula::And(left, right) => {
             let left = lower_formula(left, positive, bindings, parent_fixpoint, nodes);
             let right = lower_formula(right, positive, bindings, parent_fixpoint, nodes);
