@@ -11,9 +11,7 @@ use formal_verification_lab::buchi_report::{
 };
 use formal_verification_lab::checker::{check_with_limits, ExplorationLimits, VerificationStatus};
 use formal_verification_lab::combined_fairness::FairnessProfile;
-use formal_verification_lab::declarative_ctl::{
-    check_declarative_ctl_text, DeclarativeCtlStatus,
-};
+use formal_verification_lab::declarative_ctl::{check_declarative_ctl_text, DeclarativeCtlStatus};
 use formal_verification_lab::declarative_ctl_report::render_declarative_ctl_report;
 use formal_verification_lab::eventuality::{
     check_eventuality, EventualityProperty, EventualityStatus,
@@ -1457,9 +1455,7 @@ fn run_state_file(
 
 fn ctl_command(args: &[String]) -> Result<ExitCode, String> {
     match args {
-        [command, path, expression] if command == "file" => {
-            run_ctl_file(path, expression)
-        }
+        [command, path, expression] if command == "file" => run_ctl_file(path, expression),
         [query, ..] => Err(format!(
             "unknown CTL query '{query}'; expected 'file <path> <expression>'"
         )),
