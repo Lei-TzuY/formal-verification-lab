@@ -67,14 +67,10 @@ pub enum MuParityMove {
     OutcomeSelfLoop,
     BooleanLeft,
     BooleanRight,
-    ModalSuccessor {
-        target_state_index: usize,
-    },
+    ModalSuccessor { target_state_index: usize },
     ModalTerminalSelfLoop,
     FixpointBody,
-    VariableReturn {
-        binder_formula_node: usize,
-    },
+    VariableReturn { binder_formula_node: usize },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -153,7 +149,10 @@ impl<V: fmt::Debug> fmt::Display for MuParityError<V> {
             Self::GameSizeOverflow => write!(f, "mu-calculus parity evaluation game is too large"),
             Self::Game(error) => write!(f, "mu-calculus parity game construction failed: {error}"),
             Self::Strategy { player, error } => {
-                write!(f, "mu-calculus parity {player:?} strategy verification failed: {error}")
+                write!(
+                    f,
+                    "mu-calculus parity {player:?} strategy verification failed: {error}"
+                )
             }
         }
     }
@@ -721,10 +720,7 @@ fn max_alternation_level<A>(nodes: &[EvalNode<A>]) -> usize {
         .unwrap_or(0)
 }
 
-fn max_fixpoint_priority<A>(
-    nodes: &[EvalNode<A>],
-    max_alternation_level: usize,
-) -> usize {
+fn max_fixpoint_priority<A>(nodes: &[EvalNode<A>], max_alternation_level: usize) -> usize {
     nodes
         .iter()
         .filter_map(|node| match node {
@@ -806,14 +802,8 @@ fn describe_strategy<S, A>(
             target.map(|target| MuParityStrategyChoice {
                 from: positions[vertex].clone(),
                 to: positions[target].clone(),
-                semantic_move: classify_semantic_move(
-                    graph,
-                    nodes,
-                    node_count,
-                    vertex,
-                    target,
-                )
-                .expect("solver strategies only select canonical evaluation-game edges"),
+                semantic_move: classify_semantic_move(graph, nodes, node_count, vertex, target)
+                    .expect("solver strategies only select canonical evaluation-game edges"),
             })
         })
         .collect();
