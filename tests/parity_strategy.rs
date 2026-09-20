@@ -36,12 +36,7 @@ fn solver_emits_certified_deterministic_strategies_without_changing_regions() {
 
 #[test]
 fn verifier_fails_closed_on_missing_unexpected_invalid_and_out_of_region_choices() {
-    let single = ParityGame::new(
-        vec![ParityPlayer::Even],
-        vec![0],
-        vec![vec![0]],
-    )
-    .unwrap();
+    let single = ParityGame::new(vec![ParityPlayer::Even], vec![0], vec![vec![0]]).unwrap();
     let missing = ParityStrategy::new(ParityPlayer::Even, vec![0], vec![None]);
     assert_eq!(
         verify_parity_strategy(&single, &missing),
@@ -51,12 +46,7 @@ fn verifier_fails_closed_on_missing_unexpected_invalid_and_out_of_region_choices
         })
     );
 
-    let opponent_owned = ParityGame::new(
-        vec![ParityPlayer::Odd],
-        vec![0],
-        vec![vec![0]],
-    )
-    .unwrap();
+    let opponent_owned = ParityGame::new(vec![ParityPlayer::Odd], vec![0], vec![vec![0]]).unwrap();
     let unexpected = ParityStrategy::new(ParityPlayer::Even, vec![0], vec![Some(0)]);
     assert_eq!(
         verify_parity_strategy(&opponent_owned, &unexpected),
@@ -72,8 +62,7 @@ fn verifier_fails_closed_on_missing_unexpected_invalid_and_out_of_region_choices
         vec![vec![0], vec![1]],
     )
     .unwrap();
-    let invalid_edge =
-        ParityStrategy::new(ParityPlayer::Even, vec![0, 1], vec![Some(1), None]);
+    let invalid_edge = ParityStrategy::new(ParityPlayer::Even, vec![0, 1], vec![Some(1), None]);
     assert_eq!(
         verify_parity_strategy(&invalid_edge_game, &invalid_edge),
         Err(ParityStrategyError::InvalidChoiceEdge {
@@ -97,8 +86,7 @@ fn verifier_fails_closed_on_missing_unexpected_invalid_and_out_of_region_choices
         })
     );
 
-    let outside_choice =
-        ParityStrategy::new(ParityPlayer::Odd, vec![1], vec![Some(0), Some(1)]);
+    let outside_choice = ParityStrategy::new(ParityPlayer::Odd, vec![1], vec![Some(0), Some(1)]);
     assert_eq!(
         verify_parity_strategy(&leaving_game, &outside_choice),
         Err(ParityStrategyError::ChoiceOutsideWinningRegion {
@@ -125,12 +113,7 @@ fn verifier_rejects_opponent_escape_and_losing_recurrent_cycles_symmetrically() 
         })
     );
 
-    let odd_cycle = ParityGame::new(
-        vec![ParityPlayer::Even],
-        vec![1],
-        vec![vec![0]],
-    )
-    .unwrap();
+    let odd_cycle = ParityGame::new(vec![ParityPlayer::Even], vec![1], vec![vec![0]]).unwrap();
     let fake_even = ParityStrategy::new(ParityPlayer::Even, vec![0], vec![Some(0)]);
     assert_eq!(
         verify_parity_strategy(&odd_cycle, &fake_even),
@@ -141,12 +124,7 @@ fn verifier_rejects_opponent_escape_and_losing_recurrent_cycles_symmetrically() 
         })
     );
 
-    let even_cycle = ParityGame::new(
-        vec![ParityPlayer::Odd],
-        vec![0],
-        vec![vec![0]],
-    )
-    .unwrap();
+    let even_cycle = ParityGame::new(vec![ParityPlayer::Odd], vec![0], vec![vec![0]]).unwrap();
     let fake_odd = ParityStrategy::new(ParityPlayer::Odd, vec![0], vec![Some(0)]);
     assert_eq!(
         verify_parity_strategy(&even_cycle, &fake_odd),
@@ -213,7 +191,8 @@ fn generated_two_vertex_games_certify_both_m81_winning_regions() {
                         for vertex in 0..2 {
                             let even_choice = solved.even_strategy().choice(vertex);
                             let odd_choice = solved.odd_strategy().choice(vertex);
-                            if solved.even_wins(vertex) && game.owner(vertex) == ParityPlayer::Even {
+                            if solved.even_wins(vertex) && game.owner(vertex) == ParityPlayer::Even
+                            {
                                 assert!(even_choice.is_some());
                             } else {
                                 assert!(even_choice.is_none());
