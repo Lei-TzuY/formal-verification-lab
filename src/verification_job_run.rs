@@ -468,6 +468,7 @@ fn proposition_expression_envelope(
         },
         cutoff: result.outcome.inconclusive_reason().map(model_cutoff),
         ctl: None,
+        mu: None,
         evidence: result
             .evidence
             .as_ref()
