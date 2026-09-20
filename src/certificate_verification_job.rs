@@ -211,7 +211,7 @@ fn required(
 }
 
 fn quote(value: &str) -> String {
-    let mut output = String::from(""");
+    let mut output = String::from("\"");
     for ch in value.chars() {
         match ch {
             '\\' => output.push_str("\\\\"),
