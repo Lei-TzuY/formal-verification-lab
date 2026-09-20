@@ -184,8 +184,9 @@ pub use recurrence::{
     RecurrenceAnalysis, RecurrenceError, RecurrenceStatus, StronglyConnectedComponent,
 };
 pub use reduction::{
-    audit_sleep_set_reduction, IndependenceError, IndependenceRelation, ReducedExploration,
-    ReductionAudit, ReductionAuditError,
+    audit_sleep_set_reduction, check_validated_sleep_set_reduction, validate_independence,
+    IndependenceError, IndependenceRelation, IndependenceValidationError, ReducedExploration,
+    ReductionAudit, ReductionAuditError, ValidatedIndependenceRelation,
 };
 pub use response::{
     check_response, check_response_with_fairness_profile,
