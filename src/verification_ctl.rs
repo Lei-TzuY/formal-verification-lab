@@ -3,10 +3,10 @@ use crate::ctl_bounded::BoundedCtlStatus;
 use crate::declarative_ctl::{
     check_declarative_ctl_text, check_declarative_ctl_text_with_limits, DeclarativeCtlStatus,
 };
+use crate::parse_declarative_document;
 use crate::verification_job::VerificationJob;
 use crate::verification_job_run::VerificationJobJsonRun;
 use crate::verification_result::{VerificationJobOutcome, VerificationJobResultEnvelope};
-use crate::parse_declarative_document;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -34,12 +34,9 @@ pub(crate) fn run_ctl_job_json(
 
     let model_limits = job.model_limits();
     let (envelope, exit_code) = if has_model_limits(model_limits) {
-        let result = check_declarative_ctl_text_with_limits(
-            &document,
-            &property_input,
-            model_limits,
-        )
-        .map_err(|error| error.to_string())?;
+        let result =
+            check_declarative_ctl_text_with_limits(&document, &property_input, model_limits)
+                .map_err(|error| error.to_string())?;
         let exit_code = match result.evaluation.outcome {
             BoundedOutcome::Conclusive(BoundedCtlStatus::Satisfied) => 0,
             BoundedOutcome::Conclusive(BoundedCtlStatus::Violated) => 14,
@@ -52,8 +49,8 @@ pub(crate) fn run_ctl_job_json(
         );
         (envelope, exit_code)
     } else {
-        let result =
-            check_declarative_ctl_text(&document, &property_input).map_err(|error| error.to_string())?;
+        let result = check_declarative_ctl_text(&document, &property_input)
+            .map_err(|error| error.to_string())?;
         let exit_code = match result.status {
             DeclarativeCtlStatus::Satisfied => 0,
             DeclarativeCtlStatus::Violated => 14,
