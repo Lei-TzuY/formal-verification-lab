@@ -97,12 +97,27 @@ impl FixpointKind {
 enum EvalNode<A> {
     True,
     False,
-    Literal { atom: A, positive: bool },
-    Var { binder: usize },
-    And { left: usize, right: usize },
-    Or { left: usize, right: usize },
-    Diamond { inner: usize },
-    Box { inner: usize },
+    Literal {
+        atom: A,
+        positive: bool,
+    },
+    Var {
+        binder: usize,
+    },
+    And {
+        left: usize,
+        right: usize,
+    },
+    Or {
+        left: usize,
+        right: usize,
+    },
+    Diamond {
+        inner: usize,
+    },
+    Box {
+        inner: usize,
+    },
     Fix {
         body: usize,
         kind: FixpointKind,
@@ -139,12 +154,7 @@ where
         })
         .max()
         .unwrap_or(0);
-    let game = build_evaluation_game(
-        &captured.graph,
-        &nodes,
-        max_alternation_level,
-        &atom_holds,
-    )?;
+    let game = build_evaluation_game(&captured.graph, &nodes, max_alternation_level, &atom_holds)?;
     let solution = solve_parity_game(&game);
     let node_count = nodes.len();
 
