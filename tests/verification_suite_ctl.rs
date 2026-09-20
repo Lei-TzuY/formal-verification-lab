@@ -143,7 +143,7 @@ fn generic_suite_runner_preserves_schema_v3_ctl_envelopes_and_heterogeneous_orde
 
     let json = run.to_json();
     let ctl_details = run.envelope.jobs[1].result.ctl.as_ref().unwrap();
-    assert!(!ctl_details.initial_states_complete);
+    assert!(ctl_details.initial_states_complete);
     assert_eq!(
         ctl_details.initial[0].truth,
         VerificationJobCtlTruth::Unknown
