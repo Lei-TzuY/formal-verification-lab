@@ -218,7 +218,10 @@ fn bounded_ctl_job_preserves_early_conclusive_witness_and_counterexample() {
     );
     let satisfied = run_verification_job_json(&manifest);
     assert_eq!(satisfied.exit_code, 0);
-    assert_eq!(satisfied.envelope.outcome, VerificationJobOutcome::Satisfied);
+    assert_eq!(
+        satisfied.envelope.outcome,
+        VerificationJobOutcome::Satisfied
+    );
     let ctl = satisfied.envelope.ctl.as_ref().unwrap();
     assert_eq!(ctl.initial[0].truth, VerificationJobCtlTruth::True);
     assert!(matches!(
