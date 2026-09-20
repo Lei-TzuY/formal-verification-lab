@@ -21,6 +21,7 @@ use crate::verification_execution::{
     execute_multi_response, MultiResponseExecutionConfig, MultiResponseExecutionResult,
 };
 use crate::verification_job::{parse_verification_job, VerificationJob, VerificationJobAnalysis};
+use crate::verification_mu::{mu_error, run_mu_job_json};
 use crate::verification_result::{
     VerificationJobAccounting, VerificationJobCutoff, VerificationJobCutoffKind,
     VerificationJobCutoffStage, VerificationJobEvidence, VerificationJobOutcome,
@@ -139,6 +140,10 @@ pub fn run_verification_job_json(manifest_path: impl AsRef<Path>) -> Verificatio
         VerificationJobAnalysis::Ctl => match run_ctl_job_json(manifest_path, job) {
             Ok(run) => run,
             Err(error) => error_run(ctl_error(error)),
+        },
+        VerificationJobAnalysis::MuCalculus => match run_mu_job_json(manifest_path, job) {
+            Ok(run) => run,
+            Err(error) => error_run(mu_error(error)),
         },
     }
 }
@@ -463,6 +468,7 @@ fn proposition_expression_envelope(
         },
         cutoff: result.outcome.inconclusive_reason().map(model_cutoff),
         ctl: None,
+        mu: None,
         evidence: result
             .evidence
             .as_ref()

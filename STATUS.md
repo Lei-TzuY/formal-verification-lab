@@ -98,38 +98,41 @@ M77 adds conservative lower/upper modal μ-calculus semantics over canonical bou
 
 ## Milestone 78 — bounded declarative modal mu-calculus file frontend
 
-**Status: implementation candidate complete on PR #78.**
+**Status: sealed in `main` at `903d5eeb94526c4769ad50b7351ff151bfc45d5a`.**
 
-M78 exposes the sealed M77 proof boundary through the existing M76 parser, proposition binder, report style, and direct file command without duplicating bounded semantics.
+M78 exposes the sealed M77 proof boundary through the M76 parser, proposition binder, deterministic reporting, and direct `fvlab mu file` model-space limits without duplicating μ semantics. The no-option complete path remains M76-compatible; bounded execution preserves lower/upper state sets, per-initial three-valued truth, cutoff provenance, graph accounting, and fixpoint-iteration observations. Exact closure candidate `fa2b9362246b774fbec1f1a2a130f0e3aa46e861` passed CI #645 and Bounded state-property CLI #495 before integration.
+
+## Milestone 79 — reproducible modal mu-calculus verification jobs
+
+**Status: implementation candidate complete on PR #79.**
+
+M79 promotes modal μ-calculus into the existing heterogeneous verification-job protocol without adding a second parser, evaluator, or runner. `analysis "mu-calculus"` preserves manifest-relative model/property loading, rejects fairness and product-only budgets before referenced-file I/O, delegates complete jobs to M76 and model-limited jobs to M77, and normalizes results into schema-v4 envelopes.
 
 Implemented contract:
 
-- typed/text bounded declarative adapters preserve M76 parse → lexical/monotonicity validation → proposition resolution order, then delegate exclusively to `evaluate_mu_with_limits`;
-- unknown propositions still fail before bounded graph capture, including zero-state budgets;
-- unbounded/generous bounded execution collapses to M76 complete execution for state sets, all-initial status, graph accounting, and fixpoint-iteration observations;
-- deterministic bounded reports include canonical formula, original state/transition/depth cutoff reason, complete-initial flag, discovered/checked/transition/depth accounting, fixpoint iterations, lower/upper satisfying-state counts, and per-initial True/False/Unknown;
-- only proven terminals are reported as totalized; cut states remain semantically unknown;
-- `fvlab mu file <path> <expression>` preserves the historical M76 complete path when no limit option is present;
-- supplying `--max-states`, `--max-transitions`, or `--max-depth` routes through M77, with exit 0 conclusive satisfied, 15 conclusive violated, 3 inconclusive, and 2 malformed/invalid input;
-- regressions cover direct-vs-M77 equality, unbounded collapse, exact-bound completion, all three cutoff classes, retained conclusive existential satisfaction, unknown proposition fail-closed behavior, proven-terminal totalization, zero-state budgets, complete/no-option compatibility, and built-binary exits/reporting.
+- complete results remain two-valued and use the historical μ exit semantics: 0 satisfied and 15 violated;
+- bounded unresolved results remain explicit `inconclusive` with exit 3; malformed or invalid jobs use exit 2;
+- schema-v4 `mu` details preserve canonical formula, retained/lower/upper state counts, per-initial True/False/Unknown, fixpoint iterations, model accounting, and original cutoff provenance;
+- no proof witness is fabricated because the sealed M75/M77 μ authorities do not expose a proof-grade witness surface;
+- malformed formulas, non-monotone/unbound variables, unknown propositions, invalid limits, missing inputs, and model/property parse failures remain fail-closed job errors;
+- focused integration regressions compare job execution directly with the sealed M76/M77 frontends across complete, state/transition/depth-bounded, early-conclusive, and zero-state cases, and exercise the built `fvlab temporal job ... --format json` path from an unrelated working directory;
+- schema-v1/v2/v3 envelopes remain unchanged when the μ-specific field is absent.
 
-Implementation candidate `8759ba897c0eee793d24959a5547e5df71ddd96d` passed CI #643 (format, all-target build, Clippy with `-D warnings`, full tests including M78 integration/built-binary regressions, the M77 15,360-case bounded μ oracle, the M75 90,112-case CTL→μ differential, and every historical CLI gate) and Bounded state-property CLI #493. Closure metadata changes must pass the same exact-head gates before merge.
+Implementation candidate `5ca958838d713958e3f2dfee50a005e9ead6687f` passed CI #652 (format, all-target build, Clippy with `-D warnings`, full tests including M79 job regressions, the M77 15,360-case bounded μ oracle, the M75 90,112-case CTL→μ differential, and every historical CLI gate) and Bounded state-property CLI #502. Closure metadata changes must pass the same exact-head gates before merge.
 
-M78 adds no μ verification-job/suite protocol, fairness, symbolic fixpoint algorithm, proof certificate, or performance claim.
+M79 adds no μ-specific suite engine, fairness semantics, symbolic fixpoint algorithm, proof certificate, or performance claim.
 
-## Next frontier — Milestone 79: reproducible modal mu-calculus verification jobs
+## Next frontier — Milestone 80: generic modal mu-calculus suite integration audit
 
-Promote the sealed M76–M78 external μ-calculus surface into the existing heterogeneous verification-job protocol without creating another parser, evaluator, or job runner.
+Audit the sealed generic verification-suite abstraction against schema-v4 μ jobs before adding any family-specific orchestration. Existing architecture already suggests that no production μ suite engine should be necessary: suites execute `run_verification_job_json`, retain the complete nested job envelope, aggregate only canonical four-state outcomes, and compare expectations only against `VerificationJobOutcome`.
 
 Acceptance criteria:
 
-- add μ-calculus as a first-class verification-job analysis family carrying one textual expression plus the existing model-space limits;
-- parse/validate/bind through the sealed M76 declarative frontend and execute complete/bounded cases exclusively through M75/M77 authorities;
-- preserve manifest-relative model loading and the existing deterministic job-runner error boundary;
-- extend the machine-readable result schema with explicit μ-calculus details: canonical formula, complete/bounded outcome, lower/upper satisfying-state counts, per-initial True/False/Unknown, cutoff provenance, graph accounting, and fixpoint-iteration observations;
-- keep complete results two-valued while bounded incomplete results remain explicitly three-valued/inconclusive;
-- make malformed formula, unbound/non-monotone variable, unknown proposition, bad limit, missing model, and model parse errors fail closed as ordinary job error envelopes;
-- add direct single-job vs job-runner differential tests, complete/bounded/zero-budget cases, all cutoff classes, deterministic JSON, and built `fvlab temporal job` or the repository's canonical job CLI integration path as appropriate to the existing protocol;
-- do not add a μ-specific suite engine: generic verification suites should consume the new job envelope in a later integration audit or dedicated slice;
-- keep fairness, symbolic algorithms, proof certificates, and performance claims out of this phase;
-- preserve M78 built-binary coverage, the M77 15,360-case oracle, M75 90,112-case CTL→μ differential, and every historical verification/suite/reduction/fairness/CTL gate.
+- prove raw suites preserve schema-v4 μ envelopes exactly against direct single-job execution;
+- prove `satisfied`, `violated`, `inconclusive`, and `error` remain ordinary generic suite outcomes for μ jobs;
+- prove expectation mode compares only explicit expected outcomes while preserving full μ state/count/cutoff/fixpoint details;
+- prove deterministic heterogeneous ordering when μ jobs are mixed with existing verification families;
+- prove built `fvlab-suite` raw and expectation JSON embed the direct μ job payloads unchanged;
+- if the generic abstraction already satisfies these properties, do not create a μ-specific suite engine; record the architecture result and carry executable integration evidence with the next substantive production milestone rather than opening a test-only micro-PR;
+- preserve every historical verification/suite/structural/reduction/fairness/CTL/μ gate.
+

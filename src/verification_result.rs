@@ -6,7 +6,9 @@ use crate::declarative_ctl::{
     BoundedDeclarativeCtlResult, DeclarativeCtlResult, DeclarativeCtlStatus,
 };
 use crate::declarative_deadlock::BoundedDeclarativeDeadlockResult;
+use crate::declarative_mu::{BoundedDeclarativeMuResult, DeclarativeMuResult, DeclarativeMuStatus};
 use crate::exact_state::{BoundedExactStateResult, ExactStateEvidence, ExactStateStatus};
+use crate::mu_bounded::{BoundedMuStatus, BoundedMuTruth};
 use crate::multi_response::{
     AnalysisMultiResponseResult, BoundedMultiResponseResult, MultiObligationState,
     MultiResponseCounterexample, MultiResponseResult, MultiResponseStatus,
@@ -23,6 +25,7 @@ pub const VERIFICATION_JOB_DEADLOCK_RESULT_SCHEMA_VERSION: u32 =
 pub const VERIFICATION_JOB_EXACT_STATE_RESULT_SCHEMA_VERSION: u32 =
     VERIFICATION_JOB_HETEROGENEOUS_RESULT_SCHEMA_VERSION;
 pub const VERIFICATION_JOB_CTL_RESULT_SCHEMA_VERSION: u32 = 3;
+pub const VERIFICATION_JOB_MU_RESULT_SCHEMA_VERSION: u32 = 4;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VerificationJobOutcome {
@@ -202,6 +205,40 @@ pub struct VerificationJobCtlDetails {
     pub initial: Vec<VerificationJobCtlInitial>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VerificationJobMuTruth {
+    True,
+    False,
+    Unknown,
+}
+
+impl VerificationJobMuTruth {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::True => "true",
+            Self::False => "false",
+            Self::Unknown => "unknown",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerificationJobMuInitial {
+    pub state_index: usize,
+    pub state: String,
+    pub truth: VerificationJobMuTruth,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerificationJobMuDetails {
+    pub initial_states_complete: bool,
+    pub retained_states: usize,
+    pub definitely_satisfying_states: usize,
+    pub possibly_satisfying_states: usize,
+    pub fixpoint_iterations: usize,
+    pub initial: Vec<VerificationJobMuInitial>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum VerificationJobEvidence {
     Finite {
@@ -258,6 +295,7 @@ pub struct VerificationJobResultEnvelope {
     pub accounting: VerificationJobAccounting,
     pub cutoff: Option<VerificationJobCutoff>,
     pub ctl: Option<VerificationJobCtlDetails>,
+    pub mu: Option<VerificationJobMuDetails>,
     pub evidence: Option<VerificationJobEvidence>,
     pub error: Option<String>,
 }
@@ -296,6 +334,7 @@ impl VerificationJobResultEnvelope {
             },
             cutoff: None,
             ctl: None,
+            mu: None,
             evidence: result.counterexample.as_ref().map(convert_evidence),
             error: None,
         }
@@ -337,6 +376,7 @@ impl VerificationJobResultEnvelope {
                 .inconclusive_reason()
                 .map(|reason| cutoff(VerificationJobCutoffStage::Product, reason)),
             ctl: None,
+            mu: None,
             evidence: result.counterexample.as_ref().map(convert_evidence),
             error: None,
         }
@@ -384,6 +424,7 @@ impl VerificationJobResultEnvelope {
             },
             cutoff: result_cutoff,
             ctl: None,
+            mu: None,
             evidence: result.counterexample.as_ref().map(convert_evidence),
             error: None,
         }
@@ -418,6 +459,7 @@ impl VerificationJobResultEnvelope {
                 .inconclusive_reason()
                 .map(|reason| cutoff(VerificationJobCutoffStage::Model, reason)),
             ctl: None,
+            mu: None,
             evidence: result
                 .counterexample
                 .as_ref()
@@ -458,6 +500,7 @@ impl VerificationJobResultEnvelope {
                 .inconclusive_reason()
                 .map(|reason| cutoff(VerificationJobCutoffStage::Model, reason)),
             ctl: None,
+            mu: None,
             evidence: result
                 .witness
                 .as_ref()
@@ -499,6 +542,7 @@ impl VerificationJobResultEnvelope {
                 .inconclusive_reason()
                 .map(|reason| cutoff(VerificationJobCutoffStage::Model, reason)),
             ctl: None,
+            mu: None,
             evidence: result.evidence.as_ref().map(convert_exact_state_evidence),
             error: None,
         }
@@ -547,6 +591,7 @@ impl VerificationJobResultEnvelope {
                     })
                     .collect(),
             }),
+            mu: None,
             evidence: None,
             error: None,
         }
@@ -614,9 +659,135 @@ impl VerificationJobResultEnvelope {
                     })
                     .collect(),
             }),
+            mu: None,
             evidence: None,
             error: None,
         }
+    }
+
+    pub fn from_mu_complete(model: impl Into<String>, result: &DeclarativeMuResult) -> Self {
+        Self {
+            schema_version: VERIFICATION_JOB_MU_RESULT_SCHEMA_VERSION,
+            analysis: Some("mu-calculus".to_owned()),
+            backend: Some("mu-fixpoint".to_owned()),
+            outcome: match result.status {
+                DeclarativeMuStatus::Satisfied => VerificationJobOutcome::Satisfied,
+                DeclarativeMuStatus::Violated => VerificationJobOutcome::Violated,
+            },
+            model: Some(model.into()),
+            property: Some(result.formula.clone()),
+            weak_fair_actions: Vec::new(),
+            strong_fair_actions: Vec::new(),
+            model_limits: ExplorationLimits::unbounded().into(),
+            product_limits: ExplorationLimits::unbounded().into(),
+            accounting: model_only_accounting(
+                result.evaluation.discovered_states,
+                result.evaluation.discovered_states,
+                result.evaluation.explored_transitions,
+                result.evaluation.max_depth_reached,
+            ),
+            cutoff: None,
+            ctl: None,
+            mu: Some(VerificationJobMuDetails {
+                initial_states_complete: true,
+                retained_states: result.evaluation.reachable_states.len(),
+                definitely_satisfying_states: result.evaluation.satisfying_state_indices.len(),
+                possibly_satisfying_states: result.evaluation.satisfying_state_indices.len(),
+                fixpoint_iterations: result.evaluation.fixpoint_iterations,
+                initial: result
+                    .evaluation
+                    .initial
+                    .iter()
+                    .map(|entry| VerificationJobMuInitial {
+                        state_index: entry.state_index,
+                        state: entry.state.clone(),
+                        truth: if entry.satisfied {
+                            VerificationJobMuTruth::True
+                        } else {
+                            VerificationJobMuTruth::False
+                        },
+                    })
+                    .collect(),
+            }),
+            evidence: None,
+            error: None,
+        }
+    }
+
+    pub fn from_mu_bounded(
+        model: impl Into<String>,
+        model_limits: ExplorationLimits,
+        result: &BoundedDeclarativeMuResult,
+    ) -> Self {
+        Self {
+            schema_version: VERIFICATION_JOB_MU_RESULT_SCHEMA_VERSION,
+            analysis: Some("mu-calculus".to_owned()),
+            backend: Some("mu-fixpoint".to_owned()),
+            outcome: match &result.evaluation.outcome {
+                BoundedOutcome::Conclusive(BoundedMuStatus::Satisfied) => {
+                    VerificationJobOutcome::Satisfied
+                }
+                BoundedOutcome::Conclusive(BoundedMuStatus::Violated) => {
+                    VerificationJobOutcome::Violated
+                }
+                BoundedOutcome::Inconclusive(_) => VerificationJobOutcome::Inconclusive,
+            },
+            model: Some(model.into()),
+            property: Some(result.formula.clone()),
+            weak_fair_actions: Vec::new(),
+            strong_fair_actions: Vec::new(),
+            model_limits: model_limits.into(),
+            product_limits: ExplorationLimits::unbounded().into(),
+            accounting: model_only_accounting(
+                result.evaluation.discovered_states,
+                result.evaluation.checked_states,
+                result.evaluation.explored_transitions,
+                result.evaluation.max_depth_reached,
+            ),
+            cutoff: result
+                .evaluation
+                .outcome
+                .inconclusive_reason()
+                .map(|reason| cutoff(VerificationJobCutoffStage::Model, reason)),
+            ctl: None,
+            mu: Some(VerificationJobMuDetails {
+                initial_states_complete: result.evaluation.initial_states_complete,
+                retained_states: result.evaluation.reachable_states.len(),
+                definitely_satisfying_states: result
+                    .evaluation
+                    .definitely_satisfying_state_indices
+                    .len(),
+                possibly_satisfying_states: result
+                    .evaluation
+                    .possibly_satisfying_state_indices
+                    .len(),
+                fixpoint_iterations: result.evaluation.fixpoint_iterations,
+                initial: result
+                    .evaluation
+                    .initial
+                    .iter()
+                    .map(|entry| VerificationJobMuInitial {
+                        state_index: entry.state_index,
+                        state: entry.state.clone(),
+                        truth: match entry.truth {
+                            BoundedMuTruth::True => VerificationJobMuTruth::True,
+                            BoundedMuTruth::False => VerificationJobMuTruth::False,
+                            BoundedMuTruth::Unknown => VerificationJobMuTruth::Unknown,
+                        },
+                    })
+                    .collect(),
+            }),
+            evidence: None,
+            error: None,
+        }
+    }
+
+    pub fn mu_error(message: impl Into<String>) -> Self {
+        let mut envelope = Self::error(message);
+        envelope.schema_version = VERIFICATION_JOB_MU_RESULT_SCHEMA_VERSION;
+        envelope.analysis = Some("mu-calculus".to_owned());
+        envelope.backend = Some("mu-fixpoint".to_owned());
+        envelope
     }
 
     pub fn ctl_error(message: impl Into<String>) -> Self {
@@ -642,6 +813,7 @@ impl VerificationJobResultEnvelope {
             accounting: VerificationJobAccounting::empty(),
             cutoff: None,
             ctl: None,
+            mu: None,
             evidence: None,
             error: Some(message.into()),
         }
@@ -715,6 +887,10 @@ impl VerificationJobResultEnvelope {
         if let Some(ctl) = &self.ctl {
             out.push_str(",\"ctl\":");
             write_ctl_details(&mut out, ctl);
+        }
+        if let Some(mu) = &self.mu {
+            out.push_str(",\"mu\":");
+            write_mu_details(&mut out, mu);
         }
         out.push_str(",\"evidence\":");
         match &self.evidence {
@@ -923,6 +1099,47 @@ fn convert_ctl_step(step: &crate::ctl::CtlEvidenceStep<String>) -> VerificationJ
         }),
         state: step.state.clone(),
     }
+}
+
+fn write_mu_details(out: &mut String, mu: &VerificationJobMuDetails) {
+    out.push('{');
+    field_bool(
+        out,
+        "initial_states_complete",
+        mu.initial_states_complete,
+        true,
+    );
+    field_u64(out, "retained_states", mu.retained_states as u64, false);
+    field_u64(
+        out,
+        "definitely_satisfying_states",
+        mu.definitely_satisfying_states as u64,
+        false,
+    );
+    field_u64(
+        out,
+        "possibly_satisfying_states",
+        mu.possibly_satisfying_states as u64,
+        false,
+    );
+    field_u64(
+        out,
+        "fixpoint_iterations",
+        mu.fixpoint_iterations as u64,
+        false,
+    );
+    out.push_str(",\"initial\":[");
+    for (index, initial) in mu.initial.iter().enumerate() {
+        if index != 0 {
+            out.push(',');
+        }
+        out.push('{');
+        field_u64(out, "state_index", initial.state_index as u64, true);
+        field_string(out, "state", &initial.state, false);
+        field_string(out, "truth", initial.truth.as_str(), false);
+        out.push('}');
+    }
+    out.push_str("]}");
 }
 
 fn write_ctl_details(out: &mut String, ctl: &VerificationJobCtlDetails) {

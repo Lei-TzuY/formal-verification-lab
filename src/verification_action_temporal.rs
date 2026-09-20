@@ -113,6 +113,7 @@ fn action_temporal_envelope(
             .inconclusive_reason()
             .map(|reason| analysis_cutoff(reason.stage, reason.reason)),
         ctl: None,
+        mu: None,
         evidence: result.counterexample.as_ref().map(convert_evidence),
         error: None,
     }
