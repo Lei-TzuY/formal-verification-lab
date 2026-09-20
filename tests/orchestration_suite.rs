@@ -140,6 +140,28 @@ fn raw_orchestration_preserves_direct_family_payloads_and_order() {
 }
 
 #[test]
+fn verification_violation_and_structural_cycle_do_not_become_orchestration_failures() {
+    let root = fixture_dir("domain-outcomes");
+    let suite_path = write_fixture(&root, false);
+
+    fs::write(root.join("properties/false.mu"), "false").unwrap();
+    fs::write(
+        root.join("jobs/verify.job"),
+        "analysis \"mu-calculus\"\nmodel \"../models/system.fvl\"\nproperty \"../properties/false.mu\"\n",
+    )
+    .unwrap();
+
+    let run = run_orchestration_suite_json(&suite_path);
+    assert_eq!(run.exit_code, 0);
+    assert_eq!(run.envelope.status, OrchestrationSuiteStatus::Complete);
+    assert_eq!(run.envelope.jobs[0].result.outcome_str(), "violated");
+    assert_eq!(run.envelope.jobs[1].result.outcome_str(), "cycle_found");
+    assert_eq!(run.envelope.jobs[2].result.outcome_str(), "verified");
+
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn raw_status_distinguishes_certificate_rejection_from_execution_error() {
     let root = fixture_dir("status");
     let suite_path = write_fixture(&root, false);
