@@ -34,37 +34,44 @@ M68 promotes the old M5 safety-reduction experiment from raw-declaration-only au
 
 ## Milestone 69 — typed CTL branching-time fixpoint kernel
 
-**Status: integration candidate complete on PR #70.**
+**Status: sealed in `main` at `39d849bc6327f7d0e91628410b23046aa567dfca`.**
 
-M69 adds a parser-free typed CTL semantic authority over one complete canonical reachable graph.
+M69 adds the parser-free typed CTL semantic authority: Boolean composition plus `EX`, `AX`, `EF`, `AF`, `EG`, `AG`, `E[U]`, and `A[U]` over one complete canonical reachable graph, explicit terminal self-loop totalization, memoized fixpoint state sets, and deterministic finite/lasso evidence. Exact candidate `a38773c27ff6bcf50078e5567b2a82b54a3ec149` passed CI #588 and Bounded state-property CLI #438 before squash integration.
+
+## Milestone 70 — declarative CTL parser and file frontend
+
+**Status: implementation candidate complete on PR #71.**
+
+M70 exposes the sealed M69 authority to existing declarative named propositions without introducing a second CTL semantics.
 
 Implemented contract:
 
-- typed Boolean formulas plus `EX`, `AX`, `EF`, `AF`, `EG`, `AG`, `E[U]`, and `A[U]`;
-- explicit terminal policy: every reachable terminal is totalized with one synthetic self-loop for CTL path semantics while the original model graph remains unchanged;
-- deterministic least/greatest fixpoint evaluation over one captured `ReachableGraph`;
-- structural subformula memoization so repeated nested formulas reuse their computed state sets instead of re-running model traversal;
-- deterministic finite evidence for existential `EX`/`EF`/`E[U]` satisfaction and universal `AX`/`AG`/`A[U]` failure where the kernel can justify it directly;
-- deterministic lasso evidence for `EG` satisfaction and `AF`/`A[U]` nontermination counterevidence;
-- evidence explicitly distinguishes real model actions from synthetic terminal self-loops;
-- focused terminal, branching, nested-formula, memoization, duality, finite-evidence, and lasso regressions;
-- generated independent path-oracle coverage across all 512 directed three-state graphs: 4,096 unary proposition valuations checked across six unary CTL operators, plus 32,768 binary proposition valuations checked across both until operators.
+- deterministic textual grammar with quoted proposition atoms, `true`/`false`, `not`, `and`, `or`, `EX`, `AX`, `EF`, `AF`, `EG`, `AG`, `E[U]`, and `A[U]`;
+- explicit Boolean precedence, bracketed until forms, UTF-8 byte-positioned parse errors, escaped proposition strings, and stable fully parenthesized canonical rendering;
+- empty proposition atoms fail closed in the parser;
+- all referenced atoms are resolved against existing declarative proposition metadata before the M69 backend captures/explores the model;
+- `check_declarative_ctl` delegates semantic evaluation exclusively to M69 `evaluate_ctl`; all-initial satisfaction defines the direct query result;
+- deterministic reporting preserves complete-graph accounting, memoized-subformula counts, per-initial satisfaction, finite/lasso evidence, real model actions, and synthetic terminal-self-loop provenance;
+- direct `fvlab ctl file <model-path> <expression>` execution returns 0 for satisfied, 14 for violated, and the existing malformed-input exit 2;
+- regressions cover parser precedence/round-trip/malformed forms, unknown propositions, direct-vs-M69 equality, existential/universal branching separation, terminal totalization, nested/until semantics, and built-binary satisfied/violated/error paths.
 
-Implementation candidate `78912262f6a37733ce3e3f03b90030f86e91344f` passed CI #587 (format, all-target build, Clippy with `-D warnings`, full tests including generated CTL oracles, and every historical CLI gate) and Bounded state-property CLI #437. Closure metadata changes must pass the same exact-head gates before merge.
+Implementation candidate `62644ff99409b3a87313c63a7f4e40fc56978024` passed CI #593 (format, all-target build, Clippy with `-D warnings`, full tests including built-binary M70 coverage, and every historical CLI gate) and Bounded state-property CLI #443. Closure metadata changes must pass the same exact-head gates before merge.
 
-M69 is a typed semantic kernel, not yet a textual/declarative CTL frontend. It makes no arbitrary CTL parser, bounded-prefix CTL proof, symbolic model checking, or shortest-witness claim.
+M70 remains complete-graph CTL. It makes no bounded-prefix CTL proof, CTL fairness, symbolic model checking, CTL verification-job/suite, or globally shortest-evidence claim.
 
-## Next frontier — Milestone 70: declarative CTL parser and file frontend
+## Next frontier — Milestone 71: proof-honest bounded CTL semantics
 
-Promote the sealed typed M69 authority to an external named-proposition surface without introducing a second CTL semantics.
+Promote the complete-graph M69/M70 authority to resource-bounded exploration without treating an incomplete graph prefix as a complete Kripke structure.
 
 Acceptance criteria:
 
-- deterministic textual grammar for Boolean composition plus `EX`, `AX`, `EF`, `AF`, `EG`, `AG`, `E[U]`, and `A[U]`, with explicit precedence/grouping and canonical rendering;
-- bind CTL atoms to existing declarative named state propositions and fail closed on unknown proposition references before backend execution;
-- execute through M69 `evaluate_ctl` only, preserving its terminal self-loop policy, state-set semantics, memoization, and evidence;
-- add a declarative model-file CLI with stable report/exit behavior for all-initial satisfaction versus violation and malformed input;
-- preserve deterministic evidence rendering, including synthetic terminal-loop provenance, without claiming shortest traces;
-- parser round-trip, malformed grammar, unknown proposition, terminal/cycle, nested operator, direct-vs-frontend, and built-binary integration regressions;
-- keep fairness external and unsupported for CTL in this phase; add no CTL job/suite protocol until the direct file frontend is sealed;
-- preserve all historical safety, temporal, fairness, structural, suite, reduction, and M69 oracle gates.
+- reuse the canonical bounded reachable-graph capture and its completeness/known-terminal provenance; do not add a second traversal engine;
+- define a sound three-valued or lower/upper satisfaction semantics for arbitrary nested CTL formulas over incomplete prefixes, so conclusive truth/falsehood is distinguished from `INCONCLUSIVE`;
+- unknown outgoing behavior at cut states must not be silently totalized as a terminal self-loop;
+- exact atomic valuations on retained states plus Boolean negation/composition must preserve sound lower/upper bounds;
+- branching predecessor and least/greatest fixpoint operators must propagate incomplete-successor uncertainty conservatively;
+- retain conclusive finite/lasso evidence only when every edge/terminal fact used by that evidence is justified by the retained graph/provenance;
+- unbounded limits must collapse exactly to the sealed M69 result on state sets/status/evidence where the bounded API reports conclusive;
+- add an independent generated small-graph × cutoff oracle plus focused state/transition/depth-cutoff, terminal-unknown, negation, nested-operator, and witness-provenance regressions;
+- keep parser/CLI bounded exposure out until the bounded semantic kernel is sealed;
+- preserve all historical verification, fairness, structural, suite, reduction, M69 oracle, and M70 frontend gates.

@@ -16,7 +16,10 @@ pub mod builder;
 pub mod checker;
 pub mod combined_fairness;
 pub mod ctl;
+pub mod ctl_parse;
 pub mod declarative;
+pub mod declarative_ctl;
+pub mod declarative_ctl_report;
 pub mod declarative_deadlock;
 pub mod declarative_deadlock_report;
 pub mod eventuality;
@@ -101,9 +104,15 @@ pub use ctl::{
     evaluate_ctl, CtlError, CtlEvaluation, CtlEvidence, CtlEvidenceAction, CtlEvidenceStep,
     CtlFormula, CtlInitialEvaluation, CtlTerminalPolicy,
 };
+pub use ctl_parse::{parse_ctl_formula, render_ctl_formula, CtlParseError, CtlParseErrorKind};
 pub use declarative::{
     parse_declarative_document, parse_declarative_model, DeclarativeDocument, DeclarativeModelError,
 };
+pub use declarative_ctl::{
+    check_declarative_ctl, check_declarative_ctl_text, DeclarativeCtlError, DeclarativeCtlResult,
+    DeclarativeCtlStatus,
+};
+pub use declarative_ctl_report::render_declarative_ctl_report;
 pub use declarative_deadlock::{
     check_declarative_deadlock_with_limits, parse_declarative_deadlock_spec,
     BoundedDeclarativeDeadlockResult, DeclarativeDeadlockError, DeclarativeDeadlockSpec,
