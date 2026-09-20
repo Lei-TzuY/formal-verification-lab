@@ -6,7 +6,7 @@ use formal_verification_lab::{
     run_orchestration_suite_json_with_provider, run_structural_job_json,
     run_structural_job_json_with_provider, run_verification_job_json,
     run_verification_job_json_with_provider, MapTextSourceProvider,
-    RootedFileSystemTextSourceProvider, VerificationJobOutcome,
+    RootedFileSystemTextSourceProvider, TextSourceIdErrorKind, VerificationJobOutcome,
 };
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -45,6 +45,29 @@ fn logical_source_ids_normalize_and_resolve_without_host_paths() {
         resolve_source_id("workspace/suites/mixed.suite", "../jobs/verify.job").unwrap(),
         "workspace/jobs/verify.job"
     );
+}
+
+#[test]
+fn rooted_and_map_workspace_providers_reject_root_escape_and_absolute_ids_consistently() {
+    let root = fixture_dir("source-boundary");
+    let rooted = RootedFileSystemTextSourceProvider::new(&root);
+    let map = MapTextSourceProvider::new();
+
+    for source_id in ["../outside.job", "/absolute.job", "C:\\absolute.job"] {
+        let rooted_run = run_verification_job_json_with_provider(&rooted, source_id);
+        let map_run = run_verification_job_json_with_provider(&map, source_id);
+
+        assert_eq!(rooted_run.to_json(), map_run.to_json());
+        assert_eq!(rooted_run.exit_code, 2);
+        assert!(rooted_run.to_json().contains("invalid-data"));
+    }
+
+    for source_id in ["../outside.job", "/absolute.job", "C:\\absolute.job"] {
+        let error = MapTextSourceProvider::from_sources([(source_id, "ignored")]).unwrap_err();
+        assert_eq!(error.kind(), &TextSourceIdErrorKind::EscapesRoot);
+    }
+
+    fs::remove_dir_all(root).unwrap();
 }
 
 #[test]
