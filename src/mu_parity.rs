@@ -11,12 +11,12 @@ use std::fmt;
 use std::hash::Hash;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MuParityMuParityFixpointKind {
+pub enum MuParityFixpointKind {
     Mu,
     Nu,
 }
 
-impl MuParityMuParityFixpointKind {
+impl MuParityFixpointKind {
     fn dual(self) -> Self {
         match self {
             Self::Mu => Self::Nu,
@@ -48,7 +48,7 @@ pub enum MuParityPositionKind {
     Diamond,
     Box,
     Fixpoint {
-        kind: MuParityMuParityFixpointKind,
+        kind: MuParityFixpointKind,
         alternation_level: usize,
     },
 }
@@ -333,7 +333,6 @@ where
     let node_count = nodes.len();
     let positions = describe_positions(&game, &nodes, captured.graph.states.len());
     let even_strategy = describe_strategy(
-        &game,
         &captured.graph,
         &nodes,
         node_count,
@@ -341,7 +340,6 @@ where
         &positions,
     );
     let odd_strategy = describe_strategy(
-        &game,
         &captured.graph,
         &nodes,
         node_count,
@@ -362,18 +360,7 @@ where
             satisfied: solution.even_wins(position(state_index, root, node_count)),
         })
         .collect::<Vec<_>>();
-    let max_priority = nodes
-        .iter()
-        .filter_map(|node| match node {
-            EvalNode::Fix {
-                kind,
-                alternation_level,
-                ..
-            } => Some(kind.priority(*alternation_level, max_alternation_level)),
-            _ => None,
-        })
-        .max()
-        .unwrap_or(0);
+    let max_priority = max_fixpoint_priority(&nodes, max_alternation_level);
     let initial_evidence = captured
         .graph
         .initial_ids
@@ -442,11 +429,7 @@ where
         || evaluation.explored_transitions != captured.explored_transitions
         || evaluation.max_depth_reached != captured.max_depth_reached
         || evaluation.parity_game_vertices != game.vertex_count()
-        || evaluation.max_priority
-            != (0..game.vertex_count())
-                .map(|vertex| game.priority(vertex))
-                .max()
-                .unwrap_or(0)
+        || evaluation.max_priority != max_fixpoint_priority(&nodes, max_alternation_level)
     {
         return Err(MuParityEvidenceError::EvaluationMismatch);
     }
@@ -738,6 +721,24 @@ fn max_alternation_level<A>(nodes: &[EvalNode<A>]) -> usize {
         .unwrap_or(0)
 }
 
+fn max_fixpoint_priority<A>(
+    nodes: &[EvalNode<A>],
+    max_alternation_level: usize,
+) -> usize {
+    nodes
+        .iter()
+        .filter_map(|node| match node {
+            EvalNode::Fix {
+                kind,
+                alternation_level,
+                ..
+            } => Some(kind.priority(*alternation_level, max_alternation_level)),
+            _ => None,
+        })
+        .max()
+        .unwrap_or(0)
+}
+
 fn describe_positions<A>(
     game: &ParityGame,
     nodes: &[EvalNode<A>],
@@ -786,7 +787,6 @@ fn position_kind<A>(node: &EvalNode<A>) -> MuParityPositionKind {
 }
 
 fn describe_strategy<S, A>(
-    game: &ParityGame,
     graph: &ReachableGraph<S>,
     nodes: &[EvalNode<A>],
     node_count: usize,
@@ -818,7 +818,6 @@ fn describe_strategy<S, A>(
         })
         .collect();
 
-    debug_assert_eq!(strategy.player(), if game.vertex_count() > 0 { strategy.player() } else { strategy.player() });
     MuParityStrategyEvidence {
         player: strategy.player(),
         winning_positions,
