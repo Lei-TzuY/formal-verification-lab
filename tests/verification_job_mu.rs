@@ -198,7 +198,7 @@ fn bounded_mu_jobs_match_m77_and_preserve_all_cutoff_classes() {
         );
         assert_eq!(
             mu.fixpoint_iterations,
-            direct.evaluation.fixpoint_iterations
+            Some(direct.evaluation.fixpoint_iterations)
         );
         assert_eq!(mu.initial[0].truth, VerificationJobMuTruth::Unknown);
         assert_eq!(direct.evaluation.initial[0].truth, BoundedMuTruth::Unknown);
