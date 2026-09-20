@@ -159,10 +159,7 @@ fn raw_status_distinguishes_certificate_rejection_from_execution_error() {
         rejected.envelope.status,
         OrchestrationSuiteStatus::Attention
     );
-    assert_eq!(
-        rejected.envelope.jobs[2].result.outcome_str(),
-        "rejected"
-    );
+    assert_eq!(rejected.envelope.jobs[2].result.outcome_str(), "rejected");
 
     fs::remove_file(root.join("models/system.fvl")).unwrap();
     let failed = run_orchestration_suite_json(&suite_path);
@@ -259,11 +256,7 @@ fn built_orchestration_cli_matches_direct_raw_and_expectation_runs() {
     let suite_path = write_fixture(&root, true);
 
     let raw = run_orchestration_suite_json(&suite_path);
-    let raw_cli = run_binary(&[
-        suite_path.to_str().unwrap(),
-        "--format",
-        "json",
-    ]);
+    let raw_cli = run_binary(&[suite_path.to_str().unwrap(), "--format", "json"]);
     assert_eq!(raw_cli.status.code(), Some(raw.exit_code as i32));
     assert_eq!(
         String::from_utf8(raw_cli.stdout).unwrap(),
@@ -278,10 +271,7 @@ fn built_orchestration_cli_matches_direct_raw_and_expectation_runs() {
         "--format",
         "json",
     ]);
-    assert_eq!(
-        expected_cli.status.code(),
-        Some(expected.exit_code as i32)
-    );
+    assert_eq!(expected_cli.status.code(), Some(expected.exit_code as i32));
     assert_eq!(
         String::from_utf8(expected_cli.stdout).unwrap(),
         format!("{}\n", expected.to_json())
@@ -370,11 +360,7 @@ fn write_fixture(root: &Path, expectations: bool) -> PathBuf {
         ]
         .join("\n")
     };
-    fs::write(
-        &suite_path,
-        format!("suite \"mixed\"\n{suffix}\n"),
-    )
-    .unwrap();
+    fs::write(&suite_path, format!("suite \"mixed\"\n{suffix}\n")).unwrap();
     suite_path
 }
 
