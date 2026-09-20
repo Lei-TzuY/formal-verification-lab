@@ -1619,14 +1619,12 @@ fn parse_mu_options(args: &[String]) -> Result<MuCliOptions, String> {
                 backend_seen = true;
             }
             "--max-states" | "--max-transitions" | "--max-depth" => {
-                let parsed = value.parse::<usize>().map_err(|_| {
-                    format!("option '{flag}' requires a non-negative integer")
-                })?;
+                let parsed = value
+                    .parse::<usize>()
+                    .map_err(|_| format!("option '{flag}' requires a non-negative integer"))?;
                 match flag {
                     "--max-states" => set_limit(&mut limits.max_states, parsed, flag)?,
-                    "--max-transitions" => {
-                        set_limit(&mut limits.max_transitions, parsed, flag)?
-                    }
+                    "--max-transitions" => set_limit(&mut limits.max_transitions, parsed, flag)?,
                     "--max-depth" => set_limit(&mut limits.max_depth, parsed, flag)?,
                     _ => unreachable!("mu limit flag matched above"),
                 }
