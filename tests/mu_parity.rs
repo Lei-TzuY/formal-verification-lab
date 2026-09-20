@@ -28,8 +28,7 @@ fn validation_fails_before_parity_graph_capture() {
         ))
     ));
 
-    let non_monotone =
-        MuFormula::<Atom, u8>::mu(0, MuFormula::negate(MuFormula::var(0)));
+    let non_monotone = MuFormula::<Atom, u8>::mu(0, MuFormula::negate(MuFormula::var(0)));
     assert!(matches!(
         evaluate_mu_via_parity(&model, &non_monotone, |_atom, _state| false),
         Err(MuParityError::Validation(
@@ -50,14 +49,8 @@ fn parity_backend_preserves_terminal_totalization_and_fixpoint_polarity() {
     .unwrap();
 
     let formulas = [
-        (
-            MuFormula::<Atom, u8>::diamond(MuFormula::True),
-            true,
-        ),
-        (
-            MuFormula::<Atom, u8>::boxed(MuFormula::False),
-            false,
-        ),
+        (MuFormula::<Atom, u8>::diamond(MuFormula::True), true),
+        (MuFormula::<Atom, u8>::boxed(MuFormula::False), false),
         (
             MuFormula::<Atom, u8>::nu(0, MuFormula::diamond(MuFormula::var(0))),
             true,
@@ -67,10 +60,7 @@ fn parity_backend_preserves_terminal_totalization_and_fixpoint_polarity() {
             false,
         ),
         (
-            MuFormula::<Atom, u8>::negate(MuFormula::mu(
-                0,
-                MuFormula::diamond(MuFormula::var(0)),
-            )),
+            MuFormula::<Atom, u8>::negate(MuFormula::mu(0, MuFormula::diamond(MuFormula::var(0)))),
             true,
         ),
     ];
@@ -146,31 +136,19 @@ fn representative_formulas() -> Vec<MuFormula<Atom, u8>> {
         MuFormula::or(p.clone(), MuFormula::negate(q.clone())),
         MuFormula::mu(
             0,
-            MuFormula::or(
-                p.clone(),
-                MuFormula::diamond(MuFormula::var(0)),
-            ),
+            MuFormula::or(p.clone(), MuFormula::diamond(MuFormula::var(0))),
         ),
         MuFormula::nu(
             0,
-            MuFormula::and(
-                p.clone(),
-                MuFormula::diamond(MuFormula::var(0)),
-            ),
+            MuFormula::and(p.clone(), MuFormula::diamond(MuFormula::var(0))),
         ),
         MuFormula::mu(
             0,
-            MuFormula::or(
-                p.clone(),
-                MuFormula::boxed(MuFormula::var(0)),
-            ),
+            MuFormula::or(p.clone(), MuFormula::boxed(MuFormula::var(0))),
         ),
         MuFormula::nu(
             0,
-            MuFormula::and(
-                p.clone(),
-                MuFormula::boxed(MuFormula::var(0)),
-            ),
+            MuFormula::and(p.clone(), MuFormula::boxed(MuFormula::var(0))),
         ),
         MuFormula::mu(
             0,
@@ -179,10 +157,7 @@ fn representative_formulas() -> Vec<MuFormula<Atom, u8>> {
                 MuFormula::diamond(MuFormula::nu(
                     1,
                     MuFormula::or(
-                        MuFormula::and(
-                            q.clone(),
-                            MuFormula::diamond(MuFormula::var(1)),
-                        ),
+                        MuFormula::and(q.clone(), MuFormula::diamond(MuFormula::var(1))),
                         MuFormula::diamond(MuFormula::var(0)),
                     ),
                 )),
@@ -195,10 +170,7 @@ fn representative_formulas() -> Vec<MuFormula<Atom, u8>> {
                 MuFormula::boxed(MuFormula::mu(
                     1,
                     MuFormula::and(
-                        MuFormula::or(
-                            q.clone(),
-                            MuFormula::diamond(MuFormula::var(1)),
-                        ),
+                        MuFormula::or(q.clone(), MuFormula::diamond(MuFormula::var(1))),
                         MuFormula::boxed(MuFormula::var(0)),
                     ),
                 )),
@@ -210,19 +182,13 @@ fn representative_formulas() -> Vec<MuFormula<Atom, u8>> {
                 p.clone(),
                 MuFormula::diamond(MuFormula::nu(
                     0,
-                    MuFormula::and(
-                        q.clone(),
-                        MuFormula::diamond(MuFormula::var(0)),
-                    ),
+                    MuFormula::and(q.clone(), MuFormula::diamond(MuFormula::var(0))),
                 )),
             ),
         ),
         MuFormula::negate(MuFormula::mu(
             0,
-            MuFormula::or(
-                q.clone(),
-                MuFormula::diamond(MuFormula::var(0)),
-            ),
+            MuFormula::or(q.clone(), MuFormula::diamond(MuFormula::var(0))),
         )),
     ]
 }
