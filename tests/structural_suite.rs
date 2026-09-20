@@ -25,8 +25,7 @@ edge "a" "loop" "a"
 
 fn fixture_dir(kind: &str) -> PathBuf {
     let id = NEXT_DIR.fetch_add(1, Ordering::Relaxed);
-    let root =
-        std::env::temp_dir().join(format!("fvlab-m67-{kind}-{}-{id}", std::process::id()));
+    let root = std::env::temp_dir().join(format!("fvlab-m67-{kind}-{}-{id}", std::process::id()));
     fs::create_dir_all(root.join("jobs")).unwrap();
     root
 }
@@ -42,9 +41,7 @@ fn write_job(root: &Path, name: &str, model_source: &str, tail: &str) -> PathBuf
     };
     fs::write(
         &job,
-        format!(
-            "analysis \"recurrence\"\nmodel \"{name}.fvl\"{suffix}"
-        ),
+        format!("analysis \"recurrence\"\nmodel \"{name}.fvl\"{suffix}"),
     )
     .unwrap();
     job
@@ -105,8 +102,7 @@ fn structural_suite_parser_fails_closed_on_invalid_metadata_and_size() {
             if outcome == "violated"
     ));
 
-    let duplicate =
-        parse_structural_suite("suite \"dup\"\njob \"a\"\njob \"a\"").unwrap_err();
+    let duplicate = parse_structural_suite("suite \"dup\"\njob \"a\"\njob \"a\"").unwrap_err();
     assert!(matches!(
         duplicate.kind(),
         StructuralSuiteParseErrorKind::DuplicateJob { path } if path == "a"
@@ -174,10 +170,7 @@ fn raw_suite_uses_error_over_inconclusive_precedence_without_dropping_entries() 
     write_job(&root, "cutoff", ACYCLIC, "max-transitions 0");
     write_error_job(&root, "broken");
 
-    let inconclusive_suite = write_suite(
-        &root,
-        "suite \"cutoff\"\njob \"jobs/cutoff.fvstruct\"\n",
-    );
+    let inconclusive_suite = write_suite(&root, "suite \"cutoff\"\njob \"jobs/cutoff.fvstruct\"\n");
     let inconclusive = run_structural_suite_json(&inconclusive_suite);
     assert_eq!(inconclusive.exit_code, 3);
     assert_eq!(
@@ -230,7 +223,11 @@ job \"jobs/broken.fvstruct\" expect \"error\"\n",
     assert_eq!(run.envelope.jobs.len(), 4);
     assert!(run.envelope.jobs.iter().all(|entry| entry.matched));
     assert_eq!(
-        run.envelope.jobs.iter().map(|entry| entry.observed).collect::<Vec<_>>(),
+        run.envelope
+            .jobs
+            .iter()
+            .map(|entry| entry.observed)
+            .collect::<Vec<_>>(),
         vec![
             StructuralJobOutcome::CycleFound,
             StructuralJobOutcome::Acyclic,
@@ -272,10 +269,7 @@ job \"jobs/acyclic.fvstruct\" expect \"cycle_found\"\n",
         run.envelope.jobs[0].observed,
         StructuralJobOutcome::CycleFound
     );
-    assert_eq!(
-        run.envelope.jobs[1].observed,
-        StructuralJobOutcome::Acyclic
-    );
+    assert_eq!(run.envelope.jobs[1].observed, StructuralJobOutcome::Acyclic);
 
     let raw = run_structural_suite_json(&suite);
     assert_eq!(raw.exit_code, 0);
@@ -290,10 +284,7 @@ job \"jobs/acyclic.fvstruct\" expect \"cycle_found\"\n",
 fn expectation_check_requires_every_job_to_declare_expectation() {
     let root = fixture_dir("missing-expectation");
     write_job(&root, "acyclic", ACYCLIC, "");
-    let suite = write_suite(
-        &root,
-        "suite \"missing\"\njob \"jobs/acyclic.fvstruct\"\n",
-    );
+    let suite = write_suite(&root, "suite \"missing\"\njob \"jobs/acyclic.fvstruct\"\n");
 
     let run = run_structural_suite_expectations_json(&suite);
     assert_eq!(run.exit_code, 2);
