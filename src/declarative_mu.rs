@@ -1,4 +1,6 @@
+use crate::checker::ExplorationLimits;
 use crate::declarative::DeclarativeDocument;
+use crate::mu_bounded::{evaluate_mu_with_limits, BoundedMuError, BoundedMuEvaluation};
 use crate::mu_calculus::{
     evaluate_mu, validate_mu_formula, MuError, MuEvaluation, MuFormula, MuValidationError,
 };
@@ -19,12 +21,19 @@ pub struct DeclarativeMuResult {
     pub evaluation: MuEvaluation<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BoundedDeclarativeMuResult {
+    pub formula: String,
+    pub evaluation: BoundedMuEvaluation<String>,
+}
+
 #[derive(Debug)]
 pub enum DeclarativeMuError {
     Parse(MuParseError),
     Validation(MuValidationError<String>),
     UnknownProposition { proposition: String },
     Backend(MuError<String>),
+    BoundedBackend(BoundedMuError<String>),
 }
 
 impl fmt::Display for DeclarativeMuError {
@@ -36,6 +45,9 @@ impl fmt::Display for DeclarativeMuError {
                 write!(f, "unknown mu-calculus proposition '{proposition}'")
             }
             Self::Backend(error) => write!(f, "mu-calculus backend failed: {error}"),
+            Self::BoundedBackend(error) => {
+                write!(f, "bounded mu-calculus backend failed: {error}")
+            }
         }
     }
 }
@@ -57,6 +69,12 @@ impl From<MuValidationError<String>> for DeclarativeMuError {
 impl From<MuError<String>> for DeclarativeMuError {
     fn from(value: MuError<String>) -> Self {
         Self::Backend(value)
+    }
+}
+
+impl From<BoundedMuError<String>> for DeclarativeMuError {
+    fn from(value: BoundedMuError<String>) -> Self {
+        Self::BoundedBackend(value)
     }
 }
 
@@ -91,6 +109,39 @@ pub fn check_declarative_mu_text(
 ) -> Result<DeclarativeMuResult, DeclarativeMuError> {
     let formula = parse_mu_formula(input)?;
     check_declarative_mu(document, &formula)
+}
+
+/// Validate, resolve, and evaluate one typed textual-surface formula through
+/// the proof-honest M77 bounded modal mu-calculus authority.
+pub fn check_declarative_mu_with_limits(
+    document: &DeclarativeDocument,
+    formula: &MuFormula<String, String>,
+    limits: ExplorationLimits,
+) -> Result<BoundedDeclarativeMuResult, DeclarativeMuError> {
+    validate_mu_formula(formula)?;
+    validate_atoms(document, formula)?;
+
+    let evaluation = evaluate_mu_with_limits(
+        document.model(),
+        formula,
+        |atom, state| document.state_has_proposition(state, atom),
+        limits,
+    )?;
+
+    Ok(BoundedDeclarativeMuResult {
+        formula: render_mu_formula(formula),
+        evaluation,
+    })
+}
+
+/// Parse and evaluate one textual modal mu-calculus formula through M77.
+pub fn check_declarative_mu_text_with_limits(
+    document: &DeclarativeDocument,
+    input: &str,
+    limits: ExplorationLimits,
+) -> Result<BoundedDeclarativeMuResult, DeclarativeMuError> {
+    let formula = parse_mu_formula(input)?;
+    check_declarative_mu_with_limits(document, &formula, limits)
 }
 
 fn validate_atoms(
