@@ -138,42 +138,47 @@ M82 exposes the sealed M81 parity authority through the existing declarative nam
 
 ## Milestone 83 — reproducible parity-backed modal mu-calculus verification jobs
 
-**Status: implementation candidate complete on PR #82.**
+**Status: sealed in `main` at `47005a56da70e4edef4d09591a566a8309528b7e`.**
 
-M83 carries M82's explicit complete parity backend into the existing M79 heterogeneous verification-job protocol while preserving fixpoint as the default and bounded authority.
+M83 carries M82's explicit complete parity backend into the existing M79 heterogeneous verification-job protocol while preserving fixpoint as the default and bounded authority. The manifest adds `backend "fixpoint"|"parity"` only for `analysis "mu-calculus"`; absent metadata preserves historical fixpoint documents, parity plus model-space limits fails closed before referenced-file I/O, schema-v4 retains backend-specific observations without fabricating fixpoint iterations, and generic suites preserve mixed backend envelopes. Exact closure candidate `81f2c7619792032e2e6193bc7bdd0e9b054b6d92` passed CI #679 and Bounded state-property CLI #529 before squash integration.
+
+## Milestone 84 — certified positional parity strategies
+
+**Status: implementation candidate complete on PR #83.**
+
+M84 promotes the sealed M81 parity kernel from winning-region classification to deterministic positional strategy evidence with an independent verifier while preserving the historical winning-region API.
 
 Implemented contract:
 
-- the manifest adds one singleton `backend "fixpoint"|"parity"` directive only for `analysis "mu-calculus"`;
-- absent backend metadata preserves historical canonical documents and defaults to fixpoint;
-- invalid backend values, duplicate backend directives, and backend directives on non-μ families fail closed during parsing;
-- complete parity jobs reuse M82/M81, preserve manifest-relative loading and validation ordering, use stable 0/15/2 exits, and emit schema-v4 envelopes with explicit `backend:"mu-parity"`;
-- parity plus model-space limits is rejected before referenced-file I/O; default/fixpoint limited jobs continue to use M77/M78 with exit 3 and original cutoff provenance;
-- schema-v4 μ details make fixpoint-iteration observations optional rather than fabricating them for parity; historical fixpoint JSON still emits its numeric `fixpoint_iterations` field and omits parity-only fields;
-- parity envelopes add parity-game vertex count and maximum priority as observations only;
-- complete parity/fixpoint jobs are differentially checked for outcome, canonical property, state/initial results, and model accounting;
-- generic raw/expectation suites preserve mixed parity/fixpoint nested envelopes without a parity-specific suite engine;
-- built `fvlab temporal job ... --format json` covers manifest-relative parity execution and backend identity.
+- `ParitySolution` still exposes the existing Even/Odd winning-region methods and now also carries deterministic positional strategies for both players;
+- winner-owned choices use stable successor ordering and are composed through both Zielonka recursion branches rather than reconstructed from the final region alone;
+- `ParityStrategy` exposes the claimed player, winning vertices, and optional successor choices without assigning moves to opponent-owned or losing vertices;
+- `verify_parity_strategy` does not trust the solver result: it validates choice-vector shape, winning-vertex range/uniqueness, ownership, real-edge selection, region closure under chosen moves, closure under every opponent move, and totality of the strategy-restricted subgame;
+- parity correctness is independently checked on the strategy-restricted graph by rejecting any recurrent cycle whose maximum priority belongs to the opponent;
+- Even and Odd evidence are verified symmetrically;
+- malformed/tampered strategies fail closed for missing, unexpected, invalid, out-of-region, escaping, or losing-cycle choices;
+- generated exhaustive coverage certifies both solver strategies for all 324 two-vertex total games across every owner assignment, priorities 0..2, and every non-empty successor subset;
+- existing M81/M82/M83 callers that consume only winning regions remain source-compatible;
+- no μ-level witness/schema surface is introduced in this milestone.
 
-A historical M79 bounded regression was strengthened after the schema field became optional: the fixpoint route now explicitly requires `Some(direct.fixpoint_iterations)`, preserving the old numeric contract while allowing parity to omit an inapplicable observation.
+Implementation candidate `9fff451e4684da8075f412e8b485fbcd938d53bc` passed CI #684 (format, all-target build, Clippy with `-D warnings`, full tests including the 324-case certification gate and every historical CTL/μ/parity/job/suite test, plus all historical CLI gates) and Bounded state-property CLI #534. Closure metadata changes must pass the same exact-head gates before merge.
 
-Implementation candidate `5894e4104f3a66ac76e2a56eee802e1f4980e2d2` passed CI #677 (format, all-target build, Clippy with `-D warnings`, full tests including M81's 3,584-case parity differential, M77's 15,360-case bounded oracle, M75's 90,112-case CTL→μ differential, and every historical CLI gate) and Bounded state-property CLI #527. Closure metadata changes must pass the same exact-head gates before merge.
+M84 adds no modal μ-calculus proof-witness claim, bounded-parity semantics, symbolic representation, fairness semantics, or performance claim.
 
-M83 adds no bounded parity semantics, strategy certificate, proof witness, symbolic representation, fairness semantics, or performance claim.
+## Next frontier — Milestone 85: typed modal mu-calculus parity strategy evidence
 
-## Next frontier — Milestone 84: certified positional parity strategies
-
-Promote the M81 parity kernel from winning-region classification to deterministic positional strategy evidence with an independent verifier. Keep this phase generic to parity games; do not yet label the resulting data a modal μ-calculus proof witness.
+Bridge the sealed generic M84 strategy certificates back into the M81 μ-calculus evaluation game without jumping directly to verification-job JSON. The current μ parity backend flattens each evaluation-game position to an opaque vertex id and discards the formula-position mapping after solving; M85 should make that semantic mapping explicit and independently checkable.
 
 Acceptance criteria:
 
-- extend parity solutions with a deterministic positional successor choice for winner-owned vertices in each winning region, using stable successor ordering for tie-breaking;
-- strategy entries must always reference real game edges and only vertices owned by the strategy's player; losing/opponent-owned vertices must not receive fabricated choices;
-- add an independent verifier that checks strategy ownership, edge validity, region closure under the chosen moves and all opponent moves, and totality of the induced strategy subgame;
-- independently verify the parity condition over every reachable recurrent SCC of the strategy-restricted subgame, rather than trusting the solver's winning-region output;
-- verify Even and Odd strategies symmetrically and fail closed on tampered/missing/out-of-region strategy entries;
-- add focused adversarial regressions plus a generated small-game differential/oracle that compares certified strategy regions with the existing M81 winning regions;
-- preserve M81 winning-region API behavior for callers that do not consume strategies;
-- do not expose μ-level witness/certificate JSON until the generic strategy evidence and verifier are sealed;
-- preserve all historical CTL/μ/parity/job/suite/CLI gates and make no performance, symbolic, bounded-parity, or fairness claim.
+- introduce a typed evaluation-game position description that identifies the reachable model-state index plus the normalized μ formula position/kind represented by each parity vertex;
+- preserve the exact M81 game construction, priorities, terminal self-loop policy, winning regions, and default satisfaction semantics;
+- expose certified Even/Odd positional strategy evidence through the typed μ parity result without changing the default fixpoint backend or M82/M83 external behavior;
+- map each strategy choice back to a semantic move: Boolean branch, modal successor/terminal self-loop, fixpoint body, or bound-variable return; do not expose unexplained raw vertex ids as proof evidence;
+- retain enough canonical game/certificate data for an independent verifier to reconstruct the selected parity edges and invoke the sealed M84 generic strategy verifier rather than trusting rendered evidence;
+- for every initial state, associate the truth value with the corresponding certified winner strategy at the root formula position;
+- add focused terminal, negation, shadowing, nested alternation, and tamper regressions plus generated differential checks showing evidence truth agrees with M75 and M81 winning regions;
+- keep the first slice typed/in-memory; do not change schema-v4 or claim a portable proof certificate until the μ evidence mapping is sealed;
+- preserve M75's 90,112-case CTL→μ differential, M77's 15,360-case bounded oracle, M81's 3,584-case parity differential, M84's strategy certification gate, and every historical job/suite/CLI gate;
+- make no bounded-parity, symbolic, fairness, or performance claim.
 

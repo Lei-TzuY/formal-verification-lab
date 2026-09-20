@@ -212,7 +212,8 @@ pub use multi_temporal::{
     ResponseActionRole,
 };
 pub use parity_game::{
-    solve_parity_game, ParityGame, ParityGameError, ParityPlayer, ParitySolution,
+    solve_parity_game, verify_parity_strategy, ParityGame, ParityGameError, ParityPlayer,
+    ParitySolution, ParityStrategy, ParityStrategyError,
 };
 pub use property::{
     check_deadlock, check_deadlock_with_limits, check_reachability, check_reachability_with_limits,
