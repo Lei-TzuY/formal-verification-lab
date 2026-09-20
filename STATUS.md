@@ -178,45 +178,56 @@ M88 adds one additive family-tagged orchestration layer above the sealed verific
 
 ## Milestone 89 — host-independent virtual workspace execution
 
-**Status: implementation candidate complete on PR #88.**
+**Status: sealed in `main` at `0fbd6bb7330394a97e555abf1ba1f98156373bf0`.**
 
-M89 promotes the sealed M88 job/orchestration stack from direct host-filesystem coupling to one shared logical UTF-8 text-source substrate while preserving every historical path API as a compatibility wrapper.
+M89 promotes M88 from direct host-filesystem coupling to one shared logical UTF-8 text-source substrate. Verification, structural, certificate-verification and multi-family orchestration all execute through the same `TextSourceProvider` core; filesystem APIs remain compatibility wrappers, rooted and map providers enforce canonical logical ids, and provider-mode diagnostics avoid host-root leakage. Exact closure candidate `01e59a3378cbeb75dd0227e3a7db817a1e50a7eb` passed CI #736 and Bounded state-property CLI #586 before squash integration.
+
+M89 intentionally makes no archive/bundle, digest/hash, signature, cryptographic-authenticity, filesystem-sandbox, bounded-parity, symbolic, fairness or performance claim.
+
+## Milestone 90 — versioned portable workspace snapshot and replay
+
+**Status: implementation candidate complete on PR #89.**
+
+M90 packages one sealed M88 orchestration root plus its exact transitive M89 logical text-source closure into a deterministic standalone schema-v1 artifact and replays it without the original host workspace.
 
 Implemented contract:
 
-- one public `TextSourceProvider` abstraction is shared by verification, structural, certificate-verification and M88 orchestration; there is no family-specific loader hierarchy;
-- `FileSystemTextSourceProvider`, `RootedFileSystemTextSourceProvider` and deterministic `MapTextSourceProvider` adapters cover compatibility, host-rooted logical workspaces and fully in-memory execution;
-- logical source ids normalize separator/dot components, resolve dependencies relative to the logical manifest id, and rooted/map providers reject absolute ids or unresolved `..` root escapes fail-closed;
-- existing path-based runner APIs convert their path to a source id and delegate through the same provider-aware execution core;
-- provider-aware verification dispatch reads canonical manifest/model/property texts through the provider, including CTL, modal μ-calculus, action-temporal and historical verification families rather than silently reopening files in those deeper paths;
-- structural recurrence and certificate-verification jobs resolve referenced sources through the same logical identity rules;
-- M88 raw and expectation orchestration have provider-aware entrypoints and dispatch nested jobs through the supplied provider, so a complete mixed-family workspace can execute from an in-memory map without temporary files;
-- provider-mode I/O diagnostics use logical source ids plus stable error kinds instead of host-root absolute paths;
-- the rooted/map boundary rejects `../outside`, POSIX absolute and Windows-drive absolute logical ids consistently; no security-sandbox or symlink-confinement claim is made;
-- regressions prove existing path APIs equal rooted-provider results for representative successful family/orchestration runs;
-- rooted filesystem and in-memory map providers produce equal typed/JSON results for satisfied, violated, recurrence-cycle, verified, rejected and expectation-mode outcomes;
-- the same logical setup-error workspace under two different physical host roots and a map provider produces byte-identical JSON containing the logical missing source and no host-root string.
+- snapshot creation accepts any M89 `TextSourceProvider`, normalizes one orchestration root id, parses the explicit M88 family tags, parses each referenced family manifest, and follows only declared model/property/certificate dependencies;
+- no directory walking, wildcard capture, or family inference is performed;
+- sources are stored in deterministic `BTreeMap` logical-id order and rendered with explicit byte-length framing for root ids, source ids and exact UTF-8 source text;
+- embedded newlines, quotes, backslashes and Unicode are preserved exactly without serde/base64/dependency churn;
+- schema-v1 parsing checks header/version, frame boundaries, UTF-8 boundary validity, required newline terminators, declared entry/source-byte totals, canonical logical ids, duplicates, required root/dependency closure and unrelated extra sources;
+- build/parser resource limits bound source count, aggregate embedded source bytes and source-id length before unbounded internal allocation;
+- parsed artifacts are reverse-validated against the embedded orchestration/family manifests so the source set must equal the explicit dependency closure;
+- replay reconstructs an M89 `MapTextSourceProvider` and runs raw or expectation M88 orchestration exclusively from embedded texts;
+- snapshot creation from two different rooted physical workspaces and from an in-memory map containing the same logical workspace produces byte-identical artifacts;
+- removing the original host workspace after snapshot creation does not change raw or expectation replay results;
+- regressions cover satisfied, violated, recurrence-cycle and verified results, loaded-certificate rejection, setup error, exact render/parse roundtrip, noncanonical ids, root escape, duplicate/missing/unrelated sources, truncation, trailing payload, resource caps and UTF-8 frame splits;
+- one built surface, `fvlab-workspace`, creates snapshots and replays raw or expectation orchestration; built CLI stdout/exit is differential-checked against direct library replay.
 
-Exact implementation candidate `bba7dfd80b0e5143a2630f07ad297cc804e09399` passed CI #734 (format, all-target build, Clippy with `-D warnings`, full tests including M89 virtual-workspace differentials plus every historical CTL/μ/parity/certificate/job/suite/orchestration gate and historical CLI smoke tests) and Bounded state-property CLI #584. Closure metadata changes must pass the same exact-head gates before merge.
+Initial CI exposed only rustfmt differences plus one Rust type-inference ambiguity in the dependency-parser error prefix. The latter was fixed by making the existing `String` error type explicit; no closure, resource-limit, replay or test semantics changed.
 
-M89 intentionally introduces no archive/bundle format, digest/hash, signature, cryptographic authenticity, filesystem sandbox, bounded-parity, symbolic, fairness or performance claim.
+Exact implementation candidate `ec92e910c54481859b9135842eecd1616ac77935` passed CI #741 (format, all-target build, Clippy with `-D warnings`, full tests including M90 snapshot/replay/built-CLI regressions plus every historical CTL/μ/parity/certificate/job/suite/orchestration/virtual-workspace gate and historical CLI smoke tests) and Bounded state-property CLI #591. Closure metadata changes must pass the same exact-head gates before merge.
 
-## Next frontier — Milestone 90: versioned portable workspace snapshot and replay
+M90 makes no digest/hash, signature, tamper-authentication, cryptographic-authenticity, compression, performance or filesystem-sandbox claim.
 
-M89 seals the execution substrate required for portable replay, but the caller still has to supply the logical source texts separately. M90 should package one M88 orchestration root plus its complete transitive logical source closure into a deterministic versioned UTF-8 artifact and replay it exclusively through the sealed M89 map-backed provider.
+## Next frontier — Milestone 91: versioned exact replay result lock
+
+M90 freezes all execution inputs, but M88 expectation mode intentionally compares only each family-native outcome. A replay can therefore preserve `satisfied`/`violated`/`cycle_found`/`verified` while deterministic evidence, accounting, backend metadata or nested result-schema details drift. M91 should add a portable exact-result regression artifact above M90 without pretending that byte equality is cryptographic authenticity.
 
 Acceptance criteria:
 
-- define an explicit schema/version for a portable workspace snapshot containing one normalized orchestration root id plus the exact logical UTF-8 sources required by that root;
-- discover the snapshot dependency closure by parsing the sealed orchestration manifest and each explicitly tagged family manifest, then resolving only their declared model/property/certificate dependencies; do not walk arbitrary filesystem directories or infer job families from content;
-- canonical rendering must order entries deterministically by normalized logical source id and preserve exact source text bytes through render/parse round trips, including embedded newlines, quotes and backslashes;
-- use explicit framing/length metadata so arbitrary UTF-8 source text is unambiguous; parser must fail closed on truncation, trailing payload, duplicate ids, invalid/root-escaping ids, invalid UTF-8 framing, count mismatch and missing root/dependency entries;
-- enforce bounded parser/build resource accounting for entry count and aggregate embedded source bytes so malformed artifacts cannot request unbounded allocation;
-- snapshot creation must be provider-aware: two different rooted filesystem providers and one map provider containing the same logical workspace must produce byte-identical snapshot artifacts;
-- replay must construct an in-memory M89 provider from the embedded entries and execute raw or expectation M88 orchestration without reading the host filesystem;
-- after snapshot creation, changing or removing the original host files must not change replay output;
-- raw and expectation replay JSON/exit codes must equal direct M89 provider execution for representative satisfied/violated, recurrence-cycle, verified/rejected and setup-error workspaces;
-- add direct library APIs first, then one built snapshot/replay CLI with direct-library vs built-binary differential coverage;
-- preserve every existing path/provider API, family result schema, M88 orchestration schema/exit semantics and certificate trust boundary;
-- make no hash, signature, tamper-authentication, cryptographic authenticity, compression, performance or security-sandbox claim. Integrity/authenticity can be a later dedicated milestone if implemented and evidenced.
+- define a versioned standalone replay-lock artifact containing one exact M90 snapshot, an explicit execution mode (`raw` or `expectations`), the expected process exit code, and the exact deterministic JSON produced by that snapshot in that mode;
+- create a lock only by successfully parsing/validating the M90 snapshot and executing it through the sealed M90 replay API; do not synthesize or normalize the expected JSON independently;
+- use explicit length framing and bounded parser limits for embedded snapshot/result payloads; preserve their bytes exactly and reject truncation, trailing payload, unsupported versions, invalid mode, count/length overflow and malformed embedded snapshots fail-closed;
+- lock verification must replay the embedded snapshot through the current engine and compare both exit code and JSON byte-for-byte, without parsing/re-serializing the expected JSON;
+- expose explicit `matched / mismatched / error` verification semantics; a valid lock whose current replay differs is a mismatch, while malformed lock/snapshot material is an error;
+- mismatch evidence must identify whether exit code, JSON, or both differ without claiming why the engine changed;
+- creating the same lock from byte-identical M90 snapshots produced under different host roots/providers must yield byte-identical lock artifacts;
+- lock verification must remain fully offline after the original workspace is removed;
+- regressions must prove that outcome-preserving mutations to expected full JSON (for example accounting/evidence fields) are detected even when the family-native outcome string is unchanged;
+- support both raw and expectation M90 replay modes and preserve the complete nested result JSON rather than inventing another domain-outcome abstraction;
+- add direct library APIs first, then extend the existing `fvlab-workspace` binary with lock create/verify commands and direct-library vs built-binary differentials;
+- preserve M90 snapshot schema/replay behavior, M89 provider APIs, M88 orchestration schemas/exits and all family result schemas;
+- make no hash, signature, cryptographic-integrity/authenticity, compression, performance or sandbox claim.
 

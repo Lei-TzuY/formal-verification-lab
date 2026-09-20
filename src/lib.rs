@@ -89,6 +89,7 @@ mod verification_mu;
 pub mod verification_result;
 pub mod verification_suite;
 pub mod verification_suite_run;
+pub mod workspace_snapshot;
 
 pub use bounded::{
     AnalysisInconclusiveReason, AnalysisLimits, AnalysisOutcome, AnalysisStage, BoundedOutcome,
@@ -352,9 +353,10 @@ pub use temporal::{
 pub use temporal_parse::{parse_action_temporal, TemporalParseError, TemporalParseErrorKind};
 pub use temporal_report::{render_bounded_temporal_report, render_temporal_report};
 pub use text_source::{
-    normalize_source_id, path_source_id, resolve_source_id, FileSystemTextSourceProvider,
-    MapTextSourceProvider, RootedFileSystemTextSourceProvider, TextSourceError,
-    TextSourceErrorKind, TextSourceIdError, TextSourceIdErrorKind, TextSourceProvider,
+    normalize_source_id, normalize_workspace_source_id, path_source_id, resolve_source_id,
+    FileSystemTextSourceProvider, MapTextSourceProvider, RootedFileSystemTextSourceProvider,
+    TextSourceError, TextSourceErrorKind, TextSourceIdError, TextSourceIdErrorKind,
+    TextSourceProvider,
 };
 pub use verification_execution::{
     execute_multi_response, MultiResponseExecutionConfig, MultiResponseExecutionResult,
@@ -393,4 +395,11 @@ pub use verification_suite_run::{
     VerificationSuiteOutcome, VerificationSuiteResultEnvelope,
     VERIFICATION_REGRESSION_MISMATCH_EXIT_CODE,
     VERIFICATION_REGRESSION_SUITE_RESULT_SCHEMA_VERSION, VERIFICATION_SUITE_RESULT_SCHEMA_VERSION,
+};
+pub use workspace_snapshot::{
+    create_workspace_snapshot, parse_workspace_snapshot, render_workspace_snapshot,
+    replay_workspace_snapshot_expectations_json, replay_workspace_snapshot_json, WorkspaceSnapshot,
+    WorkspaceSnapshotBuildError, WorkspaceSnapshotParseError, WorkspaceSnapshotParseErrorKind,
+    MAX_WORKSPACE_SNAPSHOT_ENTRIES, MAX_WORKSPACE_SNAPSHOT_SOURCE_BYTES,
+    MAX_WORKSPACE_SNAPSHOT_SOURCE_ID_BYTES, WORKSPACE_SNAPSHOT_SCHEMA_VERSION,
 };
