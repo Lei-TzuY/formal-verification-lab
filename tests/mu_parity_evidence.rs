@@ -22,8 +22,10 @@ fn typed_strategy_evidence_maps_semantic_moves_and_initial_winners() {
     .unwrap();
 
     let true_result =
-        evaluate_mu_via_parity(&terminal, &MuFormula::<Atom, u8>::True, |_atom, _state| false)
-            .unwrap();
+        evaluate_mu_via_parity(&terminal, &MuFormula::<Atom, u8>::True, |_atom, _state| {
+            false
+        })
+        .unwrap();
     assert!(true_result
         .even_strategy
         .choices
@@ -63,21 +65,18 @@ fn typed_strategy_evidence_maps_semantic_moves_and_initial_winners() {
         .iter()
         .any(|choice| choice.semantic_move == MuParityMove::ModalTerminalSelfLoop));
 
-    let nu_formula = MuFormula::<Atom, u8>::nu(
-        0,
-        MuFormula::diamond(MuFormula::var(0)),
-    );
-    let nu_result =
-        evaluate_mu_via_parity(&terminal, &nu_formula, |_atom, _state| false).unwrap();
+    let nu_formula = MuFormula::<Atom, u8>::nu(0, MuFormula::diamond(MuFormula::var(0)));
+    let nu_result = evaluate_mu_via_parity(&terminal, &nu_formula, |_atom, _state| false).unwrap();
     assert!(nu_result
         .even_strategy
         .choices
         .iter()
         .any(|choice| choice.semantic_move == MuParityMove::FixpointBody));
-    assert!(nu_result.even_strategy.choices.iter().any(|choice| matches!(
-        choice.semantic_move,
-        MuParityMove::VariableReturn { .. }
-    )));
+    assert!(nu_result
+        .even_strategy
+        .choices
+        .iter()
+        .any(|choice| matches!(choice.semantic_move, MuParityMove::VariableReturn { .. })));
 
     let edge_model = TransitionSystem::new(
         "mu-evidence-edge",
@@ -93,21 +92,21 @@ fn typed_strategy_evidence_maps_semantic_moves_and_initial_winners() {
     )
     .unwrap();
     let modal = MuFormula::<Atom, u8>::diamond(MuFormula::True);
-    let modal_result =
-        evaluate_mu_via_parity(&edge_model, &modal, |_atom, _state| false).unwrap();
-    assert!(modal_result.even_strategy.choices.iter().any(|choice| matches!(
-        choice.semantic_move,
-        MuParityMove::ModalSuccessor {
-            target_state_index: 1
-        }
-    )));
-    assert!(verify_mu_parity_evidence(
-        &edge_model,
-        &modal,
-        |_atom, _state| false,
-        &modal_result,
-    )
-    .is_ok());
+    let modal_result = evaluate_mu_via_parity(&edge_model, &modal, |_atom, _state| false).unwrap();
+    assert!(modal_result
+        .even_strategy
+        .choices
+        .iter()
+        .any(|choice| matches!(
+            choice.semantic_move,
+            MuParityMove::ModalSuccessor {
+                target_state_index: 1
+            }
+        )));
+    assert!(
+        verify_mu_parity_evidence(&edge_model, &modal, |_atom, _state| false, &modal_result,)
+            .is_ok()
+    );
 }
 
 #[test]
@@ -132,12 +131,7 @@ fn evidence_verifier_rejects_position_move_strategy_partition_and_initial_tamper
     let mut bad_position = original.clone();
     bad_position.positions[0].kind = MuParityPositionKind::False;
     assert!(matches!(
-        verify_mu_parity_evidence(
-            &model,
-            &truth,
-            |_atom, _state| false,
-            &bad_position
-        ),
+        verify_mu_parity_evidence(&model, &truth, |_atom, _state| false, &bad_position),
         Err(MuParityEvidenceError::PositionMismatch { vertex: 0 })
     ));
 
@@ -159,12 +153,7 @@ fn evidence_verifier_rejects_position_move_strategy_partition_and_initial_tamper
     let mut missing_move = original.clone();
     missing_move.even_strategy.choices.clear();
     assert!(matches!(
-        verify_mu_parity_evidence(
-            &model,
-            &truth,
-            |_atom, _state| false,
-            &missing_move
-        ),
+        verify_mu_parity_evidence(&model, &truth, |_atom, _state| false, &missing_move),
         Err(MuParityEvidenceError::Strategy {
             player: ParityPlayer::Even,
             ..
@@ -174,21 +163,15 @@ fn evidence_verifier_rejects_position_move_strategy_partition_and_initial_tamper
     let mut bad_initial = original.clone();
     bad_initial.initial_evidence[0].winner = ParityPlayer::Odd;
     assert!(matches!(
-        verify_mu_parity_evidence(
-            &model,
-            &truth,
-            |_atom, _state| false,
-            &bad_initial
-        ),
+        verify_mu_parity_evidence(&model, &truth, |_atom, _state| false, &bad_initial),
         Err(MuParityEvidenceError::InitialEvidenceMismatch { index: 0 })
     ));
 
     let atom_formula = MuFormula::<Atom, u8>::atom(Atom::P);
-    let atom_result =
-        evaluate_mu_via_parity(&model, &atom_formula, |atom, state| {
-            matches!(atom, Atom::P) && *state == 0
-        })
-        .unwrap();
+    let atom_result = evaluate_mu_via_parity(&model, &atom_formula, |atom, state| {
+        matches!(atom, Atom::P) && *state == 0
+    })
+    .unwrap();
     let mut bad_partition = atom_result.clone();
     bad_partition.odd_strategy.winning_positions.clear();
     assert!(matches!(
@@ -235,15 +218,18 @@ fn nested_alternation_and_shadowing_evidence_is_canonical_and_verifiable() {
     let direct = evaluate_mu(&model, &formula, atom).unwrap();
     let parity = evaluate_mu_via_parity(&model, &formula, atom).unwrap();
 
-    assert_eq!(parity.satisfying_state_indices, direct.satisfying_state_indices);
-    assert!(parity.positions.iter().any(|position| matches!(
-        position.kind,
-        MuParityPositionKind::Fixpoint { .. }
-    )));
-    assert!(parity.positions.iter().any(|position| matches!(
-        position.kind,
-        MuParityPositionKind::Variable { .. }
-    )));
+    assert_eq!(
+        parity.satisfying_state_indices,
+        direct.satisfying_state_indices
+    );
+    assert!(parity
+        .positions
+        .iter()
+        .any(|position| matches!(position.kind, MuParityPositionKind::Fixpoint { .. })));
+    assert!(parity
+        .positions
+        .iter()
+        .any(|position| matches!(position.kind, MuParityPositionKind::Variable { .. })));
     assert!(verify_mu_parity_evidence(&model, &formula, atom, &parity).is_ok());
 }
 
@@ -263,11 +249,12 @@ fn generated_typed_evidence_matches_m75_and_m81_on_all_two_state_graphs() {
                         Atom::Q => q_mask & (1 << *state) != 0,
                     })
                     .unwrap();
-                    let parity = evaluate_mu_via_parity(&model, formula, |atom, state| match atom {
-                        Atom::P => p_mask & (1 << *state) != 0,
-                        Atom::Q => q_mask & (1 << *state) != 0,
-                    })
-                    .unwrap();
+                    let parity =
+                        evaluate_mu_via_parity(&model, formula, |atom, state| match atom {
+                            Atom::P => p_mask & (1 << *state) != 0,
+                            Atom::Q => q_mask & (1 << *state) != 0,
+                        })
+                        .unwrap();
 
                     assert_eq!(
                         parity.satisfying_state_indices,
