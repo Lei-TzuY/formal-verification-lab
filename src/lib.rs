@@ -15,6 +15,7 @@ pub mod buchi_report;
 pub mod builder;
 pub mod checker;
 pub mod combined_fairness;
+pub mod ctl;
 pub mod declarative;
 pub mod declarative_deadlock;
 pub mod declarative_deadlock_report;
@@ -95,6 +96,10 @@ pub use checker::{
 };
 pub use combined_fairness::{
     check_buchi_with_fairness_profile, FairnessProfile, FairnessProfileError,
+};
+pub use ctl::{
+    evaluate_ctl, CtlError, CtlEvaluation, CtlEvidence, CtlEvidenceAction, CtlEvidenceStep,
+    CtlFormula, CtlInitialEvaluation, CtlTerminalPolicy,
 };
 pub use declarative::{
     parse_declarative_document, parse_declarative_model, DeclarativeDocument, DeclarativeModelError,
