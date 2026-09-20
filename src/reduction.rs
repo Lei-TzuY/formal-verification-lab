@@ -260,14 +260,16 @@ fn validate_pair<S>(
     graph: &ReachableGraph<S>,
     left: &str,
     right: &str,
-) -> Result<(), IndependenceValidationError> {
+) -> Result<(), IndependenceValidationError>
+where
+    S: Clone + Eq + Hash,
+{
     for state_index in 0..graph.states.len() {
         let left_target = unique_action_target(&graph.outgoing[state_index], state_index, left)?;
         let right_target = unique_action_target(&graph.outgoing[state_index], state_index, right)?;
 
         let right_after_left = if let Some(left_state) = left_target {
-            let observed =
-                unique_action_target(&graph.outgoing[left_state], left_state, right)?;
+            let observed = unique_action_target(&graph.outgoing[left_state], left_state, right)?;
             if right_target.is_some() != observed.is_some() {
                 return Err(IndependenceValidationError::EnablednessChanged {
                     state_index,
@@ -284,8 +286,7 @@ fn validate_pair<S>(
         };
 
         let left_after_right = if let Some(right_state) = right_target {
-            let observed =
-                unique_action_target(&graph.outgoing[right_state], right_state, left)?;
+            let observed = unique_action_target(&graph.outgoing[right_state], right_state, left)?;
             if left_target.is_some() != observed.is_some() {
                 return Err(IndependenceValidationError::EnablednessChanged {
                     state_index,
@@ -302,10 +303,10 @@ fn validate_pair<S>(
         };
 
         if let (Some(left_state), Some(right_state)) = (left_target, right_target) {
-            let left_then_right = right_after_left
-                .expect("enabledness preservation requires right after left");
-            let right_then_left = left_after_right
-                .expect("enabledness preservation requires left after right");
+            let left_then_right =
+                right_after_left.expect("enabledness preservation requires right after left");
+            let right_then_left =
+                left_after_right.expect("enabledness preservation requires left after right");
             if left_then_right != right_then_left {
                 return Err(IndependenceValidationError::NonCommuting {
                     state_index,
@@ -320,16 +321,14 @@ fn validate_pair<S>(
                 if invariant.holds(&graph.states[left_state])
                     != invariant.holds(&graph.states[right_state])
                 {
-                    return Err(
-                        IndependenceValidationError::InvariantObservationMismatch {
-                            state_index,
-                            left: left.to_owned(),
-                            right: right.to_owned(),
-                            invariant: invariant.name().to_owned(),
-                            left_state_index: left_state,
-                            right_state_index: right_state,
-                        },
-                    );
+                    return Err(IndependenceValidationError::InvariantObservationMismatch {
+                        state_index,
+                        left: left.to_owned(),
+                        right: right.to_owned(),
+                        invariant: invariant.name().to_owned(),
+                        left_state_index: left_state,
+                        right_state_index: right_state,
+                    });
                 }
             }
         }
@@ -360,10 +359,10 @@ fn unique_action_target(
     Ok(target)
 }
 
-fn first_invariant_violations<S>(
-    model: &TransitionSystem<S>,
-    states: &[S],
-) -> Vec<Option<String>> {
+fn first_invariant_violations<S>(model: &TransitionSystem<S>, states: &[S]) -> Vec<Option<String>>
+where
+    S: Clone + Eq + Hash,
+{
     states
         .iter()
         .map(|state| {
@@ -722,9 +721,7 @@ where
         });
         context.discovered_states.insert(transition.target);
 
-        if let Some(counterexample) =
-            explore_validated_snapshot(next_id, &next_sleep, context)
-        {
+        if let Some(counterexample) = explore_validated_snapshot(next_id, &next_sleep, context) {
             return Some(counterexample);
         }
 
