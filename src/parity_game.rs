@@ -432,8 +432,8 @@ fn zielonka(game: &ParityGame, active: &[bool]) -> RecursiveSolution {
     let first = zielonka(game, &remainder);
     let opponent = player.opponent();
     let opponent_region = match opponent {
-        ParityPlayer::Even => &first.even_winning,
-        ParityPlayer::Odd => &first.odd_winning,
+        ParityPlayer::Even => first.even_winning.clone(),
+        ParityPlayer::Odd => first.odd_winning.clone(),
     };
 
     if !opponent_region.iter().any(|value| *value) {
@@ -449,13 +449,13 @@ fn zielonka(game: &ParityGame, active: &[bool]) -> RecursiveSolution {
     }
 
     let (opponent_attractor, opponent_attractor_strategy) =
-        attractor(game, active, opponent_region, opponent);
+        attractor(game, active, &opponent_region, opponent);
     let second_remainder = subtract(active, &opponent_attractor);
     let second = zielonka(game, &second_remainder);
 
     finish_opponent_recovers(
         opponent,
-        opponent_region,
+        &opponent_region,
         opponent_attractor,
         opponent_attractor_strategy,
         first,
