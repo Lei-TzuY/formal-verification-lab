@@ -17,8 +17,8 @@ impl ParityPlayer {
 
     fn owns_priority(self, priority: usize) -> bool {
         match self {
-            Self::Even => priority % 2 == 0,
-            Self::Odd => priority % 2 == 1,
+            Self::Even => priority.is_multiple_of(2),
+            Self::Odd => !priority.is_multiple_of(2),
         }
     }
 }
