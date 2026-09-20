@@ -42,6 +42,7 @@ pub mod monitor_fairness;
 pub mod monitor_report;
 pub mod monitor_strong_fairness;
 pub mod mu_calculus;
+pub mod mu_bounded;
 pub mod mu_parse;
 pub mod multi_response;
 pub mod multi_response_examples;
@@ -174,6 +175,10 @@ pub use monitor_strong_fairness::{
 pub use mu_calculus::{
     compile_ctl_to_mu, evaluate_mu, validate_mu_formula, MuError, MuEvaluation, MuFormula,
     MuInitialEvaluation, MuTerminalPolicy, MuValidationError,
+};
+pub use mu_bounded::{
+    evaluate_mu_with_limits, BoundedMuError, BoundedMuEvaluation, BoundedMuInitialEvaluation,
+    BoundedMuStatus, BoundedMuTruth,
 };
 pub use mu_parse::{parse_mu_formula, render_mu_formula, MuParseError, MuParseErrorKind};
 pub use multi_response::{
