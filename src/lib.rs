@@ -44,11 +44,13 @@ pub mod monitor_strong_fairness;
 pub mod mu_bounded;
 pub mod mu_calculus;
 pub mod mu_parse;
+pub mod mu_parity;
 pub mod multi_response;
 pub mod multi_response_examples;
 pub mod multi_response_report;
 pub mod multi_temporal;
 mod product;
+pub mod parity_game;
 pub mod property;
 pub mod proposition;
 pub mod proposition_expr;
@@ -185,6 +187,7 @@ pub use mu_calculus::{
     MuInitialEvaluation, MuTerminalPolicy, MuValidationError,
 };
 pub use mu_parse::{parse_mu_formula, render_mu_formula, MuParseError, MuParseErrorKind};
+pub use mu_parity::{evaluate_mu_via_parity, MuParityError, MuParityEvaluation};
 pub use multi_response::{
     check_multi_response, check_multi_response_with_limits,
     check_multi_response_with_product_limits, check_multi_response_with_strong_fairness,
@@ -205,6 +208,9 @@ pub use multi_temporal::{
     parse_multi_response_temporal, ExactResponseClause, MultiResponseTemporalParseError,
     MultiResponseTemporalParseErrorKind, MultiResponseTemporalSpec, MultiResponseTemporalSpecError,
     ResponseActionRole,
+};
+pub use parity_game::{
+    solve_parity_game, ParityGame, ParityGameError, ParityPlayer, ParitySolution,
 };
 pub use property::{
     check_deadlock, check_deadlock_with_limits, check_reachability, check_reachability_with_limits,
