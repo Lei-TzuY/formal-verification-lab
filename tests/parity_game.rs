@@ -1,25 +1,13 @@
-use formal_verification_lab::{
-    solve_parity_game, ParityGame, ParityGameError, ParityPlayer,
-};
+use formal_verification_lab::{solve_parity_game, ParityGame, ParityGameError, ParityPlayer};
 
 #[test]
 fn self_loops_follow_priority_parity() {
-    let even = ParityGame::new(
-        vec![ParityPlayer::Even],
-        vec![0],
-        vec![vec![0]],
-    )
-    .unwrap();
+    let even = ParityGame::new(vec![ParityPlayer::Even], vec![0], vec![vec![0]]).unwrap();
     let even_solution = solve_parity_game(&even);
     assert!(even_solution.even_wins(0));
     assert!(!even_solution.odd_wins(0));
 
-    let odd = ParityGame::new(
-        vec![ParityPlayer::Even],
-        vec![1],
-        vec![vec![0]],
-    )
-    .unwrap();
+    let odd = ParityGame::new(vec![ParityPlayer::Even], vec![1], vec![vec![0]]).unwrap();
     let odd_solution = solve_parity_game(&odd);
     assert!(!odd_solution.even_wins(0));
     assert!(odd_solution.odd_wins(0));
@@ -56,32 +44,17 @@ fn construction_fails_closed_on_non_total_or_invalid_games() {
     );
 
     assert!(matches!(
-        ParityGame::new(
-            vec![ParityPlayer::Even],
-            vec![0, 1],
-            vec![vec![0]],
-        )
-        .unwrap_err(),
+        ParityGame::new(vec![ParityPlayer::Even], vec![0, 1], vec![vec![0]],).unwrap_err(),
         ParityGameError::LengthMismatch { .. }
     ));
 
     assert_eq!(
-        ParityGame::new(
-            vec![ParityPlayer::Even],
-            vec![0],
-            vec![Vec::new()],
-        )
-        .unwrap_err(),
+        ParityGame::new(vec![ParityPlayer::Even], vec![0], vec![Vec::new()],).unwrap_err(),
         ParityGameError::DeadEnd { vertex: 0 }
     );
 
     assert_eq!(
-        ParityGame::new(
-            vec![ParityPlayer::Even],
-            vec![0],
-            vec![vec![1]],
-        )
-        .unwrap_err(),
+        ParityGame::new(vec![ParityPlayer::Even], vec![0], vec![vec![1]],).unwrap_err(),
         ParityGameError::InvalidTarget {
             vertex: 0,
             target: 1,
