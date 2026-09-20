@@ -79,7 +79,8 @@ fn run_loaded_job_with_provider(
         Ok(value) => value,
         Err(error) => return setup_error(job, None, error.to_string()),
     };
-    let certificate_source_id = match resolve_source_id(manifest_source_id, job.certificate_path()) {
+    let certificate_source_id = match resolve_source_id(manifest_source_id, job.certificate_path())
+    {
         Ok(value) => value,
         Err(error) => return setup_error(job, None, error.to_string()),
     };
