@@ -1,4 +1,6 @@
-use crate::graph::{capture_reachable_graph, GraphCaptureError, ReachableGraph};
+use crate::graph::{
+    capture_reachable_graph, CapturedReachableGraph, GraphCaptureError, ReachableGraph,
+};
 use crate::model::{ModelError, TransitionSystem};
 use std::collections::{HashMap, VecDeque};
 use std::fmt;
@@ -189,10 +191,23 @@ where
     F: Fn(&A, &S) -> bool,
 {
     let captured = capture_reachable_graph(model).map_err(map_capture_error)?;
+    Ok(evaluate_captured_ctl(captured, formula, &atom_holds))
+}
+
+pub(crate) fn evaluate_captured_ctl<S, A, F>(
+    captured: CapturedReachableGraph<S>,
+    formula: &CtlFormula<A>,
+    atom_holds: &F,
+) -> CtlEvaluation<S>
+where
+    S: Clone,
+    A: Clone + Eq + Hash,
+    F: Fn(&A, &S) -> bool,
+{
     let graph = captured.graph;
     let mut evaluator = Evaluator {
         graph: &graph,
-        atom_holds: &atom_holds,
+        atom_holds,
         memo: HashMap::new(),
     };
 
@@ -219,7 +234,7 @@ where
     let memoized_subformulas = evaluator.memo.len();
     drop(evaluator);
 
-    Ok(CtlEvaluation {
+    CtlEvaluation {
         terminal_policy: CtlTerminalPolicy::TotalizeWithSelfLoop,
         reachable_states: graph.states,
         satisfying_state_indices,
@@ -228,7 +243,7 @@ where
         explored_transitions: captured.explored_transitions,
         max_depth_reached: captured.max_depth_reached,
         memoized_subformulas,
-    })
+    }
 }
 
 fn map_capture_error(error: GraphCaptureError) -> CtlError {
