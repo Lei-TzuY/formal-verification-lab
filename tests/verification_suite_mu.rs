@@ -43,9 +43,7 @@ fn write_mu_job(root: &Path, name: &str, property: &str, tail: &str) -> PathBuf 
     let manifest = root.join(format!("{name}.fvj"));
     fs::write(
         &manifest,
-        format!(
-            "analysis \"mu-calculus\"\nmodel \"{name}.fvl\"\nproperty \"{name}.mu\"\n{tail}"
-        ),
+        format!("analysis \"mu-calculus\"\nmodel \"{name}.fvl\"\nproperty \"{name}.mu\"\n{tail}"),
     )
     .unwrap();
     manifest
@@ -95,12 +93,7 @@ fn expectation_args(suite: &Path) -> Vec<String> {
 fn generic_suite_preserves_schema_v4_mu_envelopes_and_heterogeneous_order() {
     let root = fixture_dir("raw");
     let satisfied = write_mu_job(&root, "mu-satisfied", REACH_COMPLETE, "");
-    let inconclusive = write_mu_job(
-        &root,
-        "mu-cutoff",
-        REACH_COMPLETE,
-        "max-model-states 1\n",
-    );
+    let inconclusive = write_mu_job(&root, "mu-cutoff", REACH_COMPLETE, "max-model-states 1\n");
     let safety = write_safety_job(&root);
     let malformed = write_mu_job(&root, "mu-error", "mu X. (", "");
 
@@ -161,12 +154,7 @@ fn expectation_suite_compares_only_outcomes_and_keeps_full_mu_details() {
     let root = fixture_dir("expectations");
     let satisfied = write_mu_job(&root, "mu-satisfied", REACH_COMPLETE, "");
     let violated = write_mu_job(&root, "mu-violated", r#""complete""#, "");
-    let cutoff = write_mu_job(
-        &root,
-        "mu-cutoff",
-        REACH_COMPLETE,
-        "max-model-states 1\n",
-    );
+    let cutoff = write_mu_job(&root, "mu-cutoff", REACH_COMPLETE, "max-model-states 1\n");
 
     let suite = root.join("suite.fvs");
     fs::write(
@@ -203,13 +191,15 @@ fn expectation_suite_compares_only_outcomes_and_keeps_full_mu_details() {
         run.envelope.jobs[2].result.mu.as_ref().unwrap().initial[0].truth,
         VerificationJobMuTruth::Unknown
     );
-    assert!(run.envelope.jobs[2]
-        .result
-        .mu
-        .as_ref()
-        .unwrap()
-        .fixpoint_iterations
-        > 0);
+    assert!(
+        run.envelope.jobs[2]
+            .result
+            .mu
+            .as_ref()
+            .unwrap()
+            .fixpoint_iterations
+            > 0
+    );
 
     fs::remove_dir_all(root).unwrap();
 }
