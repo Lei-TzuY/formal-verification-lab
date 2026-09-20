@@ -36,8 +36,8 @@ pub(crate) fn run_mu_job_json_from_text(
             (envelope, exit_code)
         }
         (VerificationJobMuBackend::Fixpoint, false) => {
-            let result =
-                check_declarative_mu_text(&document, property_input).map_err(|error| error.to_string())?;
+            let result = check_declarative_mu_text(&document, property_input)
+                .map_err(|error| error.to_string())?;
             let exit_code = match result.status {
                 DeclarativeMuStatus::Satisfied => 0,
                 DeclarativeMuStatus::Violated => 15,
