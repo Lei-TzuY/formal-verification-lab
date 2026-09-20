@@ -111,7 +111,8 @@ impl VerificationJob {
     }
 
     pub fn mu_backend(&self) -> VerificationJobMuBackend {
-        self.mu_backend.unwrap_or(VerificationJobMuBackend::Fixpoint)
+        self.mu_backend
+            .unwrap_or(VerificationJobMuBackend::Fixpoint)
     }
 
     pub fn model_path(&self) -> &str {
