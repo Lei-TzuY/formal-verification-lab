@@ -1,5 +1,5 @@
 use crate::bounded::BoundedOutcome;
-use crate::checker::{ExplorationLimits, InconclusiveReason};
+use crate::checker::ExplorationLimits;
 use crate::ctl::{
     evaluate_captured_ctl, CtlEvidence, CtlEvidenceAction, CtlEvidenceStep, CtlFormula,
 };
