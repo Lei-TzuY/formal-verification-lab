@@ -17,10 +17,7 @@ fn validator_rejects_unbound_and_negative_fixpoint_variables() {
         Err(MuValidationError::UnboundVariable { variable: "X" })
     );
 
-    let non_monotone = MuFormula::<Atom, &str>::mu(
-        "X",
-        MuFormula::negate(MuFormula::var("X")),
-    );
+    let non_monotone = MuFormula::<Atom, &str>::mu("X", MuFormula::negate(MuFormula::var("X")));
     assert_eq!(
         validate_mu_formula(&non_monotone),
         Err(MuValidationError::NonMonotoneVariable { variable: "X" })
@@ -57,7 +54,10 @@ fn lexical_shadowing_uses_the_nearest_fixpoint_binder() {
     })
     .unwrap();
 
-    assert_eq!(result.terminal_policy, MuTerminalPolicy::TotalizeWithSelfLoop);
+    assert_eq!(
+        result.terminal_policy,
+        MuTerminalPolicy::TotalizeWithSelfLoop
+    );
     assert!(result.fixpoint_iterations > 0);
 }
 
@@ -107,26 +107,17 @@ fn modal_operators_totalize_reachable_terminals_with_self_loops() {
 
     let diamond_true = MuFormula::<Atom, &str>::diamond(MuFormula::True);
     let box_false = MuFormula::<Atom, &str>::boxed(MuFormula::False);
-    let nu_loop = MuFormula::<Atom, &str>::nu(
-        "X",
-        MuFormula::diamond(MuFormula::var("X")),
-    );
+    let nu_loop = MuFormula::<Atom, &str>::nu("X", MuFormula::diamond(MuFormula::var("X")));
 
-    assert!(
-        evaluate_mu(&model, &diamond_true, |_atom, _state| false)
-            .unwrap()
-            .all_initial_states_satisfy()
-    );
-    assert!(
-        !evaluate_mu(&model, &box_false, |_atom, _state| false)
-            .unwrap()
-            .all_initial_states_satisfy()
-    );
-    assert!(
-        evaluate_mu(&model, &nu_loop, |_atom, _state| false)
-            .unwrap()
-            .all_initial_states_satisfy()
-    );
+    assert!(evaluate_mu(&model, &diamond_true, |_atom, _state| false)
+        .unwrap()
+        .all_initial_states_satisfy());
+    assert!(!evaluate_mu(&model, &box_false, |_atom, _state| false)
+        .unwrap()
+        .all_initial_states_satisfy());
+    assert!(evaluate_mu(&model, &nu_loop, |_atom, _state| false)
+        .unwrap()
+        .all_initial_states_satisfy());
 }
 
 #[test]
@@ -206,8 +197,7 @@ fn generated_ctl_to_mu_unary_differential_matches_all_three_state_graphs() {
                 let ctl_result = evaluate_ctl(&model, &ctl, atom).unwrap();
                 let mu_result = evaluate_mu(&model, &mu, atom).unwrap();
                 assert_eq!(
-                    mu_result.satisfying_state_indices,
-                    ctl_result.satisfying_state_indices,
+                    mu_result.satisfying_state_indices, ctl_result.satisfying_state_indices,
                     "CTL->mu unary mismatch graph={graph_code} p_mask={p_mask} formula={ctl:?}"
                 );
                 comparisons += 1;
