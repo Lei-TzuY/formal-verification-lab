@@ -164,46 +164,64 @@ M86 makes no cryptographic authenticity, signature, trust-chain, bounded-parity,
 
 ## Milestone 87 — reproducible modal mu-calculus certificate verification jobs
 
-**Status: implementation candidate complete on PR #86.**
+**Status: sealed in `main` at `e057d31bd60b6ddd0def54f98933f7178a07767c`.**
 
-M87 promotes M86 certificate verification into a dedicated manifest-relative machine-readable job surface without misclassifying artifact validity as model-checking truth and without modifying M83 schema-v4.
-
-Implemented contract:
-
-- certificate-verification manifests have exactly three required path directives: `model`, `property`, and `certificate`; paths resolve relative to the manifest and canonical rendering is deterministic;
-- result schema v1 uses explicit `verified / rejected / error` semantics rather than `satisfied / violated` or structural recurrence outcomes;
-- exit codes are 0 for `verified`, 16 for `rejected`, and 2 for `error`;
-- malformed/unreadable manifests, missing files, model parse failures, formula parse/validation/proposition-binding failures, and other setup failures that prevent artifact validation are `error`;
-- once the referenced certificate file is successfully loaded, unsupported/truncated/malformed certificate syntax, wrong model/formula binding, or M85/M86 evidence verification failure is `rejected`;
-- deterministic JSON records result schema, submitted relative model/property/certificate paths, canonical formula when setup succeeds, submitted certificate schema when recoverable, and one stable message; machine-specific resolved absolute paths are not emitted;
-- the runner never creates a replacement certificate and contains no parity-solver call; it verifies only the submitted artifact through M86;
-- direct CLI integration is `fvlab mu certificate job <manifest> [--format json]`;
-- regressions cover canonical manifest parsing, duplicate/missing/unknown directives, manifest-relative verified execution, deterministic JSON, unsupported/truncated/accounting-tampered certificates, missing artifacts, invalid formulas, wrong model/formula bindings, and direct-runner vs built-binary equality across all three outcomes.
-
-During convergence, CI first exposed a malformed Rust string escape in the manifest quoting helper and then an invalid `Option<char>::is_some_and` method-pointer signature; both root causes were fixed without changing outcome semantics or test expectations.
-
-Exact implementation candidate `a39b48236e779b1ec0681bf2ae543b3a298fe1c8` passed CI #712 (format, all-target build, Clippy with `-D warnings`, full tests including M87 runner/built-binary three-state differentials and every historical CTL/μ/parity/certificate/job/suite/CLI gate) and Bounded state-property CLI #562. Closure metadata changes must pass the same exact-head gates before merge.
+M87 promotes M86 certificate verification into a dedicated manifest-relative machine-readable job surface with explicit `verified / rejected / error` semantics, deterministic JSON, 0/16/2 exit codes, relative model/property/certificate paths, direct `fvlab mu certificate job` execution, and strict separation between setup `error` and loaded-artifact `rejected`. The runner verifies only the submitted M86 artifact and never creates or re-solves a replacement certificate. Exact closure candidate `1996fc438881e58663a05334e963dc3cff8a5fa5` passed CI #714 and Bounded state-property CLI #564 before squash integration.
 
 M87 makes no certificate-authenticity, signature, trust-chain, bounded-parity, symbolic, fairness, or performance claim.
 
-## Next frontier — Milestone 88: outcome-neutral multi-family job orchestration
+## Milestone 88 — outcome-neutral multi-family job orchestration
 
-Post-M87 architecture audit found that the existing verification and structural suite layers each duplicate manifest parsing, relative-path dispatch, aggregation, expectation handling, deterministic JSON and CLI integration around a family-specific outcome enum. Adding a third certificate-specific suite engine would repeat the same architecture again and would not constitute a meaningful promotion.
+**Status: implementation candidate complete on PR #87.**
 
-M88 should introduce one outcome-neutral orchestration layer able to mix sealed verification, structural and certificate-verification jobs while preserving every family's native result envelope and expectation vocabulary.
+M88 adds one additive family-tagged orchestration layer above the sealed verification, structural and certificate-verification job protocols instead of creating a third family-specific suite engine.
+
+Implemented contract:
+
+- orchestration manifests use explicit `verification`, `structural`, and `certificate-verification` family tags; dispatch never probes file contents or relies on parse failure to infer a family;
+- every job path resolves relative to the orchestration manifest, while duplicate identity is `(family, path)`, so one logical path can be referenced under different explicitly declared families without ambiguity;
+- expectations are family-aware and fail closed at parse time on cross-family values such as `verified` for a verification job;
+- nested family result envelopes remain typed and are preserved verbatim in deterministic JSON; heterogeneous payloads use indirection so the orchestration enum does not inherit the largest verification-result size;
+- raw orchestration status is deliberately operational rather than domain-semantic: `complete`, `attention`, or `error`;
+- verification `violated`, structural `cycle_found`, and other family-native non-error outcomes do not become orchestration failures; certificate `rejected` yields `attention`, while family `error` yields orchestration `error`;
+- raw exit codes are 0 / 16 / 2 for `complete / attention / error`;
+- expectation mode requires every entry to declare a family-native expected outcome, reports `matched / mismatched / error`, preserves a separate execution status, and uses exit 13 for mismatch;
+- an expected `rejected` or `error` may satisfy a regression expectation while the original nested result and operational status remain visible;
+- built `fvlab-orchestrate <suite> [--check-expectations] --format json` exposes the generic layer without removing or reinterpreting existing verification/structural suite APIs or CLIs;
+- mixed-family regressions execute real modal μ verification, recurrence, and certificate-verification jobs, compare nested typed envelopes to each direct family runner, cover complete/attention/error plus matched/mismatch behavior, lock the verification-violation and structural-cycle neutrality boundary, and require built CLI stdout/exit to equal the library runner.
+
+Convergence evidence:
+
+- initial candidate CI #716 exposed rustfmt-only ordering/layout differences; those were applied without semantic changes;
+- CI #721 then exposed Clippy `large_enum_variant` on heterogeneous typed payloads; the fix boxes all family payloads rather than suppressing the warning, preserving exact nested values and JSON;
+- exact implementation candidate `414a6da76fb3b9557b514b4d05f92eca366ed3cc` passed CI #724 (format, all-target build, Clippy with `-D warnings`, full tests including mixed-family orchestration/built-binary regressions plus every historical CTL/μ/parity/certificate/job/suite gate and every historical CLI smoke test) and Bounded state-property CLI #574.
+
+Closure metadata changes must pass the same exact-head gates before merge.
+
+M88 introduces no performance, cryptographic authenticity, bounded-parity, symbolic, or fairness claim.
+
+## Next frontier — Milestone 89: host-independent virtual workspace execution
+
+Post-M88 architecture audit found that all three canonical job formats now have deterministic `canonical_document()` renderers and M88 supplies deterministic family-tagged orchestration, but execution is still directly coupled to host filesystem I/O:
+
+- verification, structural, certificate-verification, verification-suite, structural-suite and orchestration runners call `fs::read_to_string` directly;
+- there is no source-provider, virtual-filesystem, loader, or in-memory workspace abstraction in the repository;
+- verification and structural runners embed resolved filesystem paths in some I/O error strings, while certificate-verification already uses submitted logical paths for referenced model/property/certificate failures;
+- M88 preserves nested family envelopes exactly, so any host-path instability in a family runner is intentionally inherited rather than rewritten;
+- no digest/hash/provenance layer currently records which exact logical source texts produced a result.
+
+M89 should introduce one host-independent UTF-8 text-source execution substrate that can execute the sealed job families and M88 orchestration from logical source identities rather than hard-wired filesystem reads.
 
 Acceptance criteria:
 
-- define an explicit job-family discriminator for suite entries, with at least `verification`, `structural`, and `certificate-verification`; do not infer family by probing files or parsing failures;
-- resolve every referenced job path relative to the suite manifest and dispatch exclusively through the sealed family runner;
-- preserve each nested result envelope verbatim rather than coercing outcomes into a shared `satisfied/violated` enum;
-- represent aggregate execution status independently from domain outcomes: orchestration must report whether entries executed and whether any family result is an error/rejection/failing expectation without rewriting the underlying family result;
-- expectation syntax must be family-aware and fail closed on invalid cross-family values (for example `verified` is not a verification-property outcome);
-- raw mode must preserve deterministic suite ordering and exact direct-runner JSON payloads for all three families;
-- expectation mode must compare only the declared family-native outcome while preserving the complete nested result payload;
-- retain bounded maximum job counts, duplicate-path detection within a family-aware entry identity, deterministic canonical manifest rendering, and stable JSON/exit codes;
-- provide one built orchestration CLI rather than three new family-specific suite binaries;
-- add mixed verification + recurrence + certificate valid/rejected/error integration fixtures and direct-runner vs built-CLI differentials;
-- preserve the existing `fvlab-suite` verification suite and structural suite APIs/CLIs for compatibility unless a migration is separately proven safe; M88 should add the generic layer first rather than perform a breaking consolidation;
-- preserve every historical CTL/μ/parity/certificate/job/suite/CLI gate and make no performance or cryptographic claim.
+- define one logical text-source provider abstraction shared by verification, structural, certificate-verification and orchestration execution; do not add one loader abstraction per family;
+- provider-aware job runners must parse the same canonical manifests and resolve dependencies relative to the logical manifest identity, without direct `fs::read_to_string` calls in provider-mode core logic;
+- add a filesystem adapter so all existing path-based public APIs and CLIs remain compatible wrappers over the same execution semantics;
+- add an in-memory/map-backed provider suitable for deterministic tests and future portable replay; provider-mode execution must not require temporary files;
+- provider-mode diagnostics must use logical submitted source identities and must not leak host absolute paths;
+- add provider-aware M88 raw and expectation orchestration so an entire mixed-family workspace can execute without touching the host filesystem after sources are supplied;
+- differential tests must show filesystem and in-memory providers produce the same typed outcomes/nested JSON for representative satisfied/violated, cycle, verified/rejected and setup-error cases;
+- execute the same logical workspace under two different host roots and require byte-identical provider-mode JSON, including error cases;
+- preserve all existing family result schemas, exit semantics, certificate trust boundaries and current path-based APIs;
+- do not add a bundle/archive/hash/signature format in M89. Portable locked workspace artifacts should be a later milestone built on the sealed source-provider substrate rather than coupled to host-path behavior.
 
