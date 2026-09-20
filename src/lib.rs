@@ -303,8 +303,8 @@ pub use verification_execution::{
     execute_multi_response, MultiResponseExecutionConfig, MultiResponseExecutionResult,
 };
 pub use verification_job::{
-    parse_verification_job, VerificationJob, VerificationJobAnalysis, VerificationJobParseError,
-    VerificationJobParseErrorKind,
+    parse_verification_job, VerificationJob, VerificationJobAnalysis, VerificationJobMuBackend,
+    VerificationJobParseError, VerificationJobParseErrorKind,
 };
 pub use verification_job_run::{
     load_verification_job, run_verification_job_json, LoadedVerificationJob,
