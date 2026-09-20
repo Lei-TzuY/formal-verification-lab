@@ -363,10 +363,7 @@ pub fn verify_parity_strategy(
         let choice = strategy.choices[vertex];
         if !region[vertex] {
             if let Some(target) = choice {
-                return Err(ParityStrategyError::ChoiceOutsideWinningRegion {
-                    vertex,
-                    target,
-                });
+                return Err(ParityStrategyError::ChoiceOutsideWinningRegion { vertex, target });
             }
             continue;
         }
@@ -685,9 +682,7 @@ fn verify_strategy_parity(
             .collect::<Vec<_>>();
 
         for successor in restricted_successors(game, strategy, vertex) {
-            if allowed[successor]
-                && can_reach_within(game, strategy, successor, vertex, &allowed)
-            {
+            if allowed[successor] && can_reach_within(game, strategy, successor, vertex, &allowed) {
                 return Err(ParityStrategyError::LosingCycle {
                     player: strategy.player,
                     vertex,
