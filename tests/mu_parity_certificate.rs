@@ -43,7 +43,10 @@ label "done" "complete"
 "#,
     )
     .unwrap();
-    assert_eq!(compact.canonical_identity(), reformatted.canonical_identity());
+    assert_eq!(
+        compact.canonical_identity(),
+        reformatted.canonical_identity()
+    );
 
     let reordered = parse_declarative_document(
         r#"
@@ -98,12 +101,10 @@ fn certificate_binding_rejects_different_model_and_formula() {
     let document = parse_declarative_document(MODEL).unwrap();
     let certificate = create_declarative_mu_parity_certificate(&document, FORMULA).unwrap();
 
-    let different_model = parse_declarative_document(
-        &MODEL.replace(
-            r#"edge "start" "finish" "done""#,
-            r#"edge "start" "finish-renamed" "done""#,
-        ),
-    )
+    let different_model = parse_declarative_document(&MODEL.replace(
+        r#"edge "start" "finish" "done""#,
+        r#"edge "start" "finish-renamed" "done""#,
+    ))
     .unwrap();
     assert!(matches!(
         verify_declarative_mu_parity_certificate(&different_model, FORMULA, &certificate),
@@ -138,11 +139,16 @@ fn certificate_parser_fails_closed_on_truncation_duplicates_and_bad_references()
 
     let duplicate = rendered.replacen(
         "formula \"",
-        &format!("formula \"{}\"\nformula \"", certificate.formula.replace('"', "\\\"")),
+        &format!(
+            "formula \"{}\"\nformula \"",
+            certificate.formula.replace('"', "\\\"")
+        ),
         1,
     );
     let duplicate_error = parse_declarative_mu_parity_certificate(&duplicate).unwrap_err();
-    assert!(duplicate_error.to_string().contains("duplicate directive 'formula'"));
+    assert!(duplicate_error
+        .to_string()
+        .contains("duplicate directive 'formula'"));
 
     let mut out_of_range = certificate.clone();
     out_of_range.even_winning_vertices = vec![certificate.positions.len() + 7];
