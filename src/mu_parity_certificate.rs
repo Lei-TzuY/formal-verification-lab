@@ -2,7 +2,7 @@ use crate::declarative::DeclarativeDocument;
 use crate::declarative_mu::{
     check_declarative_mu_text_via_parity, validate_declarative_mu_formula, DeclarativeMuError,
 };
-use crate::graph::{capture_reachable_graph, GraphCaptureError};
+use crate::graph::capture_reachable_graph;
 use crate::mu_calculus::{MuInitialEvaluation, MuTerminalPolicy};
 use crate::mu_parity::{
     verify_mu_parity_evidence, MuParityEvaluation, MuParityEvidenceError, MuParityFixpointKind,
@@ -99,7 +99,7 @@ pub enum DeclarativeMuParityCertificateError {
         certificate: String,
         requested: String,
     },
-    Capture(GraphCaptureError),
+    CanonicalGraphCapture,
     MalformedEvidence {
         message: String,
     },
@@ -122,10 +122,9 @@ impl fmt::Display for DeclarativeMuParityCertificateError {
                 f,
                 "mu parity certificate formula binding mismatch: certificate={certificate:?}, requested={requested:?}"
             ),
-            Self::Capture(error) => write!(
-                f,
-                "mu parity certificate canonical graph capture failed: {error:?}"
-            ),
+            Self::CanonicalGraphCapture => {
+                write!(f, "mu parity certificate canonical graph capture failed")
+            }
             Self::MalformedEvidence { message } => {
                 write!(f, "mu parity certificate evidence is malformed: {message}")
             }
@@ -225,8 +224,8 @@ pub fn verify_declarative_mu_parity_certificate(
         });
     }
 
-    let captured =
-        capture_reachable_graph(document.model()).map_err(DeclarativeMuParityCertificateError::Capture)?;
+    let captured = capture_reachable_graph(document.model())
+        .map_err(|_| DeclarativeMuParityCertificateError::CanonicalGraphCapture)?;
     if certificate.parity_game_vertices != certificate.positions.len() {
         return Err(DeclarativeMuParityCertificateError::MalformedEvidence {
             message: format!(
