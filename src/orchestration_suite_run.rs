@@ -149,12 +149,7 @@ impl OrchestrationSuiteResultEnvelope {
             out.push('{');
             field_string(&mut out, "family", job.family.as_str(), true);
             field_string(&mut out, "manifest", &job.manifest, false);
-            field_u64(
-                &mut out,
-                "job_exit_code",
-                job.job_exit_code as u64,
-                false,
-            );
+            field_u64(&mut out, "job_exit_code", job.job_exit_code as u64, false);
             out.push_str(",\"result\":");
             out.push_str(&job.result.to_json());
             out.push('}');
@@ -272,12 +267,7 @@ impl OrchestrationRegressionSuiteResultEnvelope {
             field_string(&mut out, "expected", job.expected.as_str(), false);
             field_string(&mut out, "observed", &job.observed, false);
             field_bool(&mut out, "matched", job.matched, false);
-            field_u64(
-                &mut out,
-                "job_exit_code",
-                job.job_exit_code as u64,
-                false,
-            );
+            field_u64(&mut out, "job_exit_code", job.job_exit_code as u64, false);
             out.push_str(",\"result\":");
             out.push_str(&job.result.to_json());
             out.push('}');
@@ -337,9 +327,7 @@ pub fn load_orchestration_suite(
         .map_err(|error| OrchestrationSuiteLoadError::new(error.to_string()))
 }
 
-pub fn run_orchestration_suite_json(
-    manifest_path: impl AsRef<Path>,
-) -> OrchestrationSuiteJsonRun {
+pub fn run_orchestration_suite_json(manifest_path: impl AsRef<Path>) -> OrchestrationSuiteJsonRun {
     let manifest_path = manifest_path.as_ref();
     match run_orchestration_suite_json_inner(manifest_path) {
         Ok(run) => run,
@@ -393,7 +381,11 @@ fn run_orchestration_suite_expectations_json_inner(
     manifest_path: &Path,
 ) -> Result<OrchestrationRegressionSuiteJsonRun, String> {
     let suite = load_orchestration_suite(manifest_path).map_err(|error| error.to_string())?;
-    if suite.entries().iter().any(|entry| entry.expected().is_none()) {
+    if suite
+        .entries()
+        .iter()
+        .any(|entry| entry.expected().is_none())
+    {
         return Err(
             "expectation check requires every orchestration suite job to declare an expected outcome"
                 .to_owned(),
@@ -424,9 +416,7 @@ fn run_orchestration_suite_expectations_json_inner(
     let envelope = OrchestrationRegressionSuiteResultEnvelope::from_suite(&suite, jobs);
     let exit_code = match envelope.outcome {
         OrchestrationRegressionOutcome::Matched => 0,
-        OrchestrationRegressionOutcome::Mismatched => {
-            ORCHESTRATION_REGRESSION_MISMATCH_EXIT_CODE
-        }
+        OrchestrationRegressionOutcome::Mismatched => ORCHESTRATION_REGRESSION_MISMATCH_EXIT_CODE,
         OrchestrationRegressionOutcome::Error => 2,
     };
     Ok(OrchestrationRegressionSuiteJsonRun {
