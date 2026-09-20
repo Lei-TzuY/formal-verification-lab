@@ -1,5 +1,7 @@
 use crate::ctl::CtlFormula;
-use crate::graph::{capture_reachable_graph, GraphCaptureError, ReachableGraph};
+use crate::graph::{
+    capture_reachable_graph, CapturedReachableGraph, GraphCaptureError, ReachableGraph,
+};
 use crate::model::{ModelError, TransitionSystem};
 use std::collections::HashMap;
 use std::fmt;
@@ -241,11 +243,24 @@ where
 {
     validate_mu_formula(formula)?;
     let captured = capture_reachable_graph(model).map_err(map_capture_error)?;
-    let graph = captured.graph;
+    Ok(evaluate_captured_mu(captured, formula, &atom_holds))
+}
 
+pub(crate) fn evaluate_captured_mu<S, A, V, F>(
+    captured: CapturedReachableGraph<S>,
+    formula: &MuFormula<A, V>,
+    atom_holds: &F,
+) -> MuEvaluation<S>
+where
+    S: Clone,
+    A: Clone,
+    V: Clone + Eq + Hash,
+    F: Fn(&A, &S) -> bool,
+{
+    let graph = captured.graph;
     let mut evaluator = Evaluator {
         graph: &graph,
-        atom_holds: &atom_holds,
+        atom_holds,
         environment: HashMap::new(),
         fixpoint_iterations: 0,
         _atom: std::marker::PhantomData,
@@ -268,7 +283,7 @@ where
         })
         .collect();
 
-    Ok(MuEvaluation {
+    MuEvaluation {
         terminal_policy: MuTerminalPolicy::TotalizeWithSelfLoop,
         reachable_states: graph.states,
         satisfying_state_indices,
@@ -277,7 +292,7 @@ where
         explored_transitions: captured.explored_transitions,
         max_depth_reached: captured.max_depth_reached,
         fixpoint_iterations,
-    })
+    }
 }
 
 fn map_capture_error<V>(error: GraphCaptureError) -> MuError<V> {
