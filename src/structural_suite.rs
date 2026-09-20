@@ -59,17 +59,14 @@ impl StructuralSuite {
     pub fn canonical_document(&self) -> String {
         let mut lines = vec![format!("suite {}", quote(&self.name))];
         lines.extend(
-            self.job_paths
-                .iter()
-                .zip(&self.expected_outcomes)
-                .map(|(path, expected)| match expected {
-                    Some(expected) => format!(
-                        "job {} expect {}",
-                        quote(path),
-                        quote(expected.as_str())
-                    ),
+            self.job_paths.iter().zip(&self.expected_outcomes).map(
+                |(path, expected)| match expected {
+                    Some(expected) => {
+                        format!("job {} expect {}", quote(path), quote(expected.as_str()))
+                    }
                     None => format!("job {}", quote(path)),
-                }),
+                },
+            ),
         );
         lines.join("\n")
     }
@@ -173,9 +170,7 @@ impl fmt::Display for StructuralSuiteParseError {
 
 impl std::error::Error for StructuralSuiteParseError {}
 
-pub fn parse_structural_suite(
-    input: &str,
-) -> Result<StructuralSuite, StructuralSuiteParseError> {
+pub fn parse_structural_suite(input: &str) -> Result<StructuralSuite, StructuralSuiteParseError> {
     let mut name = None;
     let mut job_paths = Vec::new();
     let mut expected_outcomes = Vec::new();
@@ -257,11 +252,7 @@ pub fn parse_structural_suite(
     }
 
     let name = name.ok_or_else(|| {
-        StructuralSuiteParseError::new(
-            1,
-            1,
-            StructuralSuiteParseErrorKind::MissingSuiteDirective,
-        )
+        StructuralSuiteParseError::new(1, 1, StructuralSuiteParseErrorKind::MissingSuiteDirective)
     })?;
     if job_paths.is_empty() {
         return Err(StructuralSuiteParseError::new(
@@ -440,9 +431,6 @@ impl<'a> LineParser<'a> {
             self.position += ch.len_utf8();
         }
 
-        Err((
-            start,
-            StructuralSuiteParseErrorKind::UnterminatedString,
-        ))
+        Err((start, StructuralSuiteParseErrorKind::UnterminatedString))
     }
 }
