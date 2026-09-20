@@ -408,8 +408,7 @@ pub fn parse_declarative_document(
         }
     }
 
-    let canonical_identity =
-        render_canonical_identity(&name, &states, &initials, &edges, &labels);
+    let canonical_identity = render_canonical_identity(&name, &states, &initials, &edges, &labels);
 
     let mut adjacency: HashMap<String, Vec<Transition<String>>> = states
         .iter()
