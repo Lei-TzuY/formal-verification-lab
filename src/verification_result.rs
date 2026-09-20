@@ -5,16 +5,14 @@ use crate::ctl_bounded::{BoundedCtlStatus, BoundedCtlTruth};
 use crate::declarative_ctl::{
     BoundedDeclarativeCtlResult, DeclarativeCtlResult, DeclarativeCtlStatus,
 };
-use crate::declarative_mu::{
-    BoundedDeclarativeMuResult, DeclarativeMuResult, DeclarativeMuStatus,
-};
 use crate::declarative_deadlock::BoundedDeclarativeDeadlockResult;
+use crate::declarative_mu::{BoundedDeclarativeMuResult, DeclarativeMuResult, DeclarativeMuStatus};
 use crate::exact_state::{BoundedExactStateResult, ExactStateEvidence, ExactStateStatus};
+use crate::mu_bounded::{BoundedMuStatus, BoundedMuTruth};
 use crate::multi_response::{
     AnalysisMultiResponseResult, BoundedMultiResponseResult, MultiObligationState,
     MultiResponseCounterexample, MultiResponseResult, MultiResponseStatus,
 };
-use crate::mu_bounded::{BoundedMuStatus, BoundedMuTruth};
 use crate::property::DeadlockStatus;
 use crate::safety::{BoundedSafetyResult, SafetyStatus};
 
