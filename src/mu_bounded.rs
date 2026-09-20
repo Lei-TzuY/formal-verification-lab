@@ -5,9 +5,7 @@ use crate::graph::{
     GraphCaptureCompletion, GraphCaptureError, ReachableGraph,
 };
 use crate::model::{ModelError, TransitionSystem};
-use crate::mu_calculus::{
-    evaluate_captured_mu, validate_mu_formula, MuFormula, MuValidationError,
-};
+use crate::mu_calculus::{evaluate_captured_mu, validate_mu_formula, MuFormula, MuValidationError};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::hash::Hash;
@@ -60,7 +58,10 @@ impl<V: fmt::Debug> fmt::Display for BoundedMuError<V> {
             Self::Validation(error) => write!(f, "{error}"),
             Self::Model(error) => write!(f, "bounded mu-calculus model capture failed: {error}"),
             Self::SnapshotInvariant => {
-                write!(f, "bounded mu-calculus reachable-graph snapshot invariant failed")
+                write!(
+                    f,
+                    "bounded mu-calculus reachable-graph snapshot invariant failed"
+                )
             }
         }
     }
@@ -100,13 +101,8 @@ where
     F: Fn(&A, &S) -> bool,
 {
     validate_mu_formula(formula)?;
-    let expected_initials = model
-        .initial_states()
-        .iter()
-        .collect::<HashSet<_>>()
-        .len();
-    let captured =
-        capture_reachable_graph_with_limits(model, limits).map_err(map_capture_error)?;
+    let expected_initials = model.initial_states().iter().collect::<HashSet<_>>().len();
+    let captured = capture_reachable_graph_with_limits(model, limits).map_err(map_capture_error)?;
     let initial_states_complete = captured.graph.initial_ids.len() == expected_initials;
 
     if matches!(captured.completion, GraphCaptureCompletion::Complete) {
@@ -227,15 +223,9 @@ where
         })
         .collect::<Vec<_>>();
 
-    let any_definitely_false = graph
-        .initial_ids
-        .iter()
-        .any(|&state| !top.upper[state]);
-    let all_definitely_true = initial_states_complete
-        && graph
-            .initial_ids
-            .iter()
-            .all(|&state| top.lower[state]);
+    let any_definitely_false = graph.initial_ids.iter().any(|&state| !top.upper[state]);
+    let all_definitely_true =
+        initial_states_complete && graph.initial_ids.iter().all(|&state| top.lower[state]);
     let outcome = if any_definitely_false {
         BoundedOutcome::Conclusive(BoundedMuStatus::Violated)
     } else if all_definitely_true {
@@ -394,12 +384,7 @@ where
         }
     }
 
-    fn eval_fixpoint(
-        &mut self,
-        variable: &V,
-        body: &MuFormula<A, V>,
-        greatest: bool,
-    ) -> Approx {
+    fn eval_fixpoint(&mut self, variable: &V, body: &MuFormula<A, V>, greatest: bool) -> Approx {
         let previous_binding = self.environment.get(variable).cloned();
         let mut current = self.exact_constant(greatest);
 
