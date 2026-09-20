@@ -156,43 +156,54 @@ M85 maps the sealed M84 generic positional strategies back into typed modal μ-c
 
 ## Milestone 86 — versioned declarative modal mu-calculus parity certificate
 
-**Status: implementation candidate complete on PR #85.**
+**Status: sealed in `main` at `7176714269c62c7d50795075578a7cf747dbe317`.**
 
-M86 promotes M85's typed in-memory evidence into an explicit versioned artifact for the declarative complete-parity surface while keeping ordinary `mu file`, M83 verification-job schema-v4, bounded μ semantics, and the default fixpoint path unchanged.
-
-Implemented contract:
-
-- `DeclarativeDocument` now exposes a canonical source-level model identity generated from validated model/state/initial/edge/label declarations; declaration order and semantic content are preserved, while comments and insignificant whitespace are ignored. This identity is artifact-binding metadata only and does not introduce a second execution graph;
-- certificate schema v1 is deterministic and line-oriented rather than Rust `Debug` output or an implicit reuse of verification-job JSON;
-- the artifact binds the canonical declarative model identity and canonical rendered μ formula and records model accounting, satisfying-state ids, every typed M85 evaluation-game position, Even/Odd winning regions, semantic strategy choices, and initial-root winners;
-- render → parse → render is deterministic and exact, with stable escaping for backslash, quotes, newline, carriage return, and tab;
-- the parser fails closed on unsupported versions, malformed strings/tokens, duplicate singleton directives, missing/truncated sections, count mismatches, and invalid references;
-- certificate creation delegates to the sealed declarative parity evaluator;
-- certificate verification validates the requested formula through the existing M76 parse/validation/proposition-binding rules, checks model/formula bindings, recaptures the canonical complete graph, reconstructs M85 typed evidence, and invokes `verify_mu_parity_evidence`;
-- the certificate verifier contains no parity-solver call and does not decide correctness by re-solving the submitted model-checking problem;
-- direct `fvlab mu certificate create <model> <expression> <certificate>` and `... verify ...` commands expose the sealed library surface without changing ordinary `mu file` behavior;
-- built-binary regressions cover relative paths, create→verify, wrong formula, wrong model, truncation, and tampered accounting;
-- library regressions cover canonical model identity, exact parser/render roundtrip, independent evidence verification, unsupported versions, duplicate directives, missing positions, out-of-range references, semantic-move tampering, initial-result tampering, and accounting tampering.
-
-The library-only intermediate candidate `22b25583b7e40f8a1bcf9f6bc5adebe0a0aa9f43` passed CI #699 and Bounded state-property CLI #549 before the CLI surface was added. Full implementation candidate `8fcf6a90b82da3e048d41eeb7ca9a46cb8d85f1d` passed CI #704 (format, all-target build, Clippy with `-D warnings`, full tests including certificate library and built-binary regressions plus all historical CTL/μ/parity/job/suite gates, and every historical CLI smoke test) and Bounded state-property CLI #554. Closure metadata changes must pass the same exact-head gates before merge.
+M86 promotes M85's typed in-memory evidence into an explicit deterministic schema-v1 artifact for the declarative complete-parity surface while keeping ordinary `mu file`, M83 verification-job schema-v4, bounded μ semantics, and the default fixpoint path unchanged. Certificates bind canonical validated model declarations plus canonical rendered μ formula, retain typed positions/strategies/initial winners, round-trip deterministically, and are independently verified by rebuilding M85 evidence without invoking the parity solver. Direct `fvlab mu certificate create` / `verify` commands expose the sealed surface. Exact closure candidate `575d267d3a03a953ba389beb0a53b31a93a592ef` passed CI #706 and Bounded state-property CLI #556 before squash integration.
 
 M86 makes no cryptographic authenticity, signature, trust-chain, bounded-parity, symbolic, fairness, or performance claim.
 
-## Next frontier — Milestone 87: reproducible modal mu-calculus certificate verification jobs
+## Milestone 87 — reproducible modal mu-calculus certificate verification jobs
 
-Promote M86 certificate verification into a manifest-relative, machine-readable CI/job surface without misclassifying artifact validity as a model-checking `satisfied` / `violated` result and without modifying M83 schema-v4.
+**Status: implementation candidate complete on PR #86.**
 
-Architecture boundary established by the M86 closure audit:
+M87 promotes M86 certificate verification into a dedicated manifest-relative machine-readable job surface without misclassifying artifact validity as model-checking truth and without modifying M83 schema-v4.
 
-- existing heterogeneous verification jobs model property outcomes (`satisfied / violated / inconclusive / error`) and therefore are not the correct semantic envelope for proof-artifact validity;
-- structural recurrence jobs have their own neutral `cycle_found / acyclic` semantics and likewise must not be overloaded;
-- M87 should use a dedicated certificate-verification job/result surface with `verified / rejected / error` semantics, while reusing M86's parser and independent verifier;
-- `rejected` means a submitted certificate artifact loaded but failed parsing/binding/evidence verification; `error` is reserved for job/manifest/I/O/model/property setup failures that prevent artifact validation;
-- manifests should resolve model, property/formula, and certificate paths relative to the manifest and render canonically/deterministically;
-- the runner must not create a replacement certificate or invoke the parity solver; it verifies only the referenced artifact;
-- machine-readable results should identify schema version, outcome, referenced paths, canonical formula when available, submitted certificate schema when parseable, and a stable rejection/error message without embedding or silently rewriting the certificate;
-- malformed manifests, missing files, invalid model/formula inputs, wrong bindings, truncated/tampered certificates, and unsupported certificate versions must retain the `rejected` versus `error` boundary deterministically;
-- add direct runner vs built-CLI differential coverage, manifest-relative fixtures, deterministic JSON, and representative valid/rejected/error cases;
-- defer suite orchestration to a post-M87 architecture audit rather than adding a certificate-specific suite engine preemptively;
-- preserve every historical CTL/μ/parity/certificate/job/suite/CLI gate and make no cryptographic authenticity or performance claim.
+Implemented contract:
+
+- certificate-verification manifests have exactly three required path directives: `model`, `property`, and `certificate`; paths resolve relative to the manifest and canonical rendering is deterministic;
+- result schema v1 uses explicit `verified / rejected / error` semantics rather than `satisfied / violated` or structural recurrence outcomes;
+- exit codes are 0 for `verified`, 16 for `rejected`, and 2 for `error`;
+- malformed/unreadable manifests, missing files, model parse failures, formula parse/validation/proposition-binding failures, and other setup failures that prevent artifact validation are `error`;
+- once the referenced certificate file is successfully loaded, unsupported/truncated/malformed certificate syntax, wrong model/formula binding, or M85/M86 evidence verification failure is `rejected`;
+- deterministic JSON records result schema, submitted relative model/property/certificate paths, canonical formula when setup succeeds, submitted certificate schema when recoverable, and one stable message; machine-specific resolved absolute paths are not emitted;
+- the runner never creates a replacement certificate and contains no parity-solver call; it verifies only the submitted artifact through M86;
+- direct CLI integration is `fvlab mu certificate job <manifest> [--format json]`;
+- regressions cover canonical manifest parsing, duplicate/missing/unknown directives, manifest-relative verified execution, deterministic JSON, unsupported/truncated/accounting-tampered certificates, missing artifacts, invalid formulas, wrong model/formula bindings, and direct-runner vs built-binary equality across all three outcomes.
+
+During convergence, CI first exposed a malformed Rust string escape in the manifest quoting helper and then an invalid `Option<char>::is_some_and` method-pointer signature; both root causes were fixed without changing outcome semantics or test expectations.
+
+Exact implementation candidate `a39b48236e779b1ec0681bf2ae543b3a298fe1c8` passed CI #712 (format, all-target build, Clippy with `-D warnings`, full tests including M87 runner/built-binary three-state differentials and every historical CTL/μ/parity/certificate/job/suite/CLI gate) and Bounded state-property CLI #562. Closure metadata changes must pass the same exact-head gates before merge.
+
+M87 makes no certificate-authenticity, signature, trust-chain, bounded-parity, symbolic, fairness, or performance claim.
+
+## Next frontier — Milestone 88: outcome-neutral multi-family job orchestration
+
+Post-M87 architecture audit found that the existing verification and structural suite layers each duplicate manifest parsing, relative-path dispatch, aggregation, expectation handling, deterministic JSON and CLI integration around a family-specific outcome enum. Adding a third certificate-specific suite engine would repeat the same architecture again and would not constitute a meaningful promotion.
+
+M88 should introduce one outcome-neutral orchestration layer able to mix sealed verification, structural and certificate-verification jobs while preserving every family's native result envelope and expectation vocabulary.
+
+Acceptance criteria:
+
+- define an explicit job-family discriminator for suite entries, with at least `verification`, `structural`, and `certificate-verification`; do not infer family by probing files or parsing failures;
+- resolve every referenced job path relative to the suite manifest and dispatch exclusively through the sealed family runner;
+- preserve each nested result envelope verbatim rather than coercing outcomes into a shared `satisfied/violated` enum;
+- represent aggregate execution status independently from domain outcomes: orchestration must report whether entries executed and whether any family result is an error/rejection/failing expectation without rewriting the underlying family result;
+- expectation syntax must be family-aware and fail closed on invalid cross-family values (for example `verified` is not a verification-property outcome);
+- raw mode must preserve deterministic suite ordering and exact direct-runner JSON payloads for all three families;
+- expectation mode must compare only the declared family-native outcome while preserving the complete nested result payload;
+- retain bounded maximum job counts, duplicate-path detection within a family-aware entry identity, deterministic canonical manifest rendering, and stable JSON/exit codes;
+- provide one built orchestration CLI rather than three new family-specific suite binaries;
+- add mixed verification + recurrence + certificate valid/rejected/error integration fixtures and direct-runner vs built-CLI differentials;
+- preserve the existing `fvlab-suite` verification suite and structural suite APIs/CLIs for compatibility unless a migration is separately proven safe; M88 should add the generic layer first rather than perform a breaking consolidation;
+- preserve every historical CTL/μ/parity/certificate/job/suite/CLI gate and make no performance or cryptographic claim.
 

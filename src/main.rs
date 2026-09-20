@@ -161,7 +161,7 @@ use formal_verification_lab::verification_job_run::{
 use formal_verification_lab::{
     create_declarative_mu_parity_certificate, parse_declarative_document, parse_declarative_model,
     parse_declarative_mu_parity_certificate, render_declarative_mu_parity_certificate,
-    verify_declarative_mu_parity_certificate,
+    run_certificate_verification_job_json, verify_declarative_mu_parity_certificate,
 };
 use std::env;
 use std::fs;
@@ -1544,8 +1544,26 @@ fn mu_command(args: &[String]) -> Result<ExitCode, String> {
         {
             run_mu_certificate_verify(model_path, expression, certificate_path)
         }
+        [command, action, manifest_path, flag, format]
+            if command == "certificate"
+                && action == "job"
+                && flag == "--format"
+                && format == "json" =>
+        {
+            run_mu_certificate_job(manifest_path)
+        }
+        [command, action, _manifest_path, flag, format]
+            if command == "certificate" && action == "job" && flag == "--format" =>
+        {
+            Err(format!(
+                "unsupported certificate verification job format '{format}'; expected json"
+            ))
+        }
+        [command, action, manifest_path] if command == "certificate" && action == "job" => {
+            run_mu_certificate_job(manifest_path)
+        }
         [query, ..] => Err(format!(
-            "unknown mu-calculus query '{query}'; expected 'file <path> <expression> [--backend <fixpoint|parity>] [limits]', 'certificate create <model-path> <expression> <certificate-path>', or 'certificate verify <model-path> <expression> <certificate-path>'"
+            "unknown mu-calculus query '{query}'; expected 'file <path> <expression> [--backend <fixpoint|parity>] [limits]', 'certificate create <model-path> <expression> <certificate-path>', 'certificate verify <model-path> <expression> <certificate-path>', or 'certificate job <manifest-path> [--format json]'"
         )),
         _ => Err(usage()),
     }
@@ -1594,6 +1612,12 @@ fn run_mu_certificate_verify(
     println!("formula: {}", certificate.formula);
     println!("certificate: {certificate_path}");
     Ok(ExitCode::SUCCESS)
+}
+
+fn run_mu_certificate_job(manifest_path: &str) -> Result<ExitCode, String> {
+    let run = run_certificate_verification_job_json(manifest_path);
+    println!("{}", run.to_json());
+    Ok(ExitCode::from(run.exit_code))
 }
 
 fn run_mu_file(path: &str, expression: &str, option_args: &[String]) -> Result<ExitCode, String> {
