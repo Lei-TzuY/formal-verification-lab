@@ -54,7 +54,10 @@ fn snapshot_creation_is_byte_identical_across_two_roots_and_map_provider() {
     assert_eq!(snapshot_a.root_source_id(), "mixed.suite");
     assert_eq!(snapshot_a.source_count(), 9);
     assert!(snapshot_a.source("expected.suite").is_none());
-    assert!(snapshot_a.source("models/system.fvl").unwrap().contains('Ω'));
+    assert!(snapshot_a
+        .source("models/system.fvl")
+        .unwrap()
+        .contains('Ω'));
     assert!(!rendered_a.contains(root_a.to_str().unwrap()));
     assert!(!rendered_a.contains(root_b.to_str().unwrap()));
 
@@ -94,14 +97,19 @@ fn expectation_snapshot_replay_matches_direct_provider() {
     let map = MapTextSourceProvider::from_sources(sources).unwrap();
     let snapshot = create_workspace_snapshot(&map, "expected.suite").unwrap();
 
-    let direct =
-        run_orchestration_suite_expectations_json_with_provider(&map, "expected.suite");
+    let direct = run_orchestration_suite_expectations_json_with_provider(&map, "expected.suite");
     let replay = replay_workspace_snapshot_expectations_json(&snapshot);
 
     assert_eq!(replay.exit_code, 0);
     assert_eq!(replay.to_json(), direct.to_json());
-    assert_eq!(replay.envelope.outcome, OrchestrationRegressionOutcome::Matched);
-    assert_eq!(replay.envelope.execution_status, OrchestrationSuiteStatus::Complete);
+    assert_eq!(
+        replay.envelope.outcome,
+        OrchestrationRegressionOutcome::Matched
+    );
+    assert_eq!(
+        replay.envelope.execution_status,
+        OrchestrationSuiteStatus::Complete
+    );
 }
 
 #[test]
@@ -118,11 +126,13 @@ fn snapshot_replays_rejected_certificate_and_setup_error_without_host_files() {
         .collect::<Vec<_>>()
         .join("\n");
     let rejected_provider = MapTextSourceProvider::from_sources(rejected_sources).unwrap();
-    let rejected_snapshot =
-        create_workspace_snapshot(&rejected_provider, "mixed.suite").unwrap();
+    let rejected_snapshot = create_workspace_snapshot(&rejected_provider, "mixed.suite").unwrap();
     let rejected = replay_workspace_snapshot_json(&rejected_snapshot);
     assert_eq!(rejected.exit_code, 16);
-    assert_eq!(rejected.envelope.status, OrchestrationSuiteStatus::Attention);
+    assert_eq!(
+        rejected.envelope.status,
+        OrchestrationSuiteStatus::Attention
+    );
     assert_eq!(rejected.envelope.jobs[3].result.outcome_str(), "rejected");
 
     let mut error_sources = fixture_sources();
@@ -236,8 +246,7 @@ fn parser_rejects_noncanonical_duplicate_missing_and_invalid_utf8_frames() {
         )
     ));
 
-    let missing_dependency_text =
-        "suite \"missing\"\njob \"verification\" \"jobs/missing.job\"";
+    let missing_dependency_text = "suite \"missing\"\njob \"verification\" \"jobs/missing.job\"";
     let missing_dependency = format!(
         "fvlab-workspace-snapshot 1\nroot 11\nmixed.suite\nentries 1 {}\nsource 11 {}\nmixed.suite\n{}\nend\n",
         missing_dependency_text.len(),
@@ -252,11 +261,7 @@ fn parser_rejects_noncanonical_duplicate_missing_and_invalid_utf8_frames() {
         )
     ));
 
-    let split_utf8 = concat!(
-        "fvlab-workspace-snapshot 1\n",
-        "root 1\n",
-        "é\n"
-    );
+    let split_utf8 = concat!("fvlab-workspace-snapshot 1\n", "root 1\n", "é\n");
     assert!(matches!(
         parse_workspace_snapshot(split_utf8),
         Err(error) if matches!(
@@ -315,7 +320,10 @@ fn built_workspace_cli_create_and_replay_match_library_after_source_removal() {
     assert_eq!(create.status.code(), Some(0));
     assert!(create.stdout.is_empty());
     assert!(create.stderr.is_empty());
-    assert_eq!(fs::read_to_string(&snapshot_path).unwrap(), expected_artifact);
+    assert_eq!(
+        fs::read_to_string(&snapshot_path).unwrap(),
+        expected_artifact
+    );
 
     fs::remove_dir_all(&root).unwrap();
 
