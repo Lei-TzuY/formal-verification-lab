@@ -89,6 +89,7 @@ mod verification_mu;
 pub mod verification_result;
 pub mod verification_suite;
 pub mod verification_suite_run;
+pub mod workspace_snapshot;
 
 pub use bounded::{
     AnalysisInconclusiveReason, AnalysisLimits, AnalysisOutcome, AnalysisStage, BoundedOutcome,
@@ -394,4 +395,12 @@ pub use verification_suite_run::{
     VerificationSuiteOutcome, VerificationSuiteResultEnvelope,
     VERIFICATION_REGRESSION_MISMATCH_EXIT_CODE,
     VERIFICATION_REGRESSION_SUITE_RESULT_SCHEMA_VERSION, VERIFICATION_SUITE_RESULT_SCHEMA_VERSION,
+};
+pub use workspace_snapshot::{
+    create_workspace_snapshot, parse_workspace_snapshot, render_workspace_snapshot,
+    replay_workspace_snapshot_expectations_json, replay_workspace_snapshot_json,
+    WorkspaceSnapshot, WorkspaceSnapshotBuildError, WorkspaceSnapshotParseError,
+    WorkspaceSnapshotParseErrorKind, MAX_WORKSPACE_SNAPSHOT_ENTRIES,
+    MAX_WORKSPACE_SNAPSHOT_SOURCE_BYTES, MAX_WORKSPACE_SNAPSHOT_SOURCE_ID_BYTES,
+    WORKSPACE_SNAPSHOT_SCHEMA_VERSION,
 };
