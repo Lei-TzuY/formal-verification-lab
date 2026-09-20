@@ -114,10 +114,13 @@ pub use declarative::{
     parse_declarative_document, parse_declarative_model, DeclarativeDocument, DeclarativeModelError,
 };
 pub use declarative_ctl::{
-    check_declarative_ctl, check_declarative_ctl_text, DeclarativeCtlError, DeclarativeCtlResult,
-    DeclarativeCtlStatus,
+    check_declarative_ctl, check_declarative_ctl_text, check_declarative_ctl_text_with_limits,
+    check_declarative_ctl_with_limits, BoundedDeclarativeCtlResult, DeclarativeCtlError,
+    DeclarativeCtlResult, DeclarativeCtlStatus,
 };
-pub use declarative_ctl_report::render_declarative_ctl_report;
+pub use declarative_ctl_report::{
+    render_bounded_declarative_ctl_report, render_declarative_ctl_report,
+};
 pub use declarative_deadlock::{
     check_declarative_deadlock_with_limits, parse_declarative_deadlock_spec,
     BoundedDeclarativeDeadlockResult, DeclarativeDeadlockError, DeclarativeDeadlockSpec,

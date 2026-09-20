@@ -1,4 +1,6 @@
+use crate::checker::ExplorationLimits;
 use crate::ctl::{evaluate_ctl, CtlError, CtlEvaluation, CtlFormula};
+use crate::ctl_bounded::{evaluate_ctl_with_limits, BoundedCtlError, BoundedCtlEvaluation};
 use crate::ctl_parse::{collect_ctl_atoms, parse_ctl_formula, render_ctl_formula, CtlParseError};
 use crate::declarative::DeclarativeDocument;
 use std::collections::HashSet;
@@ -18,10 +20,17 @@ pub struct DeclarativeCtlResult {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BoundedDeclarativeCtlResult {
+    pub formula: String,
+    pub evaluation: BoundedCtlEvaluation<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DeclarativeCtlError {
     Parse(CtlParseError),
     UnknownProposition { proposition: String },
     Backend(CtlError),
+    BoundedBackend(BoundedCtlError),
 }
 
 impl fmt::Display for DeclarativeCtlError {
@@ -32,6 +41,7 @@ impl fmt::Display for DeclarativeCtlError {
                 write!(f, "unknown CTL proposition '{proposition}'")
             }
             Self::Backend(error) => write!(f, "CTL backend failed: {error}"),
+            Self::BoundedBackend(error) => write!(f, "bounded CTL backend failed: {error}"),
         }
     }
 }
@@ -47,6 +57,12 @@ impl From<CtlParseError> for DeclarativeCtlError {
 impl From<CtlError> for DeclarativeCtlError {
     fn from(value: CtlError) -> Self {
         Self::Backend(value)
+    }
+}
+
+impl From<BoundedCtlError> for DeclarativeCtlError {
+    fn from(value: BoundedCtlError) -> Self {
+        Self::BoundedBackend(value)
     }
 }
 
@@ -86,6 +102,40 @@ pub fn check_declarative_ctl_text(
 ) -> Result<DeclarativeCtlResult, DeclarativeCtlError> {
     let formula = parse_ctl_formula(input)?;
     check_declarative_ctl(document, &formula)
+}
+
+/// Evaluate one typed CTL formula through the proof-honest M71 bounded
+/// authority after resolving every named proposition against the declarative
+/// document.
+pub fn check_declarative_ctl_with_limits(
+    document: &DeclarativeDocument,
+    formula: &CtlFormula<String>,
+    limits: ExplorationLimits,
+) -> Result<BoundedDeclarativeCtlResult, DeclarativeCtlError> {
+    validate_atoms(document, formula)?;
+
+    let evaluation = evaluate_ctl_with_limits(
+        document.model(),
+        formula,
+        |atom, state| document.state_has_proposition(state, atom),
+        limits,
+    )?;
+
+    Ok(BoundedDeclarativeCtlResult {
+        formula: render_ctl_formula(formula),
+        evaluation,
+    })
+}
+
+/// Parse and evaluate one textual CTL formula through the bounded M71
+/// authority.
+pub fn check_declarative_ctl_text_with_limits(
+    document: &DeclarativeDocument,
+    input: &str,
+    limits: ExplorationLimits,
+) -> Result<BoundedDeclarativeCtlResult, DeclarativeCtlError> {
+    let formula = parse_ctl_formula(input)?;
+    check_declarative_ctl_with_limits(document, &formula, limits)
 }
 
 fn validate_atoms(

@@ -74,6 +74,7 @@ Historical no-fairness behavior remains the default. Fairness is enabled only wh
 | M69 | Typed CTL branching-time fixpoint kernel with explicit terminal totalization, memoized state-set semantics, deterministic evidence, and generated path oracles. |
 | M70 | Declarative textual CTL parser, named-proposition binding, deterministic reporting, and direct file CLI over the sealed M69 authority. |
 | M71 | Proof-honest bounded CTL with lower/upper satisfaction sets, explicit unknowns, justified evidence, and generated cutoff soundness coverage. |
+| M72 | Bounded declarative CTL adapters, three-valued cutoff reporting, and direct file CLI limits over the sealed M71 authority. |
 
 ### M31 — explicit weak-fairness liveness core
 
@@ -353,7 +354,7 @@ src/ctl.rs                    typed CTL formulas, fixpoint state sets, terminal 
 src/ctl_bounded.rs            lower/upper bounded CTL semantics + cutoff-safe evidence
 src/ctl_parse.rs              textual CTL grammar + canonical rendering
 src/declarative_ctl.rs        named-proposition binding onto the typed CTL authority
-src/declarative_ctl_report.rs deterministic complete-graph CTL reporting
+src/declarative_ctl_report.rs deterministic complete/bounded CTL reporting
 src/fair_enablement.rs        complete/conservative model-action enablement projection
 src/bounded_fairness.rs       product-bounded/staged weak-fair Büchi composition
 src/bounded_strong_fairness.rs product-bounded/staged strong-fair Büchi composition
@@ -443,6 +444,8 @@ cargo run -- state file path/to/model.fvl 'reachable("done")' --max-depth 2
 cargo run -- proposition file path/to/model.fvl reachable critical --max-states 20
 cargo run -- proposition expr path/to/model.fvl reachable '"critical" and not "error"' --max-depth 4
 cargo run -- proposition always path/to/model.fvl 'not "error"' --max-depth 4
+cargo run -- ctl file path/to/model.fvl 'AF "quiescent"'
+cargo run -- ctl file path/to/model.fvl 'EF "pending"' --max-states 20 --max-depth 4
 ```
 
 ### Declarative model file
@@ -476,6 +479,7 @@ The same finite graph can feed action-temporal, exact-state, proposition, Boolea
 - `10`: typed/textual/declarative action-temporal property is `VIOLATED`;
 - `11`: exact-state or proposition state property is `VIOLATED`;
 - `12`: declarative Boolean safety assertion is `VIOLATED`.
+- `14`: declarative CTL property is conclusively `VIOLATED`;
 
 ## Tests and CI
 
@@ -534,7 +538,7 @@ M25–M29 retain product/staged semantic and built-binary regression suites. M32
 - Response obligations remain Boolean pending obligations, not per-request identity queues.
 - The action-temporal frontend supports exact action atoms only; it has no wildcard/Boolean action predicate language, nested temporal operators, temporal negation, or arbitrary formula composition.
 - `all_infinitely_often` is intentionally an infinite-run-only property; finite terminals are ignored for that form. Response fairness instead uses strict finite-terminal handling so a pending finite terminal remains a violation.
-- M69 provides the typed finite-state CTL semantic kernel and M70 the deterministic textual/declarative named-proposition frontend plus direct complete-graph file CLI. M71 adds proof-honest deterministic exploration bounds using lower/upper satisfaction sets: only proven terminals are totalized, cut-state outgoing behavior stays unknown, and whole-query conclusions are emitted only when justified. M71 is an API-level semantic kernel; bounded CTL CLI/job/suite exposure, CTL fairness, symbolic CTL model checking, and globally shortest-evidence claims remain out of scope. The generalized Büchi layer remains separate and does not translate arbitrary LTL into Büchi automata.
+- M69 provides the typed finite-state CTL semantic kernel, M70 the deterministic textual/declarative named-proposition frontend, M71 proof-honest lower/upper bounded semantics, and M72 direct bounded declarative file execution/reporting. Only proven terminals are totalized; cut-state outgoing behavior remains unknown; bounded whole-query conclusions are emitted only when justified. CTL verification jobs/suites, CTL fairness, symbolic CTL model checking, and globally shortest-evidence claims remain out of scope through M72. The generalized Büchi layer remains separate and does not translate arbitrary LTL into Büchi automata.
 - No SAT/SMT, BDDs, symbolic execution, theorem proving, symmetry reduction, disk-backed state storage, parallel exploration, or distributed checking is implemented.
 - Raw `IndependenceRelation` declarations and the historical `audit_sleep_set_reduction` path remain experimental inputs guarded by exhaustive differential comparison. M68 adds a separate safety-only standalone path that accepts only `ValidatedIndependenceRelation` evidence bound to one complete canonical reachable snapshot and its invariant observations. The validator fails closed on configured same-label nondeterminism, enabledness interference, non-commuting diamonds, and intermediate invariant-observation changes. This does not validate arbitrary POR schemes, liveness reduction, or cross-model certificate reuse.
 - Deterministic witnesses require deterministic successor ordering; declarative models preserve input edge ordering to make this explicit.
@@ -543,19 +547,21 @@ M25–M29 retain product/staged semantic and built-binary regression suites. M32
 
 ## Roadmap
 
-Milestones 1–71 now form a coherent explicit-state stack: canonical safety/bounded exploration -> typed finite models and independent graph validation -> reachability/deadlock/recurrence/eventuality -> response obligations, finite monitors and generalized Büchi acceptance -> shared graph/action-product substrates -> typed/textual/declarative property frontends -> proof-honest model/product budgets -> iterative deep-graph SCC traversal -> opt-in weak, strong and combined fairness -> reproducible verification/structural jobs and deterministic suites -> validated safety partial-order reduction evidence -> typed CTL branching-time fixpoint semantics -> declarative textual CTL -> proof-honest bounded CTL.
+Milestones 1–72 now form a coherent explicit-state stack: canonical safety/bounded exploration -> typed finite models and independent graph validation -> reachability/deadlock/recurrence/eventuality -> response obligations, finite monitors and generalized Büchi acceptance -> shared graph/action-product substrates -> typed/textual/declarative property frontends -> proof-honest model/product budgets -> iterative deep-graph SCC traversal -> opt-in weak, strong and combined fairness -> reproducible verification/structural jobs and deterministic suites -> validated safety partial-order reduction evidence -> typed CTL branching-time fixpoint semantics -> declarative textual CTL -> proof-honest bounded CTL -> bounded declarative CTL file execution.
 
-M71 closes the semantic gap between complete CTL and bounded exploration. The bounded authority reuses the canonical prefix capture and evaluates every subformula with lower/upper satisfaction sets. A cut state is not a terminal, unknown successors are preserved as uncertainty, retained real witnesses/counterexamples can still be conclusive, and complete/unbounded captures delegate back to the sealed M69 authority. The 12,288-case generated cutoff oracle rejects any bounded true/false conclusion that disagrees with the corresponding complete graph.
+M72 closes the external bounded-CTL gap. Named propositions are validated before exploration, configured limits delegate to the M71 lower/upper authority, no-option invocations preserve the sealed M70 complete path, and reports expose exact cutoff provenance plus per-initial three-valued status instead of collapsing unknown into violation. Built-binary regressions cover conclusive satisfied/violated, inconclusive, malformed options, unknown propositions, and proven terminal evidence.
 
-The next high-value slice is **Milestone 72: bounded declarative CTL file frontend**. M71 is now strong enough to expose resource bounds through the already sealed M70 parser and named-proposition surface without duplicating bounded semantics.
+The next high-value slice is **Milestone 73: reproducible CTL verification jobs**. The direct complete and bounded file surfaces are now sealed enough to enter the existing versioned verification-job/result architecture without creating another CTL parser or semantic engine.
 
-Acceptance criteria for M72:
+Acceptance criteria for M73:
 
-- add declarative CTL bounded adapters that resolve named proposition atoms before calling the M71 authority;
-- add deterministic bounded CTL reporting with exact cutoff reason, lower/upper state-set accounting, per-initial three-valued status, and only justified evidence;
-- extend `fvlab ctl file` with model-space `--max-states`, `--max-transitions`, and `--max-depth` options while keeping the no-option path behavior-compatible;
-- return exit 0 for conclusive satisfaction, 14 for conclusive violation, 3 for inconclusive, and 2 for malformed input/options;
-- differentially compare direct declarative adapters with M71 typed execution, including exact-bound completion, early conclusive witness/counterexample, state/transition/depth cutoffs, terminal uncertainty, and nested formulas;
-- add built-binary coverage for satisfied, violated, inconclusive, malformed option, and unknown-proposition cases;
-- keep CTL verification jobs/suites and fairness out of this slice;
-- preserve every historical safety, temporal, fairness, structural, suite, reduction, M69 oracle, M70 frontend, and M71 generated bounded-CTL gate.
+- add a CTL verification-job analysis family referencing a declarative model path, textual CTL expression, and optional model-space state/transition/depth limits;
+- resolve manifest-relative paths and delegate unbounded jobs to the sealed M70 path and limited jobs to the M72/M71 bounded path;
+- extend stable machine-readable verification envelopes with CTL `satisfied`, `violated`, `inconclusive`, and `error` outcomes plus exact cutoff provenance;
+- normalize finite/lasso CTL evidence, including synthetic terminal-self-loop provenance, without inventing shortest-witness claims;
+- preserve bounded lower/upper state-set counts and per-initial `true`/`false`/`unknown` data in machine-readable results;
+- fail closed on malformed formulas, unknown propositions, invalid/unsupported limits or fields, missing models, and schema errors;
+- add direct-vs-job differentials for complete satisfaction/violation, each cutoff class, retained conclusive bounded evidence, and terminal/cycle evidence;
+- add built-binary JSON job integration using existing verification-job conventions;
+- keep CTL suite/expectation orchestration out until the single-job protocol is sealed;
+- preserve every historical safety, temporal, fairness, structural, suite, reduction, and M69–M72 CTL gate.
