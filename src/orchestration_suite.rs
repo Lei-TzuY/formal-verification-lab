@@ -72,10 +72,7 @@ impl OrchestrationExpectedOutcome {
         }
     }
 
-    fn parse(
-        family: OrchestrationJobFamily,
-        value: &str,
-    ) -> Option<OrchestrationExpectedOutcome> {
+    fn parse(family: OrchestrationJobFamily, value: &str) -> Option<OrchestrationExpectedOutcome> {
         match family {
             OrchestrationJobFamily::Verification => match value {
                 "satisfied" => Some(Self::Verification(VerificationJobOutcome::Satisfied)),
@@ -164,18 +161,26 @@ impl OrchestrationSuite {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OrchestrationSuiteParseErrorKind {
     ExpectedDirective,
-    UnknownDirective { directive: String },
+    UnknownDirective {
+        directive: String,
+    },
     ExpectedString,
     UnterminatedString,
-    InvalidEscape { escape: String },
+    InvalidEscape {
+        escape: String,
+    },
     EmptyName,
     EmptyPath,
-    InvalidFamily { family: String },
+    InvalidFamily {
+        family: String,
+    },
     InvalidExpectedOutcome {
         family: OrchestrationJobFamily,
         outcome: String,
     },
-    ExpectedExpectKeyword { keyword: String },
+    ExpectedExpectKeyword {
+        keyword: String,
+    },
     TrailingInput,
     DuplicateSuiteDirective,
     DuplicateJob {
@@ -184,7 +189,9 @@ pub enum OrchestrationSuiteParseErrorKind {
     },
     MissingSuiteDirective,
     NoJobs,
-    TooManyJobs { limit: usize },
+    TooManyJobs {
+        limit: usize,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -357,11 +364,7 @@ pub fn parse_orchestration_suite(
                 } else {
                     let keyword_start = parser.position;
                     let keyword = parser.parse_word().map_err(|kind| {
-                        OrchestrationSuiteParseError::new(
-                            line,
-                            leading + keyword_start + 1,
-                            kind,
-                        )
+                        OrchestrationSuiteParseError::new(line, leading + keyword_start + 1, kind)
                     })?;
                     if keyword != EXPECT {
                         return Err(OrchestrationSuiteParseError::new(
@@ -485,11 +488,7 @@ impl<'a> LineParser<'a> {
         }
     }
 
-    fn finish(
-        &mut self,
-        line: usize,
-        leading: usize,
-    ) -> Result<(), OrchestrationSuiteParseError> {
+    fn finish(&mut self, line: usize, leading: usize) -> Result<(), OrchestrationSuiteParseError> {
         self.skip_whitespace();
         if self.is_eof() {
             Ok(())
@@ -526,10 +525,7 @@ impl<'a> LineParser<'a> {
 
         loop {
             let Some(ch) = self.peek() else {
-                return Err((
-                    start,
-                    OrchestrationSuiteParseErrorKind::UnterminatedString,
-                ));
+                return Err((start, OrchestrationSuiteParseErrorKind::UnterminatedString));
             };
             self.position += ch.len_utf8();
             match ch {
