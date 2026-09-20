@@ -466,7 +466,7 @@ fn model_from_edges(edges: [Vec<(usize, u8)>; 3]) -> TransitionSystem<u8> {
         move |state| {
             Ok(edges[*state as usize]
                 .iter()
-                .map(|(ordinal, target)| Transition::new(format!("e{state}-{ordinal}"), *target))
+                .map(|(_ordinal, target)| Transition::new(format!("e{state}-{target}"), *target))
                 .collect())
         },
         vec![Invariant::new("always", |_state: &u8| true)],
