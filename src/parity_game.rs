@@ -199,14 +199,8 @@ fn zielonka(game: &ParityGame, active: &[bool]) -> (Vec<bool>, Vec<bool>) {
 
     if !opponent_has_region {
         return match player {
-            ParityPlayer::Even => (
-                union(&even_remainder, &player_attractor),
-                odd_remainder,
-            ),
-            ParityPlayer::Odd => (
-                even_remainder,
-                union(&odd_remainder, &player_attractor),
-            ),
+            ParityPlayer::Even => (union(&even_remainder, &player_attractor), odd_remainder),
+            ParityPlayer::Odd => (even_remainder, union(&odd_remainder, &player_attractor)),
         };
     }
 
@@ -219,14 +213,8 @@ fn zielonka(game: &ParityGame, active: &[bool]) -> (Vec<bool>, Vec<bool>) {
     let (even_second, odd_second) = zielonka(game, &second_remainder);
 
     match player {
-        ParityPlayer::Even => (
-            even_second,
-            union(&odd_second, &opponent_attractor),
-        ),
-        ParityPlayer::Odd => (
-            union(&even_second, &opponent_attractor),
-            odd_second,
-        ),
+        ParityPlayer::Even => (even_second, union(&odd_second, &opponent_attractor)),
+        ParityPlayer::Odd => (union(&even_second, &opponent_attractor), odd_second),
     }
 }
 
