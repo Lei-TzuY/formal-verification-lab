@@ -8,9 +8,7 @@ use crate::orchestration_suite::{
     parse_orchestration_suite, OrchestrationExpectedOutcome, OrchestrationJobFamily,
     OrchestrationSuite,
 };
-use crate::structural_job_run::{
-    run_structural_job_json_with_provider, StructuralJobJsonRun,
-};
+use crate::structural_job_run::{run_structural_job_json_with_provider, StructuralJobJsonRun};
 use crate::structural_result::{StructuralJobOutcome, StructuralJobResultEnvelope};
 use crate::text_source::{
     path_source_id, resolve_source_id, FileSystemTextSourceProvider, TextSourceProvider,
