@@ -221,6 +221,9 @@ where
         });
     }
 
+    let memoized_subformulas = evaluator.memo.len();
+    drop(evaluator);
+
     Ok(CtlEvaluation {
         terminal_policy: CtlTerminalPolicy::TotalizeWithSelfLoop,
         reachable_states: graph.states,
@@ -229,7 +232,7 @@ where
         discovered_states: captured.discovered_states,
         explored_transitions: captured.explored_transitions,
         max_depth_reached: captured.max_depth_reached,
-        memoized_subformulas: evaluator.memo.len(),
+        memoized_subformulas,
     })
 }
 
@@ -269,9 +272,15 @@ where
                 .collect(),
             CtlFormula::Not(inner) => complement(&self.eval(inner)),
             CtlFormula::And(left, right) => {
-                intersect(&self.eval(left), &self.eval(right))
+                let left = self.eval(left);
+                let right = self.eval(right);
+                intersect(&left, &right)
             }
-            CtlFormula::Or(left, right) => union(&self.eval(left), &self.eval(right)),
+            CtlFormula::Or(left, right) => {
+                let left = self.eval(left);
+                let right = self.eval(right);
+                union(&left, &right)
+            },
             CtlFormula::Ex(inner) => {
                 let inner = self.eval(inner);
                 pre_exists(self.graph, &inner)
@@ -466,7 +475,8 @@ where
         }
         CtlFormula::Ef(inner) if satisfied => {
             let target = evaluator.eval(inner);
-            finite_path_evidence(evaluator.graph, state, &vec![true; target.len()], &target)
+            let all = vec![true; target.len()];
+            finite_path_evidence(evaluator.graph, state, &all, &target)
         }
         CtlFormula::Eg(_inner) if satisfied => {
             lasso_evidence(evaluator.graph, state, top_values)
@@ -488,12 +498,8 @@ where
         CtlFormula::Ag(inner) if !satisfied => {
             let inner = evaluator.eval(inner);
             let bad = complement(&inner);
-            finite_path_evidence(
-                evaluator.graph,
-                state,
-                &vec![true; bad.len()],
-                &bad,
-            )
+            let all = vec![true; bad.len()];
+            finite_path_evidence(evaluator.graph, state, &all, &bad)
         }
         CtlFormula::Au(left, right) if !satisfied => {
             let left = evaluator.eval(left);
