@@ -46,40 +46,42 @@ M70 exposes the sealed M69 authority through deterministic textual CTL parsing, 
 
 ## Milestone 71 — proof-honest bounded CTL semantics
 
-**Status: implementation candidate complete on PR #72.**
+**Status: sealed in `main` at `887b5f5f8eb0bb44995ee3b991d92bf8b013c368`.**
 
-M71 promotes complete-graph CTL to deterministic resource-bounded exploration without interpreting an incomplete prefix as a complete Kripke structure.
+M71 adds conservative lower/upper CTL satisfaction sets over the canonical bounded reachable-graph capture, preserves unknown successor behavior at cut states, only totalizes proven terminals, emits only justified retained evidence, and collapses complete captures back to the sealed M69 authority. Exact candidate `ef6b0ba8412c2949e4155b6067e71768db83cc9c` passed CI #602 and Bounded state-property CLI #452 before squash integration.
+
+## Milestone 72 — bounded declarative CTL file frontend
+
+**Status: implementation candidate complete on PR #73.**
+
+M72 exposes the sealed M71 bounded CTL semantics through the M70 declarative named-proposition frontend without introducing another semantic engine.
 
 Implemented contract:
 
-- M69 complete-graph evaluation is factored over a captured graph; a complete bounded capture delegates to that exact authority rather than reimplementing CTL;
-- the bounded path reuses canonical bounded graph capture, cutoff accounting, known-terminal facts, and complete successor-vector provenance;
-- each typed CTL subformula is evaluated as conservative lower/upper satisfaction sets, inducing retained-state truth values `True`, `False`, or `Unknown`;
-- atoms and constants are exact on retained states; negation swaps/complements lower and upper sets; Boolean composition preserves lower/upper soundness;
-- existential/universal predecessor rules distinguish complete successor sets from unknown outgoing behavior, and least/greatest fixpoints propagate that uncertainty through `EX`, `AX`, `EF`, `AF`, `EG`, `AG`, `E[U]`, and `A[U]`;
-- only proven terminals receive synthetic self-loops; cut or unchecked states are never silently totalized;
-- all-initial queries are conclusive satisfied only when every real initial is retained and definitely true, conclusive violated when a retained real initial is definitely false, and otherwise preserve the original cutoff as `INCONCLUSIVE`;
-- finite/lasso evidence is retained only for conclusive top-level cases whose path/cycle uses retained model edges or proven terminal self-loops;
-- zero-state budgets cannot vacuously prove an all-initial property;
-- unbounded limits collapse to the exact M69 state sets, status, accounting, memoization, and supported evidence;
-- focused regressions cover depth-cut terminal uncertainty, retained existential witnesses, retained universal counterexamples, retained cycles, zero-state limits, and exact unbounded collapse;
-- generated soundness coverage executes **12,288** two-state graph × proposition valuation × CTL operator × cutoff combinations; every bounded true/false or conclusive whole-query result is checked against an independent full-graph oracle.
+- typed and textual declarative bounded adapters resolve every CTL atom against existing proposition metadata before invoking `evaluate_ctl_with_limits`;
+- deterministic bounded reports render `SATISFIED`, `VIOLATED`, or explicit `INCONCLUSIVE` plus exact state/transition/depth cutoff provenance;
+- reports preserve discovered/checked/explored accounting, lower/upper state-set counts, per-initial `TRUE`/`FALSE`/`UNKNOWN`, memoized-subformula counts, justified finite/lasso evidence, and proven terminal-self-loop provenance;
+- `fvlab ctl file <model-path> <expression> [--max-states N] [--max-transitions N] [--max-depth N]` now supports deterministic model-space limits;
+- the historical no-option path remains on the sealed M70 complete-graph frontend rather than being silently rerouted through bounded semantics;
+- exit codes are 0 for conclusive satisfied, 14 for conclusive violated, 3 for inconclusive, and 2 for malformed model/formula/options or unknown proposition references;
+- regressions cover direct-vs-M71 equality, exact-bound completion, state/transition/depth cutoffs, retained conclusive witness, unknown-proposition fail-closed behavior, proven terminal self-loop evidence, and built-binary satisfied/violated/inconclusive/error routes.
 
-Implementation candidate `c0172d40086774c461a42adb12e1409a5c3a5bc4` passed CI #600 (format, all-target build, Clippy with `-D warnings`, full tests including the generated bounded-CTL oracle, and every historical CLI gate) and Bounded state-property CLI #450. Closure metadata changes must pass the same exact-head gates before merge.
+Implementation candidate `4f20ca9e2ff26088d1b3133d98ff1a1aadfea21b` passed CI #605 (format, all-target build, Clippy with `-D warnings`, full tests including M72 built-binary coverage, and every historical CLI gate) and Bounded state-property CLI #455. Closure metadata changes must pass the same exact-head gates before merge.
 
-M71 is a semantic kernel only. It does not yet expose bounded CTL through the textual/declarative CLI, verification jobs/suites, fairness assumptions, symbolic model checking, or wall-clock/resource-performance claims.
+M72 adds no CTL fairness, symbolic checking, verification-job/suite orchestration, or wall-clock/performance claim.
 
-## Next frontier — Milestone 72: bounded declarative CTL file frontend
+## Next frontier — Milestone 73: reproducible CTL verification jobs
 
-Expose M71 through the already sealed M70 parser/declarative surface without introducing another bounded semantics.
+Promote the sealed M70–M72 declarative CTL surfaces into the existing versioned verification-job/result architecture without duplicating parser, bounded semantics, evidence, or cutoff logic.
 
 Acceptance criteria:
 
-- add declarative typed/text adapters that resolve all named propositions before invoking `evaluate_ctl_with_limits`;
-- extend deterministic CTL reporting to render conclusive `SATISFIED` / `VIOLATED` and explicit `INCONCLUSIVE` with exact state/transition/depth cutoff provenance;
-- expose `fvlab ctl file <model-path> <expression> [--max-states N] [--max-transitions N] [--max-depth N]`, preserving the existing unbounded behavior when no limits are supplied;
-- retain per-initial `True` / `False` / `Unknown`, lower/upper state-set accounting, justified finite/lasso evidence, and terminal-self-loop provenance in reports;
-- use exit 0 for conclusive satisfied, 14 for conclusive violated, 3 for inconclusive, and 2 for malformed model/formula/options;
-- add direct-vs-M71 differential tests, exact-bound/completed-prefix tests, each cutoff class, unknown-proposition fail-closed behavior, terminal/cycle evidence, and built-binary integration;
-- do not add CTL verification-job/suite orchestration until the direct bounded file frontend is sealed;
-- preserve all historical verification, fairness, structural, suite, reduction, M69 oracle, M70 frontend, and M71 bounded-oracle gates.
+- add a CTL verification-job analysis family that references a declarative model plus textual CTL expression and optional model-space state/transition/depth limits;
+- resolve manifest-relative model paths and delegate exclusively to the sealed M70 complete path when unbounded and M72/M71 bounded path when limits are configured;
+- extend the machine-readable verification result envelope with stable CTL outcomes `satisfied`, `violated`, `inconclusive`, and `error`, exact cutoff provenance, and normalized finite/lasso evidence including synthetic terminal-self-loop provenance;
+- preserve lower/upper state-set counts and per-initial three-valued status for bounded CTL results without reinterpreting unknown as false;
+- fail closed on malformed CTL, unknown propositions, invalid limits, unsupported fields, and model-loading errors before producing a success envelope;
+- add direct-vs-job differential regressions for unbounded satisfaction/violation, each cutoff class, early conclusive bounded evidence, terminal lasso/self-loop evidence, and malformed inputs;
+- add a built-binary JSON job integration gate using the existing job runner conventions;
+- keep CTL suite/expectation orchestration out until the single-job protocol is sealed;
+- preserve all historical verification, fairness, structural, reduction, M69–M72 CTL, and suite gates.
