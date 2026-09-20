@@ -1,8 +1,8 @@
 use crate::workspace_snapshot::{
-    parse_workspace_snapshot, render_workspace_snapshot, replay_workspace_snapshot_expectations_json,
-    replay_workspace_snapshot_json, WorkspaceSnapshot, WorkspaceSnapshotParseError,
-    MAX_WORKSPACE_SNAPSHOT_ENTRIES, MAX_WORKSPACE_SNAPSHOT_SOURCE_BYTES,
-    MAX_WORKSPACE_SNAPSHOT_SOURCE_ID_BYTES,
+    parse_workspace_snapshot, render_workspace_snapshot,
+    replay_workspace_snapshot_expectations_json, replay_workspace_snapshot_json, WorkspaceSnapshot,
+    WorkspaceSnapshotParseError, MAX_WORKSPACE_SNAPSHOT_ENTRIES,
+    MAX_WORKSPACE_SNAPSHOT_SOURCE_BYTES, MAX_WORKSPACE_SNAPSHOT_SOURCE_ID_BYTES,
 };
 use std::fmt;
 use std::str;
@@ -226,7 +226,12 @@ impl WorkspaceReplayLockVerificationEnvelope {
         out.push('{');
         field_u64(&mut out, "schema_version", self.schema_version as u64, true);
         field_string(&mut out, "status", self.status.as_str(), false);
-        field_optional_string(&mut out, "mode", self.mode.map(WorkspaceReplayMode::as_str), false);
+        field_optional_string(
+            &mut out,
+            "mode",
+            self.mode.map(WorkspaceReplayMode::as_str),
+            false,
+        );
         field_optional_bool(&mut out, "exit_code_matches", self.exit_code_matches, false);
         field_optional_bool(&mut out, "json_matches", self.json_matches, false);
         field_optional_u64(
@@ -410,7 +415,9 @@ pub fn parse_workspace_replay_lock(
             },
         ));
     }
-    let snapshot_text = cursor.read_frame(snapshot_len, "workspace snapshot")?.to_owned();
+    let snapshot_text = cursor
+        .read_frame(snapshot_len, "workspace snapshot")?
+        .to_owned();
     parse_workspace_snapshot(&snapshot_text).map_err(|error| {
         WorkspaceReplayLockParseError::new(
             snapshot_header_offset,
@@ -436,7 +443,9 @@ pub fn parse_workspace_replay_lock(
             },
         ));
     }
-    let expected_json = cursor.read_frame(result_len, "expected result JSON")?.to_owned();
+    let expected_json = cursor
+        .read_frame(result_len, "expected result JSON")?
+        .to_owned();
 
     let end_offset = cursor.position();
     if cursor.read_line("end marker")? != "end" {
@@ -490,7 +499,10 @@ pub fn verify_workspace_replay_lock(lock: &WorkspaceReplayLock) -> WorkspaceRepl
         }
         WorkspaceReplayLockVerificationStatus::Error => 2,
     };
-    WorkspaceReplayLockJsonRun { envelope, exit_code }
+    WorkspaceReplayLockJsonRun {
+        envelope,
+        exit_code,
+    }
 }
 
 pub fn verify_workspace_replay_lock_text(input: &str) -> WorkspaceReplayLockJsonRun {
