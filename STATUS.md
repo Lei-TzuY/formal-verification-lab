@@ -22,34 +22,41 @@ M66 adds a reproducible structural job protocol without forcing recurrence into 
 
 ## Milestone 67 — deterministic structural-analysis suites and expectations
 
-**Status: integration candidate complete on PR #68.**
+**Status: sealed in `main` at `58770b29ee4be73dad59c9a880034abd9ee2754c`.**
 
-M67 adds deterministic orchestration over the sealed M66 structural-job protocol while preserving structural neutrality.
+M67 adds deterministic multi-job orchestration over the sealed M66 structural-job protocol. Raw suites preserve neutral `cycle_found`, `acyclic`, `inconclusive`, and `error` envelopes without property-style reinterpretation; a separate explicit expectation mode supplies regression meaning. Exact candidate `5ef77ebe6cdccf045ff4dcaee458da4bb84d8ee0` passed CI #575 and Bounded state-property CLI #425 before squash integration.
+
+## Milestone 68 — validated partial-order reduction foundation
+
+**Status: integration candidate complete on PR #69.**
+
+M68 promotes the old M5 safety-reduction experiment from raw-declaration-only auditing to a validation-first proof boundary while preserving the historical audit API.
 
 Implemented contract:
 
-- dedicated structural-suite manifests with declaration-order execution, manifest-relative job paths, duplicate rejection, and a 128-job limit;
-- raw suites preserve each complete M66 result envelope and aggregate only operational completion as `complete`, `inconclusive`, or `error`;
-- raw execution never maps `cycle_found` / `acyclic` into verification-style pass/fail states;
-- a separate expectation mode requires explicit expected structural outcomes and reports deterministic per-job matches/mismatches;
-- versioned raw and regression JSON envelopes with deterministic ordering, missing/malformed-job preservation, aggregate precedence, and dedicated mismatch exit 13;
-- built `fvlab-structural-suite` binary differential coverage against the library runner plus semantic parser/execution regressions.
+- raw `IndependenceRelation` remains non-authoritative; `audit_sleep_set_reduction` still differentially compares raw-declaration reduction with canonical exhaustive safety;
+- `validate_independence` captures the complete canonical reachable graph once and binds exact action-pair claims to that snapshot plus its invariant observations;
+- validation fails closed on configured same-label nondeterminism, enabledness changes under the peer action, non-commuting diamonds, and intermediate invariant-observation changes;
+- `ValidatedIndependenceRelation` has private evidence fields and the standalone `check_validated_sleep_set_reduction` accepts only that evidence, executing over the exact certified snapshot rather than a caller-supplied model;
+- raw and validated reducers preserve distinct `(state, sleep-set)` contexts, so revisiting the same model state under a different sleep set is not collapsed by one global state-only visited entry;
+- reduction witnesses are deterministic DFS evidence, not advertised as shortest BFS witnesses;
+- generated differential coverage enumerates all 4,096 deterministic two-action graphs over three states across all eight safety masks (32,768 model/property combinations); every relation accepted by the validator is compared with canonical exhaustive safety;
+- focused regressions cover invalid declarations, enabledness interference, commuting/invariant-observation failures, same-label ambiguity, sleep-context revisitation, deterministic witnesses, and the commuting-counter baseline.
 
-Implementation candidate `b04fd6b4d571186a8668cb94bade61785b1e456c` passed CI #573 (format, all-target build, Clippy with `-D warnings`, full tests, and historical CLI gates) and Bounded state-property CLI #423. Closure metadata changes must pass the same exact-head gates before merge.
+Candidate `97b253d9b8f2f92bf9e8bd02e194d99c0154fe36` passed CI #580 (format, all-target build, Clippy with `-D warnings`, full tests including the generated differential, and all historical CLI gates) and Bounded state-property CLI #430. Closure metadata changes must pass the same exact-head gates before merge.
 
-M67 adds no second recurrence/SCC traversal, fairness interpretation, wall-clock proof bound, or performance claim.
+M68 is a proof-safety foundation, not a performance claim: validation itself exhaustively captures the reachable graph. It makes no claim about liveness POR, arbitrary independence theories, symbolic reduction, or CI timing as a benchmark.
 
-## Next frontier — Milestone 68: validated partial-order reduction foundation
+## Next frontier — Milestone 69: CTL branching-time fixpoint kernel
 
-The long-standing M5 sleep-set reduction remains deliberately experimental because caller-supplied action independence is not itself proof evidence and the reduced search is only trusted after exhaustive differential comparison. The next architectural phase is to turn that old experiment into a validation-first reduction substrate without weakening the canonical exhaustive checker.
+Promote from specialized temporal properties to a general branching-time state-formula authority over the shared complete reachable graph.
 
 Acceptance criteria:
 
-- add an explicit reachable-graph independence validator for exact action-label pairs instead of trusting declarations;
-- validate conservative local conditions needed by the supported safety use case, including enabledness preservation, commuting diamonds, deterministic handling of ambiguous same-label successors, and invariant-observation preservation; unsupported or ambiguous cases fail closed;
-- introduce a validated/certified independence type that cannot be constructed from unchecked declarations and keep the historical audited API behavior-compatible;
-- make reduced exploration safe under state revisitation by preserving the sleep-set context required for completeness rather than treating one visited state as equivalent to every sleep context;
-- expose a standalone reduced safety path only through validated independence evidence; do not claim reduction correctness for raw declarations;
-- add generated differential coverage over small finite graphs/declarations against exhaustive safety, plus focused invalid-declaration, commuting-diamond, invariant-visibility, revisit-context, and deterministic-witness regressions;
-- report actual exploration/pruning counts as observations only; make no performance claim from CI timing;
-- preserve every existing verification/structural API and all historical CI gates.
+- typed CTL formulas for Boolean composition plus `EX`, `AX`, `EF`, `AF`, `EG`, `AG`, `E[U]`, and `A[U]`;
+- one explicit terminal-state policy applied consistently to all operators and tests;
+- deterministic least/greatest-fixpoint evaluation over one captured `ReachableGraph`, with memoized subformula state sets rather than repeated model traversal;
+- deterministic existential evidence and universal counterevidence where sound, without unearned shortest-witness claims;
+- independent generated small-graph/proposition oracle coverage plus terminal/cycle/nesting/duality regressions;
+- typed semantic kernel first; parser/CLI/reporting only after the authority layer is sealed;
+- preserve every historical verification, fairness, structural, suite, and validated-reduction gate.
