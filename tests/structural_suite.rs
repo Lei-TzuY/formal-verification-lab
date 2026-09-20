@@ -199,6 +199,35 @@ fn raw_suite_uses_error_over_inconclusive_precedence_without_dropping_entries() 
 }
 
 #[test]
+fn raw_suite_retains_missing_job_as_error_envelope() {
+    let root = fixture_dir("missing-job");
+    let suite = write_suite(
+        &root,
+        "suite \"missing-job\"\njob \"jobs/missing.fvstruct\"\n",
+    );
+
+    let run = run_structural_suite_json(&suite);
+    assert_eq!(run.exit_code, 2);
+    assert_eq!(run.envelope.outcome, StructuralSuiteOutcome::Error);
+    assert_eq!(run.envelope.jobs.len(), 1);
+    assert_eq!(run.envelope.jobs[0].manifest, "jobs/missing.fvstruct");
+    assert_eq!(
+        run.envelope.jobs[0].result.outcome,
+        StructuralJobOutcome::Error
+    );
+    let error = run.envelope.jobs[0]
+        .result
+        .error
+        .as_deref()
+        .expect("missing job should preserve the structural job error");
+    assert!(error.contains("failed to read structural job manifest"));
+    assert!(error.contains("missing.fvstruct"));
+    assert_eq!(run.to_json(), run_structural_suite_json(&suite).to_json());
+
+    fs::remove_dir_all(root).ok();
+}
+
+#[test]
 fn expectation_mode_matches_all_four_structural_outcomes() {
     let root = fixture_dir("expectations");
     write_job(&root, "cycle", CYCLIC, "");
