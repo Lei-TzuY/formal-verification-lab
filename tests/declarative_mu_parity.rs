@@ -50,8 +50,7 @@ fn declarative_parity_backend_matches_sealed_fixpoint_frontend() {
             MuTerminalPolicy::TotalizeWithSelfLoop
         );
         assert_eq!(
-            parity.evaluation.reachable_states,
-            fixpoint.evaluation.reachable_states,
+            parity.evaluation.reachable_states, fixpoint.evaluation.reachable_states,
             "formula={formula}"
         );
         assert_eq!(
@@ -60,8 +59,7 @@ fn declarative_parity_backend_matches_sealed_fixpoint_frontend() {
             "formula={formula}"
         );
         assert_eq!(
-            parity.evaluation.initial,
-            fixpoint.evaluation.initial,
+            parity.evaluation.initial, fixpoint.evaluation.initial,
             "formula={formula}"
         );
         assert_eq!(
@@ -116,8 +114,7 @@ fn declarative_parity_keeps_validation_and_atom_resolution_fail_closed() {
             if variable == "X"
     ));
 
-    let non_monotone =
-        check_declarative_mu_text_via_parity(&document, "mu X. not $X").unwrap_err();
+    let non_monotone = check_declarative_mu_text_via_parity(&document, "mu X. not $X").unwrap_err();
     assert!(matches!(
         non_monotone,
         DeclarativeMuError::Validation(MuValidationError::NonMonotoneVariable { variable })
