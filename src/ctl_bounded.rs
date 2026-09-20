@@ -91,13 +91,8 @@ where
     A: Clone + Eq + Hash,
     F: Fn(&A, &S) -> bool,
 {
-    let expected_initials = model
-        .initial_states()
-        .iter()
-        .collect::<HashSet<_>>()
-        .len();
-    let captured =
-        capture_reachable_graph_with_limits(model, limits).map_err(map_capture_error)?;
+    let expected_initials = model.initial_states().iter().collect::<HashSet<_>>().len();
+    let captured = capture_reachable_graph_with_limits(model, limits).map_err(map_capture_error)?;
     let initial_states_complete = captured.graph.initial_ids.len() == expected_initials;
 
     if matches!(captured.completion, GraphCaptureCompletion::Complete) {
@@ -210,13 +205,7 @@ where
     let mut initial = Vec::with_capacity(graph.initial_ids.len());
     for &state_index in &graph.initial_ids {
         let truth = classify(top.lower[state_index], top.upper[state_index]);
-        let evidence = explain_bounded_top_level(
-            formula,
-            state_index,
-            truth,
-            &top,
-            &mut evaluator,
-        );
+        let evidence = explain_bounded_top_level(formula, state_index, truth, &top, &mut evaluator);
         initial.push(BoundedCtlInitialEvaluation {
             state_index,
             state: graph.states[state_index].clone(),
@@ -225,15 +214,9 @@ where
         });
     }
 
-    let any_definitely_false = graph
-        .initial_ids
-        .iter()
-        .any(|&state| !top.upper[state]);
-    let all_definitely_true = initial_states_complete
-        && graph
-            .initial_ids
-            .iter()
-            .all(|&state| top.lower[state]);
+    let any_definitely_false = graph.initial_ids.iter().any(|&state| !top.upper[state]);
+    let all_definitely_true =
+        initial_states_complete && graph.initial_ids.iter().all(|&state| top.lower[state]);
     let outcome = if any_definitely_false {
         BoundedOutcome::Conclusive(BoundedCtlStatus::Violated)
     } else if all_definitely_true {
@@ -584,19 +567,21 @@ where
     match formula {
         CtlFormula::Ex(inner) if truth == BoundedCtlTruth::True => {
             let inner = evaluator.eval(inner);
-            one_step_evidence(evaluator.graph, evaluator.known_terminal, state, &inner.lower)
+            one_step_evidence(
+                evaluator.graph,
+                evaluator.known_terminal,
+                state,
+                &inner.lower,
+            )
         }
         CtlFormula::Ef(inner) if truth == BoundedCtlTruth::True => {
             let inner = evaluator.eval(inner);
             let all = vec![true; inner.lower.len()];
             finite_path_evidence(evaluator.graph, state, &all, &inner.lower)
         }
-        CtlFormula::Eg(_) if truth == BoundedCtlTruth::True => lasso_evidence(
-            evaluator.graph,
-            evaluator.known_terminal,
-            state,
-            &top.lower,
-        ),
+        CtlFormula::Eg(_) if truth == BoundedCtlTruth::True => {
+            lasso_evidence(evaluator.graph, evaluator.known_terminal, state, &top.lower)
+        }
         CtlFormula::Eu(left, right) if truth == BoundedCtlTruth::True => {
             let left = evaluator.eval(left);
             let right = evaluator.eval(right);
@@ -612,8 +597,7 @@ where
             )
         }
         CtlFormula::Af(inner) if truth == BoundedCtlTruth::False => {
-            let dual =
-                CtlFormula::eg(CtlFormula::negate((**inner).clone()));
+            let dual = CtlFormula::eg(CtlFormula::negate((**inner).clone()));
             let dual = evaluator.eval(&dual);
             lasso_evidence(
                 evaluator.graph,
@@ -630,10 +614,8 @@ where
         CtlFormula::Au(left, right) if truth == BoundedCtlTruth::False => {
             let not_right_formula = CtlFormula::negate((**right).clone());
             let not_left_formula = CtlFormula::negate((**left).clone());
-            let bad_formula =
-                CtlFormula::and(not_left_formula, not_right_formula.clone());
-            let finite_formula =
-                CtlFormula::eu(not_right_formula.clone(), bad_formula.clone());
+            let bad_formula = CtlFormula::and(not_left_formula, not_right_formula.clone());
+            let finite_formula = CtlFormula::eu(not_right_formula.clone(), bad_formula.clone());
             let finite = evaluator.eval(&finite_formula);
             if finite.lower[state] {
                 let allowed = evaluator.eval(&not_right_formula);
