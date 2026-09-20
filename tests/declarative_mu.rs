@@ -91,8 +91,7 @@ fn declarative_frontend_validates_binding_and_monotonicity_before_execution() {
             if variable == "X"
     ));
 
-    let non_monotone =
-        check_declarative_mu_text(&document, "mu X. not $X").unwrap_err();
+    let non_monotone = check_declarative_mu_text(&document, "mu X. not $X").unwrap_err();
     assert!(matches!(
         non_monotone,
         DeclarativeMuError::Validation(MuValidationError::NonMonotoneVariable { variable })
@@ -111,8 +110,7 @@ fn declarative_frontend_validates_binding_and_monotonicity_before_execution() {
 #[test]
 fn declarative_frontend_delegates_exactly_to_m75_kernel() {
     let document = parse_declarative_document(MODEL).unwrap();
-    let formula =
-        parse_mu_formula(r#"nu X. "ready" and diamond $X"#).unwrap();
+    let formula = parse_mu_formula(r#"nu X. "ready" and diamond $X"#).unwrap();
 
     let direct = evaluate_mu(document.model(), &formula, |atom, state| {
         document.state_has_proposition(state, atom)
@@ -145,8 +143,7 @@ fn textual_ctl_compatible_fixpoints_match_sealed_ctl_frontend() {
         let mu = check_declarative_mu_text(&document, mu_text).unwrap();
         let ctl = check_declarative_ctl_text(&document, ctl_text).unwrap();
         assert_eq!(
-            mu.evaluation.satisfying_state_indices,
-            ctl.evaluation.satisfying_state_indices,
+            mu.evaluation.satisfying_state_indices, ctl.evaluation.satisfying_state_indices,
             "textual mu/CTL subset mismatch: {mu_text} vs {ctl_text}"
         );
     }
@@ -164,13 +161,9 @@ label "done" "complete"
     )
     .unwrap();
 
-    let diamond =
-        check_declarative_mu_text(&document, r#"diamond "complete""#).unwrap();
-    let forever = check_declarative_mu_text(
-        &document,
-        r#"nu X. "complete" and diamond $X"#,
-    )
-    .unwrap();
+    let diamond = check_declarative_mu_text(&document, r#"diamond "complete""#).unwrap();
+    let forever =
+        check_declarative_mu_text(&document, r#"nu X. "complete" and diamond $X"#).unwrap();
 
     assert_eq!(diamond.status, DeclarativeMuStatus::Satisfied);
     assert_eq!(forever.status, DeclarativeMuStatus::Satisfied);
@@ -185,12 +178,7 @@ fn built_binary_mu_file_covers_satisfaction_violation_and_fail_closed_errors() {
     let path = path.to_str().unwrap();
 
     let satisfied = Command::new(binary)
-        .args([
-            "mu",
-            "file",
-            path,
-            r#"mu X. "complete" or diamond $X"#,
-        ])
+        .args(["mu", "file", path, r#"mu X. "complete" or diamond $X"#])
         .output()
         .unwrap();
     assert_eq!(satisfied.status.code(), Some(0));
@@ -200,12 +188,7 @@ fn built_binary_mu_file_covers_satisfaction_violation_and_fail_closed_errors() {
     assert!(stdout.contains("terminal policy: totalize reachable terminals"));
 
     let violated = Command::new(binary)
-        .args([
-            "mu",
-            "file",
-            path,
-            r#"nu X. "complete" and box $X"#,
-        ])
+        .args(["mu", "file", path, r#"nu X. "complete" and box $X"#])
         .output()
         .unwrap();
     assert_eq!(violated.status.code(), Some(15));
@@ -249,10 +232,8 @@ fn built_binary_mu_file_covers_satisfaction_violation_and_fail_closed_errors() {
 
 fn fixture_dir(kind: &str) -> PathBuf {
     let id = NEXT_DIR.fetch_add(1, Ordering::Relaxed);
-    let root = std::env::temp_dir().join(format!(
-        "fvlab-m76-mu-{kind}-{}-{id}",
-        std::process::id()
-    ));
+    let root =
+        std::env::temp_dir().join(format!("fvlab-m76-mu-{kind}-{}-{id}", std::process::id()));
     fs::create_dir_all(&root).unwrap();
     root
 }
