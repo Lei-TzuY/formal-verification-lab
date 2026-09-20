@@ -378,11 +378,11 @@ fn successors(edges: &[Vec<(usize, u8)>; 3], state: u8) -> Vec<u8> {
 
 fn decode_graph(code: usize) -> [Vec<(usize, u8)>; 3] {
     let mut edges = [Vec::new(), Vec::new(), Vec::new()];
-    for source in 0..3 {
+    for (source, source_edges) in edges.iter_mut().enumerate() {
         for target in 0..3 {
             let bit = source * 3 + target;
             if code & (1 << bit) != 0 {
-                edges[source].push((target, target as u8));
+                source_edges.push((target, target as u8));
             }
         }
     }
