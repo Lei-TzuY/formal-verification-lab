@@ -53,11 +53,7 @@ fn terminal_states_are_totalized_with_one_self_loop() {
 
 #[test]
 fn branching_next_distinguishes_existential_and_universal_paths() {
-    let model = model_from_edges([
-        vec![(0, 1), (1, 2)],
-        Vec::new(),
-        Vec::new(),
-    ]);
+    let model = model_from_edges([vec![(0, 1), (1, 2)], Vec::new(), Vec::new()]);
     let good = CtlFormula::atom(Atom::P);
     let atom = |_atom: &Atom, state: &u8| *state == 1;
 
@@ -82,22 +78,13 @@ fn branching_next_distinguishes_existential_and_universal_paths() {
 
 #[test]
 fn existential_eventually_and_until_emit_deterministic_finite_evidence() {
-    let model = model_from_edges([
-        vec![(0, 1)],
-        vec![(0, 2)],
-        Vec::new(),
-    ]);
+    let model = model_from_edges([vec![(0, 1)], vec![(0, 2)], Vec::new()]);
     let atom = |atom: &Atom, state: &u8| match atom {
         Atom::P => *state != 2,
         Atom::Q => *state == 2,
     };
 
-    let ef = evaluate_ctl(
-        &model,
-        &CtlFormula::ef(CtlFormula::atom(Atom::Q)),
-        atom,
-    )
-    .unwrap();
+    let ef = evaluate_ctl(&model, &CtlFormula::ef(CtlFormula::atom(Atom::Q)), atom).unwrap();
     let eu = evaluate_ctl(
         &model,
         &CtlFormula::eu(CtlFormula::atom(Atom::P), CtlFormula::atom(Atom::Q)),
@@ -122,28 +109,14 @@ fn existential_eventually_and_until_emit_deterministic_finite_evidence() {
 
 #[test]
 fn existential_globally_and_failed_af_emit_closed_lassos() {
-    let model = model_from_edges([
-        vec![(0, 1)],
-        vec![(0, 0)],
-        Vec::new(),
-    ]);
+    let model = model_from_edges([vec![(0, 1)], vec![(0, 0)], Vec::new()]);
     let atom = |atom: &Atom, state: &u8| match atom {
         Atom::P => *state <= 1,
         Atom::Q => *state == 2,
     };
 
-    let eg = evaluate_ctl(
-        &model,
-        &CtlFormula::eg(CtlFormula::atom(Atom::P)),
-        atom,
-    )
-    .unwrap();
-    let af = evaluate_ctl(
-        &model,
-        &CtlFormula::af(CtlFormula::atom(Atom::Q)),
-        atom,
-    )
-    .unwrap();
+    let eg = evaluate_ctl(&model, &CtlFormula::eg(CtlFormula::atom(Atom::P)), atom).unwrap();
+    let af = evaluate_ctl(&model, &CtlFormula::af(CtlFormula::atom(Atom::Q)), atom).unwrap();
 
     assert!(eg.initial[0].satisfied);
     assert!(!af.initial[0].satisfied);
@@ -164,11 +137,7 @@ fn existential_globally_and_failed_af_emit_closed_lassos() {
 
 #[test]
 fn universal_until_failure_reports_bad_prefix_or_nonterminating_avoidance() {
-    let finite_bad = model_from_edges([
-        vec![(0, 1)],
-        Vec::new(),
-        Vec::new(),
-    ]);
+    let finite_bad = model_from_edges([vec![(0, 1)], Vec::new(), Vec::new()]);
     let atom = |atom: &Atom, state: &u8| match atom {
         Atom::P => *state == 0,
         Atom::Q => false,
@@ -181,11 +150,7 @@ fn universal_until_failure_reports_bad_prefix_or_nonterminating_avoidance() {
         Some(CtlEvidence::Finite { .. })
     ));
 
-    let infinite_avoidance = model_from_edges([
-        vec![(0, 1)],
-        vec![(0, 0)],
-        Vec::new(),
-    ]);
+    let infinite_avoidance = model_from_edges([vec![(0, 1)], vec![(0, 0)], Vec::new()]);
     let atom = |atom: &Atom, state: &u8| match atom {
         Atom::P => *state <= 1,
         Atom::Q => false,
@@ -216,11 +181,7 @@ fn nested_formula_reuses_structurally_identical_subformula_sets() {
 
 #[test]
 fn nested_branching_formula_and_classic_dualities_hold() {
-    let model = model_from_edges([
-        vec![(0, 1), (1, 2)],
-        vec![(0, 1)],
-        vec![(0, 2)],
-    ]);
+    let model = model_from_edges([vec![(0, 1), (1, 2)], vec![(0, 1)], vec![(0, 2)]]);
     let atom = |_atom: &Atom, state: &u8| *state == 1;
     let p = CtlFormula::atom(Atom::P);
 
@@ -298,12 +259,7 @@ fn generated_until_ctl_matches_independent_path_oracle() {
                 let p = CtlFormula::atom(Atom::P);
                 let q = CtlFormula::atom(Atom::Q);
 
-                let eu = evaluate_ctl(
-                    &model,
-                    &CtlFormula::eu(p.clone(), q.clone()),
-                    atom,
-                )
-                .unwrap();
+                let eu = evaluate_ctl(&model, &CtlFormula::eu(p.clone(), q.clone()), atom).unwrap();
                 let au = evaluate_ctl(&model, &CtlFormula::au(p, q), atom).unwrap();
 
                 for (index, state) in eu.reachable_states.iter().enumerate() {
@@ -336,12 +292,8 @@ enum UnaryKind {
 fn oracle_unary(edges: &[Vec<(usize, u8)>; 3], mask: u8, state: u8, kind: UnaryKind) -> bool {
     let holds = |state: u8| mask & (1 << state) != 0;
     match kind {
-        UnaryKind::Ex => successors(edges, state)
-            .into_iter()
-            .any(holds),
-        UnaryKind::Ax => successors(edges, state)
-            .into_iter()
-            .all(holds),
+        UnaryKind::Ex => successors(edges, state).into_iter().any(holds),
+        UnaryKind::Ax => successors(edges, state).into_iter().all(holds),
         UnaryKind::Ef => oracle_ef(edges, mask, state),
         UnaryKind::Af => !oracle_eg(edges, !mask & 0b111, state),
         UnaryKind::Eg => oracle_eg(edges, mask, state),
@@ -369,12 +321,7 @@ fn oracle_ef(edges: &[Vec<(usize, u8)>; 3], mask: u8, source: u8) -> bool {
 }
 
 fn oracle_eg(edges: &[Vec<(usize, u8)>; 3], mask: u8, source: u8) -> bool {
-    fn prefix(
-        edges: &[Vec<(usize, u8)>; 3],
-        mask: u8,
-        state: u8,
-        transitions_left: usize,
-    ) -> bool {
+    fn prefix(edges: &[Vec<(usize, u8)>; 3], mask: u8, state: u8, transitions_left: usize) -> bool {
         if mask & (1 << state) == 0 {
             return false;
         }
@@ -389,12 +336,7 @@ fn oracle_eg(edges: &[Vec<(usize, u8)>; 3], mask: u8, source: u8) -> bool {
     prefix(edges, mask, source, 3)
 }
 
-fn oracle_eu(
-    edges: &[Vec<(usize, u8)>; 3],
-    p_mask: u8,
-    q_mask: u8,
-    source: u8,
-) -> bool {
+fn oracle_eu(edges: &[Vec<(usize, u8)>; 3], p_mask: u8, q_mask: u8, source: u8) -> bool {
     fn search(
         edges: &[Vec<(usize, u8)>; 3],
         p_mask: u8,
@@ -411,9 +353,7 @@ fn oracle_eu(
 
         for next in successors(edges, state) {
             let bit = 1 << next;
-            if visited & bit == 0
-                && search(edges, p_mask, q_mask, next, visited | bit)
-            {
+            if visited & bit == 0 && search(edges, p_mask, q_mask, next, visited | bit) {
                 return true;
             }
         }
@@ -423,12 +363,7 @@ fn oracle_eu(
     search(edges, p_mask, q_mask, source, 1 << source)
 }
 
-fn oracle_au(
-    edges: &[Vec<(usize, u8)>; 3],
-    p_mask: u8,
-    q_mask: u8,
-    source: u8,
-) -> bool {
+fn oracle_au(edges: &[Vec<(usize, u8)>; 3], p_mask: u8, q_mask: u8, source: u8) -> bool {
     let not_q = !q_mask & 0b111;
     let bad = (!p_mask & 0b111) & not_q;
     !oracle_eu(edges, not_q, bad, source) && !oracle_eg(edges, not_q, source)
