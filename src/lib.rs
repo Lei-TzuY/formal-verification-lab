@@ -352,9 +352,10 @@ pub use temporal::{
 pub use temporal_parse::{parse_action_temporal, TemporalParseError, TemporalParseErrorKind};
 pub use temporal_report::{render_bounded_temporal_report, render_temporal_report};
 pub use text_source::{
-    normalize_source_id, path_source_id, resolve_source_id, FileSystemTextSourceProvider,
-    MapTextSourceProvider, RootedFileSystemTextSourceProvider, TextSourceError,
-    TextSourceErrorKind, TextSourceIdError, TextSourceIdErrorKind, TextSourceProvider,
+    normalize_source_id, normalize_workspace_source_id, path_source_id, resolve_source_id,
+    FileSystemTextSourceProvider, MapTextSourceProvider, RootedFileSystemTextSourceProvider,
+    TextSourceError, TextSourceErrorKind, TextSourceIdError, TextSourceIdErrorKind,
+    TextSourceProvider,
 };
 pub use verification_execution::{
     execute_multi_response, MultiResponseExecutionConfig, MultiResponseExecutionResult,
