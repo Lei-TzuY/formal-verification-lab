@@ -262,7 +262,7 @@ pub fn normalize_source_id(source_id: &str) -> Result<String, TextSourceIdError>
     }
 }
 
-fn normalize_workspace_source_id(source_id: &str) -> Result<String, TextSourceIdError> {
+pub fn normalize_workspace_source_id(source_id: &str) -> Result<String, TextSourceIdError> {
     let normalized = normalize_source_id(source_id)?;
     if is_absolute_source_id(&normalized) || escapes_logical_root(&normalized) {
         Err(TextSourceIdError::new(
