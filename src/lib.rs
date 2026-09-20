@@ -16,6 +16,7 @@ pub mod builder;
 pub mod checker;
 pub mod combined_fairness;
 pub mod ctl;
+pub mod ctl_bounded;
 pub mod ctl_parse;
 pub mod declarative;
 pub mod declarative_ctl;
@@ -103,6 +104,10 @@ pub use combined_fairness::{
 pub use ctl::{
     evaluate_ctl, CtlError, CtlEvaluation, CtlEvidence, CtlEvidenceAction, CtlEvidenceStep,
     CtlFormula, CtlInitialEvaluation, CtlTerminalPolicy,
+};
+pub use ctl_bounded::{
+    evaluate_ctl_with_limits, BoundedCtlError, BoundedCtlEvaluation, BoundedCtlInitialEvaluation,
+    BoundedCtlStatus, BoundedCtlTruth,
 };
 pub use ctl_parse::{parse_ctl_formula, render_ctl_formula, CtlParseError, CtlParseErrorKind};
 pub use declarative::{
