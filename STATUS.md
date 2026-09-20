@@ -28,22 +28,35 @@ M67 adds deterministic multi-job orchestration over the sealed M66 structural-jo
 
 ## Milestone 68 — validated partial-order reduction foundation
 
-**Status: implementation in progress on `feature/milestone-68-validated-reduction`.**
+**Status: integration candidate complete on PR #69.**
 
-Current vertical slice:
+M68 promotes the old M5 safety-reduction experiment from raw-declaration-only auditing to a validation-first proof boundary while preserving the historical audit API.
 
-- raw `IndependenceRelation` remains non-authoritative and the historical exhaustive differential audit remains available;
-- `validate_independence` exhaustively binds exact action-pair claims to one canonical reachable snapshot and its invariant observations;
-- validation fails closed on configured same-label nondeterminism, action enabledness changes, non-commuting diamonds, and intermediate invariant-observation changes;
-- `ValidatedIndependenceRelation` has private evidence fields and is the only input accepted by the new standalone reduced safety path;
-- validated reduction executes over the exact certified snapshot rather than accepting a certificate alongside an arbitrary model;
-- raw and validated reducers distinguish the same model state reached under different sleep sets, preventing global state-only visitation from collapsing reduction contexts;
-- focused regressions cover invalid declarations, observation changes, context revisitation, deterministic witnesses, and the commuting-counter baseline;
-- generated differential coverage enumerates all 4,096 deterministic two-action graphs over three states across all eight safety masks, accepting only relations that pass validation and comparing every accepted reduced result with canonical exhaustive safety.
+Implemented contract:
 
-Acceptance before closure:
+- raw `IndependenceRelation` remains non-authoritative; `audit_sleep_set_reduction` still differentially compares raw-declaration reduction with canonical exhaustive safety;
+- `validate_independence` captures the complete canonical reachable graph once and binds exact action-pair claims to that snapshot plus its invariant observations;
+- validation fails closed on configured same-label nondeterminism, enabledness changes under the peer action, non-commuting diamonds, and intermediate invariant-observation changes;
+- `ValidatedIndependenceRelation` has private evidence fields and the standalone `check_validated_sleep_set_reduction` accepts only that evidence, executing over the exact certified snapshot rather than a caller-supplied model;
+- raw and validated reducers preserve distinct `(state, sleep-set)` contexts, so revisiting the same model state under a different sleep set is not collapsed by one global state-only visited entry;
+- reduction witnesses are deterministic DFS evidence, not advertised as shortest BFS witnesses;
+- generated differential coverage enumerates all 4,096 deterministic two-action graphs over three states across all eight safety masks (32,768 model/property combinations); every relation accepted by the validator is compared with canonical exhaustive safety;
+- focused regressions cover invalid declarations, enabledness interference, commuting/invariant-observation failures, same-label ambiguity, sleep-context revisitation, deterministic witnesses, and the commuting-counter baseline.
 
-- exact-head format/build/Clippy/full tests and all historical CLI gates must pass;
-- generated differential must converge without weakening validation or expected safety semantics;
-- README/trust-boundary documentation must describe the new validated path without claiming performance from CI timing;
-- branch must remain based on current `main`, mergeable, and free of review blockers.
+Candidate `97b253d9b8f2f92bf9e8bd02e194d99c0154fe36` passed CI #580 (format, all-target build, Clippy with `-D warnings`, full tests including the generated differential, and all historical CLI gates) and Bounded state-property CLI #430. Closure metadata changes must pass the same exact-head gates before merge.
+
+M68 is a proof-safety foundation, not a performance claim: validation itself exhaustively captures the reachable graph. It makes no claim about liveness POR, arbitrary independence theories, symbolic reduction, or CI timing as a benchmark.
+
+## Next frontier — Milestone 69: CTL branching-time fixpoint kernel
+
+Promote from specialized temporal properties to a general branching-time state-formula authority over the shared complete reachable graph.
+
+Acceptance criteria:
+
+- typed CTL formulas for Boolean composition plus `EX`, `AX`, `EF`, `AF`, `EG`, `AG`, `E[U]`, and `A[U]`;
+- one explicit terminal-state policy applied consistently to all operators and tests;
+- deterministic least/greatest-fixpoint evaluation over one captured `ReachableGraph`, with memoized subformula state sets rather than repeated model traversal;
+- deterministic existential evidence and universal counterevidence where sound, without unearned shortest-witness claims;
+- independent generated small-graph/proposition oracle coverage plus terminal/cycle/nesting/duality regressions;
+- typed semantic kernel first; parser/CLI/reporting only after the authority layer is sealed;
+- preserve every historical verification, fairness, structural, suite, and validated-reduction gate.
