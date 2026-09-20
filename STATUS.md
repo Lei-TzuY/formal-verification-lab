@@ -28,35 +28,43 @@ M67 adds deterministic multi-job orchestration over the sealed M66 structural-jo
 
 ## Milestone 68 — validated partial-order reduction foundation
 
-**Status: integration candidate complete on PR #69.**
+**Status: sealed in `main` at `1bf1395253bb0f2f0d2cd96b25c03199ef2528dd`.**
 
-M68 promotes the old M5 safety-reduction experiment from raw-declaration-only auditing to a validation-first proof boundary while preserving the historical audit API.
+M68 promotes the old M5 safety-reduction experiment from raw-declaration-only auditing to a validation-first proof boundary. Raw declarations remain non-authoritative; validated certificates are bound to one complete canonical reachable snapshot plus invariant observations, fail closed on supported independence violations, and preserve distinct `(state, sleep-set)` contexts. Exact candidate `f44e7d56fc919ebee0a1245d82c23cdff35ab4b9` passed CI #582 and Bounded state-property CLI #432 before squash integration.
+
+## Milestone 69 — typed CTL branching-time fixpoint kernel
+
+**Status: integration candidate complete on PR #70.**
+
+M69 adds a parser-free typed CTL semantic authority over one complete canonical reachable graph.
 
 Implemented contract:
 
-- raw `IndependenceRelation` remains non-authoritative; `audit_sleep_set_reduction` still differentially compares raw-declaration reduction with canonical exhaustive safety;
-- `validate_independence` captures the complete canonical reachable graph once and binds exact action-pair claims to that snapshot plus its invariant observations;
-- validation fails closed on configured same-label nondeterminism, enabledness changes under the peer action, non-commuting diamonds, and intermediate invariant-observation changes;
-- `ValidatedIndependenceRelation` has private evidence fields and the standalone `check_validated_sleep_set_reduction` accepts only that evidence, executing over the exact certified snapshot rather than a caller-supplied model;
-- raw and validated reducers preserve distinct `(state, sleep-set)` contexts, so revisiting the same model state under a different sleep set is not collapsed by one global state-only visited entry;
-- reduction witnesses are deterministic DFS evidence, not advertised as shortest BFS witnesses;
-- generated differential coverage enumerates all 4,096 deterministic two-action graphs over three states across all eight safety masks (32,768 model/property combinations); every relation accepted by the validator is compared with canonical exhaustive safety;
-- focused regressions cover invalid declarations, enabledness interference, commuting/invariant-observation failures, same-label ambiguity, sleep-context revisitation, deterministic witnesses, and the commuting-counter baseline.
+- typed Boolean formulas plus `EX`, `AX`, `EF`, `AF`, `EG`, `AG`, `E[U]`, and `A[U]`;
+- explicit terminal policy: every reachable terminal is totalized with one synthetic self-loop for CTL path semantics while the original model graph remains unchanged;
+- deterministic least/greatest fixpoint evaluation over one captured `ReachableGraph`;
+- structural subformula memoization so repeated nested formulas reuse their computed state sets instead of re-running model traversal;
+- deterministic finite evidence for existential `EX`/`EF`/`E[U]` satisfaction and universal `AX`/`AG`/`A[U]` failure where the kernel can justify it directly;
+- deterministic lasso evidence for `EG` satisfaction and `AF`/`A[U]` nontermination counterevidence;
+- evidence explicitly distinguishes real model actions from synthetic terminal self-loops;
+- focused terminal, branching, nested-formula, memoization, duality, finite-evidence, and lasso regressions;
+- generated independent path-oracle coverage across all 512 directed three-state graphs: 4,096 unary proposition valuations checked across six unary CTL operators, plus 32,768 binary proposition valuations checked across both until operators.
 
-Candidate `97b253d9b8f2f92bf9e8bd02e194d99c0154fe36` passed CI #580 (format, all-target build, Clippy with `-D warnings`, full tests including the generated differential, and all historical CLI gates) and Bounded state-property CLI #430. Closure metadata changes must pass the same exact-head gates before merge.
+Implementation candidate `78912262f6a37733ce3e3f03b90030f86e91344f` passed CI #587 (format, all-target build, Clippy with `-D warnings`, full tests including generated CTL oracles, and every historical CLI gate) and Bounded state-property CLI #437. Closure metadata changes must pass the same exact-head gates before merge.
 
-M68 is a proof-safety foundation, not a performance claim: validation itself exhaustively captures the reachable graph. It makes no claim about liveness POR, arbitrary independence theories, symbolic reduction, or CI timing as a benchmark.
+M69 is a typed semantic kernel, not yet a textual/declarative CTL frontend. It makes no arbitrary CTL parser, bounded-prefix CTL proof, symbolic model checking, or shortest-witness claim.
 
-## Next frontier — Milestone 69: CTL branching-time fixpoint kernel
+## Next frontier — Milestone 70: declarative CTL parser and file frontend
 
-Promote from specialized temporal properties to a general branching-time state-formula authority over the shared complete reachable graph.
+Promote the sealed typed M69 authority to an external named-proposition surface without introducing a second CTL semantics.
 
 Acceptance criteria:
 
-- typed CTL formulas for Boolean composition plus `EX`, `AX`, `EF`, `AF`, `EG`, `AG`, `E[U]`, and `A[U]`;
-- one explicit terminal-state policy applied consistently to all operators and tests;
-- deterministic least/greatest-fixpoint evaluation over one captured `ReachableGraph`, with memoized subformula state sets rather than repeated model traversal;
-- deterministic existential evidence and universal counterevidence where sound, without unearned shortest-witness claims;
-- independent generated small-graph/proposition oracle coverage plus terminal/cycle/nesting/duality regressions;
-- typed semantic kernel first; parser/CLI/reporting only after the authority layer is sealed;
-- preserve every historical verification, fairness, structural, suite, and validated-reduction gate.
+- deterministic textual grammar for Boolean composition plus `EX`, `AX`, `EF`, `AF`, `EG`, `AG`, `E[U]`, and `A[U]`, with explicit precedence/grouping and canonical rendering;
+- bind CTL atoms to existing declarative named state propositions and fail closed on unknown proposition references before backend execution;
+- execute through M69 `evaluate_ctl` only, preserving its terminal self-loop policy, state-set semantics, memoization, and evidence;
+- add a declarative model-file CLI with stable report/exit behavior for all-initial satisfaction versus violation and malformed input;
+- preserve deterministic evidence rendering, including synthetic terminal-loop provenance, without claiming shortest traces;
+- parser round-trip, malformed grammar, unknown proposition, terminal/cycle, nested operator, direct-vs-frontend, and built-binary integration regressions;
+- keep fairness external and unsupported for CTL in this phase; add no CTL job/suite protocol until the direct file frontend is sealed;
+- preserve all historical safety, temporal, fairness, structural, suite, reduction, and M69 oracle gates.
