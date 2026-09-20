@@ -93,7 +93,10 @@ impl RootedFileSystemTextSourceProvider {
 impl TextSourceProvider for RootedFileSystemTextSourceProvider {
     fn read_text(&self, source_id: &str) -> Result<String, TextSourceError> {
         let normalized = normalize_workspace_source_id(source_id).map_err(|error| {
-            TextSourceError::new(error.source_id().to_owned(), TextSourceErrorKind::InvalidData)
+            TextSourceError::new(
+                error.source_id().to_owned(),
+                TextSourceErrorKind::InvalidData,
+            )
         })?;
         fs::read_to_string(self.root.join(source_id_to_path(&normalized)))
             .map_err(|error| TextSourceError::new(normalized, classify_io_error(&error)))
@@ -142,7 +145,10 @@ impl MapTextSourceProvider {
 impl TextSourceProvider for MapTextSourceProvider {
     fn read_text(&self, source_id: &str) -> Result<String, TextSourceError> {
         let normalized = normalize_workspace_source_id(source_id).map_err(|error| {
-            TextSourceError::new(error.source_id().to_owned(), TextSourceErrorKind::InvalidData)
+            TextSourceError::new(
+                error.source_id().to_owned(),
+                TextSourceErrorKind::InvalidData,
+            )
         })?;
         self.sources
             .get(&normalized)
