@@ -4,6 +4,13 @@ use formal_verification_lab::{
     verify_declarative_mu_parity_certificate, DeclarativeMuParityCertificateError,
     MuParityCertificateParseError, MuParityMove,
 };
+use std::fs;
+use std::path::PathBuf;
+use std::process::Command;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+static NEXT_DIR: AtomicUsize = AtomicUsize::new(0);
+
 
 const MODEL: &str = r#"
 model "certificate-model"
@@ -214,4 +221,148 @@ end
             actual: 0,
         })
     ));
+}
+
+#[test]
+fn built_binary_certificate_create_and_verify_support_relative_paths_and_fail_closed_tampering() {
+    let root = fixture_dir("cli");
+    fs::write(root.join("model.fvl"), MODEL).unwrap();
+    let binary = env!("CARGO_BIN_EXE_fvlab");
+
+    let created = Command::new(binary)
+        .current_dir(&root)
+        .args([
+            "mu",
+            "certificate",
+            "create",
+            "model.fvl",
+            FORMULA,
+            "proof.fvlcert",
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(created.status.code(), Some(0));
+    let stdout = String::from_utf8(created.stdout).unwrap();
+    assert!(stdout.contains("MU PARITY CERTIFICATE: WRITTEN"));
+    assert!(root.join("proof.fvlcert").exists());
+
+    let verified = Command::new(binary)
+        .current_dir(&root)
+        .args([
+            "mu",
+            "certificate",
+            "verify",
+            "model.fvl",
+            FORMULA,
+            "proof.fvlcert",
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(verified.status.code(), Some(0));
+    let stdout = String::from_utf8(verified.stdout).unwrap();
+    assert!(stdout.contains("MU PARITY CERTIFICATE: VERIFIED"));
+
+    let wrong_formula = Command::new(binary)
+        .current_dir(&root)
+        .args([
+            "mu",
+            "certificate",
+            "verify",
+            "model.fvl",
+            r#"nu X. "ready" and box $X"#,
+            "proof.fvlcert",
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(wrong_formula.status.code(), Some(2));
+    let stderr = String::from_utf8(wrong_formula.stderr).unwrap();
+    assert!(stderr.contains("formula binding mismatch"));
+
+    let wrong_model = MODEL.replace(
+        r#"edge "start" "finish" "done""#,
+        r#"edge "start" "finish-renamed" "done""#,
+    );
+    fs::write(root.join("wrong-model.fvl"), wrong_model).unwrap();
+    let wrong_model_run = Command::new(binary)
+        .current_dir(&root)
+        .args([
+            "mu",
+            "certificate",
+            "verify",
+            "wrong-model.fvl",
+            FORMULA,
+            "proof.fvlcert",
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(wrong_model_run.status.code(), Some(2));
+    let stderr = String::from_utf8(wrong_model_run.stderr).unwrap();
+    assert!(stderr.contains("different declarative model"));
+
+    let proof = fs::read_to_string(root.join("proof.fvlcert")).unwrap();
+    let truncated = proof
+        .lines()
+        .filter(|line| *line != "end")
+        .collect::<Vec<_>>()
+        .join("\n");
+    fs::write(root.join("truncated.fvlcert"), truncated).unwrap();
+    let truncated_run = Command::new(binary)
+        .current_dir(&root)
+        .args([
+            "mu",
+            "certificate",
+            "verify",
+            "model.fvl",
+            FORMULA,
+            "truncated.fvlcert",
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(truncated_run.status.code(), Some(2));
+    let stderr = String::from_utf8(truncated_run.stderr).unwrap();
+    assert!(stderr.contains("missing 'end'"));
+
+    let tampered = proof
+        .lines()
+        .map(|line| {
+            if let Some(rest) = line.strip_prefix("accounting ") {
+                let mut fields = rest.split_whitespace().collect::<Vec<_>>();
+                let discovered = fields[0].parse::<usize>().unwrap();
+                fields[0] = Box::leak((discovered + 1).to_string().into_boxed_str());
+                format!("accounting {}", fields.join(" "))
+            } else {
+                line.to_owned()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+        + "\n";
+    fs::write(root.join("tampered.fvlcert"), tampered).unwrap();
+    let tampered_run = Command::new(binary)
+        .current_dir(&root)
+        .args([
+            "mu",
+            "certificate",
+            "verify",
+            "model.fvl",
+            FORMULA,
+            "tampered.fvlcert",
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(tampered_run.status.code(), Some(2));
+    let stderr = String::from_utf8(tampered_run.stderr).unwrap();
+    assert!(stderr.contains("evidence does not match the canonical evaluation"));
+
+    fs::remove_dir_all(root).unwrap();
+}
+
+fn fixture_dir(kind: &str) -> PathBuf {
+    let id = NEXT_DIR.fetch_add(1, Ordering::Relaxed);
+    let root = std::env::temp_dir().join(format!(
+        "fvlab-m86-mu-certificate-{kind}-{}-{id}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&root).unwrap();
+    root
 }
