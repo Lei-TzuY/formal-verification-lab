@@ -347,7 +347,7 @@ fn mu_jobs_fail_closed_on_formula_metadata_limits_and_temporal_only_configuratio
         .error
         .as_deref()
         .unwrap()
-        .contains("invalid non-negative decimal integer"));
+        .contains("expected a non-negative decimal integer"));
 
     fs::remove_dir_all(root).unwrap();
 }
