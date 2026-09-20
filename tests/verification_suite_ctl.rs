@@ -1,7 +1,8 @@
 use formal_verification_lab::{
     run_verification_job_json, run_verification_suite_expectations_json,
-    run_verification_suite_json, VerificationJobOutcome, VerificationRegressionSuiteOutcome,
-    VerificationJobCtlTruth, VerificationSuiteOutcome, VERIFICATION_JOB_CTL_RESULT_SCHEMA_VERSION,
+    run_verification_suite_json, VerificationJobCtlTruth, VerificationJobOutcome,
+    VerificationRegressionSuiteOutcome, VerificationSuiteOutcome,
+    VERIFICATION_JOB_CTL_RESULT_SCHEMA_VERSION,
 };
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -26,8 +27,10 @@ label "done" "complete"
 
 fn fixture_dir(kind: &str) -> PathBuf {
     let id = NEXT_DIR.fetch_add(1, Ordering::Relaxed);
-    let root =
-        std::env::temp_dir().join(format!("fvlab-m74-ctl-suite-{kind}-{}-{id}", std::process::id()));
+    let root = std::env::temp_dir().join(format!(
+        "fvlab-m74-ctl-suite-{kind}-{}-{id}",
+        std::process::id()
+    ));
     fs::create_dir_all(&root).unwrap();
     root
 }
@@ -38,9 +41,7 @@ fn write_ctl_job(root: &Path, name: &str, property: &str, tail: &str) -> PathBuf
     let manifest = root.join(format!("{name}.fvj"));
     fs::write(
         &manifest,
-        format!(
-            "analysis \"ctl\"\nmodel \"{name}.fvl\"\nproperty \"{name}.ctl\"\n{tail}"
-        ),
+        format!("analysis \"ctl\"\nmodel \"{name}.fvl\"\nproperty \"{name}.ctl\"\n{tail}"),
     )
     .unwrap();
     manifest
@@ -143,7 +144,10 @@ fn generic_suite_runner_preserves_schema_v3_ctl_envelopes_and_heterogeneous_orde
     let json = run.to_json();
     let ctl_details = run.envelope.jobs[1].result.ctl.as_ref().unwrap();
     assert!(!ctl_details.initial_states_complete);
-    assert_eq!(ctl_details.initial[0].truth, VerificationJobCtlTruth::Unknown);
+    assert_eq!(
+        ctl_details.initial[0].truth,
+        VerificationJobCtlTruth::Unknown
+    );
     assert!(json.contains("\"schema_version\":3,\"analysis\":\"ctl\""));
     assert!(json.contains("\"kind\":\"state_limit\""));
     assert!(json.contains("\"truth\":\"unknown\""));
