@@ -1,10 +1,11 @@
 use crate::bounded::BoundedOutcome;
 use crate::declarative_mu::{
-    check_declarative_mu_text, check_declarative_mu_text_with_limits, DeclarativeMuStatus,
+    check_declarative_mu_text, check_declarative_mu_text_via_parity,
+    check_declarative_mu_text_with_limits, DeclarativeMuStatus,
 };
 use crate::mu_bounded::BoundedMuStatus;
 use crate::parse_declarative_document;
-use crate::verification_job::VerificationJob;
+use crate::verification_job::{VerificationJob, VerificationJobMuBackend};
 use crate::verification_job_run::VerificationJobJsonRun;
 use crate::verification_result::{VerificationJobOutcome, VerificationJobResultEnvelope};
 use std::fs;
@@ -33,33 +34,52 @@ pub(crate) fn run_mu_job_json(
     })?;
 
     let model_limits = job.model_limits();
-    let (envelope, exit_code) = if has_model_limits(model_limits) {
-        let result =
-            check_declarative_mu_text_with_limits(&document, &property_input, model_limits)
+    let (envelope, exit_code) = match (job.mu_backend(), has_model_limits(model_limits)) {
+        (VerificationJobMuBackend::Fixpoint, true) => {
+            let result =
+                check_declarative_mu_text_with_limits(&document, &property_input, model_limits)
+                    .map_err(|error| error.to_string())?;
+            let exit_code = match result.evaluation.outcome {
+                BoundedOutcome::Conclusive(BoundedMuStatus::Satisfied) => 0,
+                BoundedOutcome::Conclusive(BoundedMuStatus::Violated) => 15,
+                BoundedOutcome::Inconclusive(_) => 3,
+            };
+            let envelope = VerificationJobResultEnvelope::from_mu_bounded(
+                document.model().name().to_owned(),
+                model_limits,
+                &result,
+            );
+            (envelope, exit_code)
+        }
+        (VerificationJobMuBackend::Fixpoint, false) => {
+            let result = check_declarative_mu_text(&document, &property_input)
                 .map_err(|error| error.to_string())?;
-        let exit_code = match result.evaluation.outcome {
-            BoundedOutcome::Conclusive(BoundedMuStatus::Satisfied) => 0,
-            BoundedOutcome::Conclusive(BoundedMuStatus::Violated) => 15,
-            BoundedOutcome::Inconclusive(_) => 3,
-        };
-        let envelope = VerificationJobResultEnvelope::from_mu_bounded(
-            document.model().name().to_owned(),
-            model_limits,
-            &result,
-        );
-        (envelope, exit_code)
-    } else {
-        let result = check_declarative_mu_text(&document, &property_input)
-            .map_err(|error| error.to_string())?;
-        let exit_code = match result.status {
-            DeclarativeMuStatus::Satisfied => 0,
-            DeclarativeMuStatus::Violated => 15,
-        };
-        let envelope = VerificationJobResultEnvelope::from_mu_complete(
-            document.model().name().to_owned(),
-            &result,
-        );
-        (envelope, exit_code)
+            let exit_code = match result.status {
+                DeclarativeMuStatus::Satisfied => 0,
+                DeclarativeMuStatus::Violated => 15,
+            };
+            let envelope = VerificationJobResultEnvelope::from_mu_complete(
+                document.model().name().to_owned(),
+                &result,
+            );
+            (envelope, exit_code)
+        }
+        (VerificationJobMuBackend::Parity, false) => {
+            let result = check_declarative_mu_text_via_parity(&document, &property_input)
+                .map_err(|error| error.to_string())?;
+            let exit_code = match result.status {
+                DeclarativeMuStatus::Satisfied => 0,
+                DeclarativeMuStatus::Violated => 15,
+            };
+            let envelope = VerificationJobResultEnvelope::from_mu_parity(
+                document.model().name().to_owned(),
+                &result,
+            );
+            (envelope, exit_code)
+        }
+        (VerificationJobMuBackend::Parity, true) => {
+            unreachable!("parity model limits are rejected before file loading")
+        }
     };
 
     debug_assert_eq!(
@@ -78,8 +98,14 @@ pub(crate) fn run_mu_job_json(
     })
 }
 
-pub(crate) fn mu_error(message: impl Into<String>) -> VerificationJobResultEnvelope {
-    VerificationJobResultEnvelope::mu_error(message)
+pub(crate) fn mu_error(
+    backend: VerificationJobMuBackend,
+    message: impl Into<String>,
+) -> VerificationJobResultEnvelope {
+    match backend {
+        VerificationJobMuBackend::Fixpoint => VerificationJobResultEnvelope::mu_error(message),
+        VerificationJobMuBackend::Parity => VerificationJobResultEnvelope::mu_parity_error(message),
+    }
 }
 
 fn has_model_limits(limits: crate::checker::ExplorationLimits) -> bool {
@@ -99,6 +125,12 @@ fn validate_mu_job(job: &VerificationJob) -> Result<(), String> {
         || product_limits.max_depth.is_some()
     {
         return Err("mu-calculus verification jobs do not support max-product-* limits".to_owned());
+    }
+    if job.mu_backend() == VerificationJobMuBackend::Parity && has_model_limits(job.model_limits())
+    {
+        return Err(
+            "mu-calculus parity verification jobs do not support max-model-* limits".to_owned(),
+        );
     }
     Ok(())
 }

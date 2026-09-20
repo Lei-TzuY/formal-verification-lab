@@ -191,15 +191,13 @@ fn expectation_suite_compares_only_outcomes_and_keeps_full_mu_details() {
         run.envelope.jobs[2].result.mu.as_ref().unwrap().initial[0].truth,
         VerificationJobMuTruth::Unknown
     );
-    assert!(
-        run.envelope.jobs[2]
-            .result
-            .mu
-            .as_ref()
-            .unwrap()
-            .fixpoint_iterations
-            > 0
-    );
+    assert!(run.envelope.jobs[2]
+        .result
+        .mu
+        .as_ref()
+        .unwrap()
+        .fixpoint_iterations
+        .is_some_and(|iterations| iterations > 0));
 
     fs::remove_dir_all(root).unwrap();
 }

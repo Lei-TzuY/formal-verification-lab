@@ -132,38 +132,48 @@ M81 adds an independent complete-graph μ-calculus evaluation-game backend along
 
 ## Milestone 82 — opt-in declarative modal mu-calculus parity backend
 
-**Status: implementation candidate complete on PR #81.**
+**Status: sealed in `main` at `12a570cad782e76218e5c5f36213fdac7f09d32d`.**
 
-M82 exposes the sealed M81 parity authority through the existing declarative named-proposition frontend and direct `fvlab mu file` command without replacing the default M75/M76 fixpoint path.
+M82 exposes the sealed M81 parity authority through the existing declarative named-proposition frontend and direct `fvlab mu file` command without replacing the default M75/M76 fixpoint path. `mu file ... --backend parity` is explicit opt-in; no-option execution remains the historical fixpoint route, and parity combined with model-space limits fails closed rather than claiming bounded parity semantics. Exact closure candidate `68b76c6b7c24d3063eee7980d885388185618f88` passed CI #671 and Bounded state-property CLI #521 before squash integration.
+
+## Milestone 83 — reproducible parity-backed modal mu-calculus verification jobs
+
+**Status: implementation candidate complete on PR #82.**
+
+M83 carries M82's explicit complete parity backend into the existing M79 heterogeneous verification-job protocol while preserving fixpoint as the default and bounded authority.
 
 Implemented contract:
 
-- `check_declarative_mu_via_parity` and the textual parity adapter reuse the existing parser, lexical/monotonicity validator, named-proposition resolution, canonical formula rendering, model loader, and terminal policy;
-- parity execution preserves the fixpoint frontend's status, canonical formula, reachable/satisfying state sets, per-initial truth, and model accounting;
-- parity reporting identifies the backend and exposes parity-game vertex count and maximum priority without presenting those observations as performance measurements;
-- `mu file ... --backend parity` is explicit opt-in; no-option execution remains the historical complete fixpoint path, and `--backend fixpoint` is an explicit equivalent;
-- existing model-space limits remain on the proof-honest M77/M78 fixpoint route;
-- parity combined with `--max-states`, `--max-transitions`, or `--max-depth` fails closed instead of silently falling back or claiming bounded parity semantics;
-- malformed formulas, unbound/non-monotone variables, and unknown propositions preserve the existing fail-closed validation order;
-- focused direct and built-binary regressions cover parity-vs-fixpoint equivalence, terminal totalization, negation/alternation, default-output compatibility, unknown/duplicate backend options, and parity-with-bounds rejection.
+- the manifest adds one singleton `backend "fixpoint"|"parity"` directive only for `analysis "mu-calculus"`;
+- absent backend metadata preserves historical canonical documents and defaults to fixpoint;
+- invalid backend values, duplicate backend directives, and backend directives on non-μ families fail closed during parsing;
+- complete parity jobs reuse M82/M81, preserve manifest-relative loading and validation ordering, use stable 0/15/2 exits, and emit schema-v4 envelopes with explicit `backend:"mu-parity"`;
+- parity plus model-space limits is rejected before referenced-file I/O; default/fixpoint limited jobs continue to use M77/M78 with exit 3 and original cutoff provenance;
+- schema-v4 μ details make fixpoint-iteration observations optional rather than fabricating them for parity; historical fixpoint JSON still emits its numeric `fixpoint_iterations` field and omits parity-only fields;
+- parity envelopes add parity-game vertex count and maximum priority as observations only;
+- complete parity/fixpoint jobs are differentially checked for outcome, canonical property, state/initial results, and model accounting;
+- generic raw/expectation suites preserve mixed parity/fixpoint nested envelopes without a parity-specific suite engine;
+- built `fvlab temporal job ... --format json` covers manifest-relative parity execution and backend identity.
 
-Implementation candidate `654075b90ffb34db9363e262bd123202a174fa99` passed CI #669 (format, all-target build, Clippy with `-D warnings`, full tests including M81's 3,584-case parity differential, M77's 15,360-case bounded oracle, M75's 90,112-case CTL→μ differential, and every historical CLI gate) and Bounded state-property CLI #519. Closure metadata changes must pass the same exact-head gates before merge.
+A historical M79 bounded regression was strengthened after the schema field became optional: the fixpoint route now explicitly requires `Some(direct.fixpoint_iterations)`, preserving the old numeric contract while allowing parity to omit an inapplicable observation.
 
-M82 adds no default backend switch, bounded parity semantics, strategy witness, proof certificate, fairness semantics, symbolic representation, or performance claim.
+Implementation candidate `5894e4104f3a66ac76e2a56eee802e1f4980e2d2` passed CI #677 (format, all-target build, Clippy with `-D warnings`, full tests including M81's 3,584-case parity differential, M77's 15,360-case bounded oracle, M75's 90,112-case CTL→μ differential, and every historical CLI gate) and Bounded state-property CLI #527. Closure metadata changes must pass the same exact-head gates before merge.
 
-## Next frontier — Milestone 83: reproducible parity-backed modal mu-calculus verification jobs
+M83 adds no bounded parity semantics, strategy certificate, proof witness, symbolic representation, fairness semantics, or performance claim.
 
-Carry the explicit complete parity backend selection into the existing M79 verification-job protocol while preserving fixpoint as the default and keeping bounded jobs on the sealed M77/M78 semantics.
+## Next frontier — Milestone 84: certified positional parity strategies
+
+Promote the M81 parity kernel from winning-region classification to deterministic positional strategy evidence with an independent verifier. Keep this phase generic to parity games; do not yet label the resulting data a modal μ-calculus proof witness.
 
 Acceptance criteria:
 
-- extend the verification-job manifest with one canonical, explicit μ backend selection; absent backend metadata must preserve existing M79 canonical documents and fixpoint behavior;
-- accept `fixpoint` and `parity` only for `analysis "mu-calculus"`; reject backend directives on unrelated analysis families rather than silently ignoring them;
-- parity-backed jobs must reuse M82/M81 execution and preserve manifest-relative loading, parser/validator/atom-resolution ordering, stable 0/15/2 exits, deterministic schema-v4 μ details, and explicit backend identity;
-- parity plus any model-space limit must fail closed because bounded parity semantics are not implemented; default/fixpoint limited jobs must continue to use M77 and retain exit 3/cutoff provenance;
-- complete parity and fixpoint jobs for the same model/formula must agree on outcome, canonical formula, state/initial results, and model accounting; only backend-specific observations may differ;
-- raw/expectation suites must continue to preserve the complete nested result envelope without a parity-specific suite engine;
-- add parser round-trip, manifest-relative, direct-vs-M82 differential, malformed backend, cross-family rejection, built `fvlab temporal job --format json`, and heterogeneous suite regressions;
-- preserve every historical M75–M82 differential/oracle plus verification/suite/CLI gates;
-- make no bounded-parity, strategy-certificate, symbolic, fairness, or performance claim.
+- extend parity solutions with a deterministic positional successor choice for winner-owned vertices in each winning region, using stable successor ordering for tie-breaking;
+- strategy entries must always reference real game edges and only vertices owned by the strategy's player; losing/opponent-owned vertices must not receive fabricated choices;
+- add an independent verifier that checks strategy ownership, edge validity, region closure under the chosen moves and all opponent moves, and totality of the induced strategy subgame;
+- independently verify the parity condition over every reachable recurrent SCC of the strategy-restricted subgame, rather than trusting the solver's winning-region output;
+- verify Even and Odd strategies symmetrically and fail closed on tampered/missing/out-of-region strategy entries;
+- add focused adversarial regressions plus a generated small-game differential/oracle that compares certified strategy regions with the existing M81 winning regions;
+- preserve M81 winning-region API behavior for callers that do not consume strategies;
+- do not expose μ-level witness/certificate JSON until the generic strategy evidence and verifier are sealed;
+- preserve all historical CTL/μ/parity/job/suite/CLI gates and make no performance, symbolic, bounded-parity, or fairness claim.
 

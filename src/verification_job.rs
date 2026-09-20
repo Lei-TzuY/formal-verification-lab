@@ -5,6 +5,7 @@ use std::fmt;
 const ANALYSIS: &str = "analysis";
 const MODEL: &str = "model";
 const PROPERTY: &str = "property";
+const BACKEND: &str = "backend";
 const WEAK_FAIR_ACTION: &str = "weak-fair-action";
 const STRONG_FAIR_ACTION: &str = "strong-fair-action";
 const MAX_MODEL_STATES: &str = "max-model-states";
@@ -55,9 +56,33 @@ impl VerificationJobAnalysis {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VerificationJobMuBackend {
+    Fixpoint,
+    Parity,
+}
+
+impl VerificationJobMuBackend {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Fixpoint => "fixpoint",
+            Self::Parity => "parity",
+        }
+    }
+
+    fn parse(value: &str) -> Option<Self> {
+        match value {
+            "fixpoint" => Some(Self::Fixpoint),
+            "parity" => Some(Self::Parity),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VerificationJob {
     declared_analysis: Option<VerificationJobAnalysis>,
+    mu_backend: Option<VerificationJobMuBackend>,
     model_path: String,
     property_path: String,
     weak_fair_actions: Vec<String>,
@@ -79,6 +104,15 @@ impl VerificationJob {
     /// historical manifest surface byte-for-byte apart from normal quoting.
     pub fn declared_analysis(&self) -> Option<VerificationJobAnalysis> {
         self.declared_analysis
+    }
+
+    pub fn declared_mu_backend(&self) -> Option<VerificationJobMuBackend> {
+        self.mu_backend
+    }
+
+    pub fn mu_backend(&self) -> VerificationJobMuBackend {
+        self.mu_backend
+            .unwrap_or(VerificationJobMuBackend::Fixpoint)
     }
 
     pub fn model_path(&self) -> &str {
@@ -151,6 +185,9 @@ impl VerificationJob {
         let mut lines = Vec::new();
         if let Some(analysis) = self.declared_analysis {
             lines.push(format!("analysis {}", quote(analysis.as_str())));
+        }
+        if let Some(backend) = self.mu_backend {
+            lines.push(format!("backend {}", quote(backend.as_str())));
         }
         lines.extend([
             format!("model {}", quote(&self.model_path)),
@@ -226,6 +263,8 @@ pub enum VerificationJobParseErrorKind {
     InvalidEscape { escape: String },
     EmptyPath { directive: String },
     InvalidAnalysis { analysis: String },
+    InvalidBackend { backend: String },
+    BackendRequiresMuCalculus { analysis: String },
     ExpectedNumber,
     InvalidNumber { value: String },
     TrailingInput,
@@ -286,6 +325,14 @@ impl fmt::Display for VerificationJobParseError {
                 f,
                 "unsupported verification analysis '{analysis}'; expected multi-response, safety, deadlock, exact-state, proposition-expression, action-temporal, ctl, or mu-calculus"
             ),
+            VerificationJobParseErrorKind::InvalidBackend { backend } => write!(
+                f,
+                "unsupported mu-calculus backend '{backend}'; expected fixpoint or parity"
+            ),
+            VerificationJobParseErrorKind::BackendRequiresMuCalculus { analysis } => write!(
+                f,
+                "'backend' directive is supported only for analysis 'mu-calculus', not '{analysis}'"
+            ),
             VerificationJobParseErrorKind::ExpectedNumber => {
                 write!(f, "expected a non-negative decimal integer")
             }
@@ -309,6 +356,8 @@ impl std::error::Error for VerificationJobParseError {}
 
 pub fn parse_verification_job(input: &str) -> Result<VerificationJob, VerificationJobParseError> {
     let mut declared_analysis = None;
+    let mut mu_backend = None;
+    let mut backend_location = None;
     let mut model_path = None;
     let mut property_path = None;
     let mut weak_fair_actions = Vec::new();
@@ -352,6 +401,28 @@ pub fn parse_verification_job(input: &str) -> Result<VerificationJob, Verificati
                             VerificationJobParseErrorKind::InvalidAnalysis { analysis: value },
                         )
                     })?);
+            }
+            BACKEND => {
+                require_singleton(
+                    &mut seen_singletons,
+                    &directive,
+                    line_number,
+                    leading + directive_start + 1,
+                )?;
+                let value_start = parser.position;
+                let value = parser.parse_string().map_err(|(position, kind)| {
+                    VerificationJobParseError::new(line_number, leading + position + 1, kind)
+                })?;
+                finish_line(&mut parser, line_number, leading)?;
+                let backend = VerificationJobMuBackend::parse(&value).ok_or_else(|| {
+                    VerificationJobParseError::new(
+                        line_number,
+                        leading + value_start + 1,
+                        VerificationJobParseErrorKind::InvalidBackend { backend: value },
+                    )
+                })?;
+                mu_backend = Some(backend);
+                backend_location = Some((line_number, leading + directive_start + 1));
             }
             MODEL | PROPERTY => {
                 require_singleton(
@@ -445,8 +516,23 @@ pub fn parse_verification_job(input: &str) -> Result<VerificationJob, Verificati
         )
     })?;
 
+    if mu_backend.is_some() {
+        let analysis = declared_analysis.unwrap_or(VerificationJobAnalysis::MultiResponse);
+        if analysis != VerificationJobAnalysis::MuCalculus {
+            let (line, column) = backend_location.unwrap_or((1, 1));
+            return Err(VerificationJobParseError::new(
+                line,
+                column,
+                VerificationJobParseErrorKind::BackendRequiresMuCalculus {
+                    analysis: analysis.as_str().to_owned(),
+                },
+            ));
+        }
+    }
+
     Ok(VerificationJob {
         declared_analysis,
+        mu_backend,
         model_path,
         property_path,
         weak_fair_actions,
