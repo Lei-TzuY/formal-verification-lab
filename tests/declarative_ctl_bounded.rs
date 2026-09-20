@@ -103,7 +103,10 @@ fn each_cutoff_class_is_reported_without_false_terminalization() {
     for (limits, reason) in cases {
         let result =
             check_declarative_ctl_text_with_limits(&document, r#"EF "complete""#, limits).unwrap();
-        assert_eq!(result.evaluation.outcome, BoundedOutcome::Inconclusive(reason));
+        assert_eq!(
+            result.evaluation.outcome,
+            BoundedOutcome::Inconclusive(reason)
+        );
         assert_eq!(result.evaluation.initial[0].truth, BoundedCtlTruth::Unknown);
         assert!(result.evaluation.initial[0].evidence.is_none());
 
@@ -183,10 +186,7 @@ label "done" "complete"
     );
     match result.evaluation.initial[0].evidence.as_ref().unwrap() {
         CtlEvidence::Finite { trace } => {
-            assert_eq!(
-                trace[1].action,
-                Some(CtlEvidenceAction::TerminalSelfLoop)
-            );
+            assert_eq!(trace[1].action, Some(CtlEvidenceAction::TerminalSelfLoop));
         }
         other => panic!("expected finite terminal-loop evidence, got {other:?}"),
     }
@@ -204,14 +204,7 @@ fn built_binary_bounded_ctl_covers_conclusive_inconclusive_and_errors() {
     let path = path.to_str().unwrap();
 
     let satisfied = Command::new(binary)
-        .args([
-            "ctl",
-            "file",
-            path,
-            r#"EF "complete""#,
-            "--max-states",
-            "2",
-        ])
+        .args(["ctl", "file", path, r#"EF "complete""#, "--max-states", "2"])
         .output()
         .unwrap();
     assert_eq!(satisfied.status.code(), Some(0));
@@ -220,27 +213,13 @@ fn built_binary_bounded_ctl_covers_conclusive_inconclusive_and_errors() {
     assert!(stdout.contains("definitely satisfying states:"));
 
     let violated = Command::new(binary)
-        .args([
-            "ctl",
-            "file",
-            path,
-            r#"AG "ready""#,
-            "--max-states",
-            "2",
-        ])
+        .args(["ctl", "file", path, r#"AG "ready""#, "--max-states", "2"])
         .output()
         .unwrap();
     assert_eq!(violated.status.code(), Some(14));
 
     let inconclusive = Command::new(binary)
-        .args([
-            "ctl",
-            "file",
-            path,
-            r#"EF "complete""#,
-            "--max-states",
-            "1",
-        ])
+        .args(["ctl", "file", path, r#"EF "complete""#, "--max-states", "1"])
         .output()
         .unwrap();
     assert_eq!(inconclusive.status.code(), Some(3));
@@ -262,14 +241,7 @@ fn built_binary_bounded_ctl_covers_conclusive_inconclusive_and_errors() {
     assert_eq!(malformed.status.code(), Some(2));
 
     let unknown = Command::new(binary)
-        .args([
-            "ctl",
-            "file",
-            path,
-            r#"EF "missing""#,
-            "--max-states",
-            "0",
-        ])
+        .args(["ctl", "file", path, r#"EF "missing""#, "--max-states", "0"])
         .output()
         .unwrap();
     assert_eq!(unknown.status.code(), Some(2));
@@ -281,10 +253,7 @@ fn built_binary_bounded_ctl_covers_conclusive_inconclusive_and_errors() {
 
 fn fixture_dir(kind: &str) -> PathBuf {
     let id = NEXT_DIR.fetch_add(1, Ordering::Relaxed);
-    let root = std::env::temp_dir().join(format!(
-        "fvlab-m72-{kind}-{}-{id}",
-        std::process::id()
-    ));
+    let root = std::env::temp_dir().join(format!("fvlab-m72-{kind}-{}-{id}", std::process::id()));
     fs::create_dir_all(&root).unwrap();
     root
 }
