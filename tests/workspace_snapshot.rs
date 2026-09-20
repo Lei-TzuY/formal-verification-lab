@@ -187,7 +187,7 @@ fn parser_fails_closed_on_truncation_trailing_payload_and_resource_caps() {
 fn parser_rejects_noncanonical_duplicate_missing_and_invalid_utf8_frames() {
     let noncanonical = concat!(
         "fvlab-workspace-snapshot 1\n",
-        "root 15\n",
+        "root 16\n",
         "a/../mixed.suite\n",
         "entries 0 0\n",
         "end\n"
