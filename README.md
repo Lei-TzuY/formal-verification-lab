@@ -66,6 +66,8 @@ Historical no-fairness behavior remains the default. Fairness is enabled only wh
 | M50 | Combined-fair finite-monitor composition plus direct mixed-fair monitor CLI/reporting with rejecting/finite-terminal precedence and bounded/staged provenance. |
 | M51 | External combined-fair multi-response CLI/reporting with canonical overlap, finite pending-terminal evidence, and bounded/staged provenance. |
 | M52 | External combined-fair single-response CLI/reporting with canonical overlap, finite pending-terminal evidence, historical no-option compatibility, and bounded/staged provenance. |
+| M53–M66 | Reproducible textual/file verification, heterogeneous verification jobs/suites, bounded declarative deadlock, proof-honest recurrence, and neutral structural jobs. |
+| M67 | Deterministic neutral structural-analysis suites with separate explicit regression expectations and stable machine-readable envelopes. |
 
 ### M31 — explicit weak-fairness liveness core
 
@@ -311,7 +313,7 @@ Product-only and staged routes preserve existing proof-honest cutoff semantics a
 
 M52 adds no fairness-by-default behavior, new response semantics, new traversal engine, textual fairness grammar, wall-clock proof bound, or performance claim.
 
-### Milestones 53–66 — reproducible verification and neutral structural jobs
+### Milestones 53–67 — reproducible verification and neutral structural suites
 
 Milestones 53–54 add a deterministic textual multi-response frontend and external model/property-file CLI, compiling named exact-action response clauses directly to the sealed multi-response authorities while keeping fairness as an explicit external assumption.
 
@@ -319,7 +321,9 @@ Milestones 55–58 add reproducible verification-job manifests, versioned machin
 
 Milestones 64–65 extend recurrence with proof-honest model-space state/transition/depth budgets and external declarative-file reporting. A retained real cycle remains conclusive even if exploration later hits a cutoff; absence of a cycle is conclusive only after complete reachable-graph capture, and incomplete prefixes never masquerade as a complete SCC partition.
 
-Milestone 66 adds a separate reproducible structural-analysis job protocol for recurrence. Its manifest requires a model but no fake property, delegates directly to `analyze_recurrence_with_limits`, rejects verification-only fairness/product directives, and emits a versioned neutral JSON envelope with `cycle_found`, `acyclic`, `inconclusive`, or `error`. Both `cycle_found` and `acyclic` remain neutral structural outcomes; regression expectations are a separate higher-level concern.
+Milestone 66 adds a separate reproducible structural-analysis job protocol for recurrence. Its manifest requires a model but no fake property, delegates directly to `analyze_recurrence_with_limits`, rejects verification-only fairness/product directives, and emits a versioned neutral JSON envelope with `cycle_found`, `acyclic`, `inconclusive`, or `error`. Both `cycle_found` and `acyclic` remain neutral structural outcomes.
+
+Milestone 67 adds deterministic multi-job structural suites over that sealed protocol. Raw suites preserve every neutral M66 envelope and aggregate only operational completion; a separate expectation mode can explicitly require `cycle_found`, `acyclic`, `inconclusive`, or `error` without changing the meaning of the raw structural result.
 
 ## Architecture
 
@@ -368,6 +372,8 @@ src/verification_suite_run.rs suite execution and regression expectation checkin
 src/structural_job.rs         neutral recurrence structural-job manifests
 src/structural_job_run.rs     manifest-relative structural execution
 src/structural_result.rs      versioned neutral structural result envelopes
+src/structural_suite.rs        deterministic neutral structural suite manifests/expectations
+src/structural_suite_run.rs    structural suite execution and regression checking
 src/*_report.rs               deterministic analysis-specific reporting
 src/*_examples.rs             executable teaching models
 src/main.rs                   CLI/file/exit-status integration; no model traversal logic
@@ -518,23 +524,24 @@ M25–M29 retain product/staged semantic and built-binary regression suites. M32
 - No SAT/SMT, BDDs, symbolic execution, theorem proving, symmetry reduction, disk-backed state storage, parallel exploration, or distributed checking is implemented.
 - The sleep-set engine remains experimental and differentially audited, not a standalone trusted POR proof backend.
 - Deterministic witnesses require deterministic successor ordering; declarative models preserve input edge ordering to make this explicit.
-- M66 structural recurrence jobs deliberately do not reuse `satisfied` / `violated`: `cycle_found` and `acyclic` are neutral structural outcomes unless a separate regression expectation assigns meaning to them.
+- M66 structural recurrence jobs deliberately do not reuse `satisfied` / `violated`: `cycle_found` and `acyclic` are neutral structural outcomes. M67 preserves those envelopes unchanged in raw suites and keeps regression expectations as a separate contract.
 - No milestone makes a performance claim from CI timing.
 
 ## Roadmap
 
-Milestones 1–66 now form a coherent explicit-state stack: canonical safety/bounded exploration -> typed finite models and independent graph validation -> reachability/deadlock/recurrence/eventuality -> response obligations, finite monitors and generalized Büchi acceptance -> shared graph/action-product substrates -> typed/textual/declarative property frontends -> proof-honest model/product budgets -> iterative deep-graph SCC traversal -> opt-in weak, strong and combined fairness -> external multi-response/property-file surfaces -> reproducible heterogeneous verification jobs, result envelopes and expectation-aware suites -> bounded declarative deadlock -> proof-honest bounded recurrence -> declarative recurrence CLI -> neutral reproducible structural-analysis jobs.
+Milestones 1–67 now form a coherent explicit-state stack: canonical safety/bounded exploration -> typed finite models and independent graph validation -> reachability/deadlock/recurrence/eventuality -> response obligations, finite monitors and generalized Büchi acceptance -> shared graph/action-product substrates -> typed/textual/declarative property frontends -> proof-honest model/product budgets -> iterative deep-graph SCC traversal -> opt-in weak, strong and combined fairness -> external multi-response/property-file surfaces -> reproducible heterogeneous verification jobs, result envelopes and expectation-aware suites -> bounded declarative deadlock -> proof-honest bounded recurrence -> declarative recurrence CLI -> neutral reproducible structural jobs -> deterministic neutral structural suites and explicit structural expectations.
 
-Milestone 66 deliberately separates structural discovery from property verification. A recurrence job reports `cycle_found`, `acyclic`, `inconclusive`, or `error`; it does not reinterpret graph structure as a pass/fail property.
+M67 closes the orchestration phase without turning graph structure into property semantics: raw structural suites preserve M66 outcomes exactly, while regression meaning is supplied only by the separate expectation contract.
 
-The next high-value slice is **Milestone 67: deterministic structural-analysis suites and explicit structural expectations**. The M66 single-job protocol is now stable enough to support reproducible orchestration without collapsing structural outcomes into `VerificationJobOutcome`.
+The next high-value slice is **Milestone 68: validated partial-order reduction foundation**. The M5 sleep-set experiment has remained intentionally non-authoritative because raw action-independence declarations are untrusted and the reduced result is accepted only after comparison with exhaustive search. M68 promotes a new architectural phase: reduction evidence must be validated before it can participate in proof-producing safety exploration.
 
-Acceptance criteria for M67:
+Acceptance criteria for M68:
 
-- add a dedicated structural-suite manifest that references multiple M66 structural jobs in deterministic declaration order and resolves job paths relative to the suite manifest;
-- preserve every raw M66 result envelope exactly enough for machine comparison and never rewrite `cycle_found` / `acyclic` into property-style satisfaction;
-- keep raw suite execution neutral, then add a separate explicit regression-expectation mode for structural outcomes such as expected `cycle_found`, `acyclic`, `inconclusive`, or `error`;
-- define deterministic aggregate precedence, mismatch reporting, suite-size limits, malformed/missing job handling, and stable JSON output;
-- reuse the sealed M66 job runner/result schema rather than adding another recurrence traversal or SCC implementation;
-- add direct-runner versus built-binary differential coverage, relative-path tests, ordered mixed-outcome suites, matching/mismatching expectations, and fail-closed malformed inputs;
-- preserve all existing verification-job/suite behavior and add no fairness interpretation, symbolic engine, wall-clock proof bound, or performance claim.
+- validate declared exact-action independence against the fully reachable finite graph using conservative fail-closed conditions for enabledness preservation, commuting diamonds, same-label ambiguity, and invariant observation;
+- produce a distinct validated independence object that cannot be forged through the unchecked declaration API;
+- preserve the historical exhaustive-audit API for compatibility, but add a standalone reduced safety path only for validated independence;
+- repair reduced-search state revisitation so completeness is not lost when the same model state is reached under different sleep contexts;
+- preserve deterministic counterexample reconstruction and exact exploration/pruning accounting;
+- add generated small-graph/declaration differential tests against the canonical exhaustive safety checker plus focused bad-declaration and revisit-context regressions;
+- expose counts as measurements only and make no performance claim from CI timing;
+- preserve all existing verification, fairness, structural-job, and suite semantics.

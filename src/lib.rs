@@ -56,6 +56,8 @@ pub mod strong_fairness;
 pub mod structural_job;
 pub mod structural_job_run;
 pub mod structural_result;
+pub mod structural_suite;
+pub mod structural_suite_run;
 pub mod temporal;
 pub mod temporal_parse;
 pub mod temporal_report;
@@ -213,6 +215,19 @@ pub use structural_result::{
     StructuralJobAccounting, StructuralJobComponent, StructuralJobCutoff, StructuralJobCutoffKind,
     StructuralJobCycleEvidence, StructuralJobLimits, StructuralJobOutcome,
     StructuralJobResultEnvelope, StructuralJobTraceStep, STRUCTURAL_JOB_RESULT_SCHEMA_VERSION,
+};
+pub use structural_suite::{
+    parse_structural_suite, StructuralExpectedOutcome, StructuralSuite, StructuralSuiteParseError,
+    StructuralSuiteParseErrorKind, MAX_STRUCTURAL_SUITE_JOBS,
+};
+pub use structural_suite_run::{
+    load_structural_suite, run_structural_suite_expectations_json, run_structural_suite_json,
+    StructuralRegressionSuiteEntryResult, StructuralRegressionSuiteJsonRun,
+    StructuralRegressionSuiteOutcome, StructuralRegressionSuiteResultEnvelope,
+    StructuralSuiteEntryResult, StructuralSuiteJsonRun, StructuralSuiteLoadError,
+    StructuralSuiteOutcome, StructuralSuiteResultEnvelope,
+    STRUCTURAL_REGRESSION_MISMATCH_EXIT_CODE, STRUCTURAL_REGRESSION_SUITE_RESULT_SCHEMA_VERSION,
+    STRUCTURAL_SUITE_RESULT_SCHEMA_VERSION,
 };
 pub use temporal::{
     check_action_temporal, check_action_temporal_with_fairness_profile,

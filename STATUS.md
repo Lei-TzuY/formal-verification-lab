@@ -16,36 +16,40 @@ M65 exposes the M64 proof boundary to declarative model files through `fvlab scc
 
 ## Milestone 66 — neutral structural-analysis job protocol
 
-**Status: integration candidate complete on PR #67.**
+**Status: sealed in `main` at `78f5e21eb113b2f57de9dc021934c1bbb4117f8b`.**
 
-M66 adds a reproducible structural job protocol without forcing recurrence into the property-verification `satisfied` / `violated` envelope.
+M66 adds a reproducible structural job protocol without forcing recurrence into the property-verification `satisfied` / `violated` envelope. Manifest-relative model loading delegates directly to the sealed bounded recurrence authority, versioned JSON preserves neutral `cycle_found`, `acyclic`, `inconclusive`, and `error` outcomes, and incomplete prefixes never expose a fake exhaustive SCC partition.
+
+## Milestone 67 — deterministic structural-analysis suites and expectations
+
+**Status: integration candidate complete on PR #68.**
+
+M67 adds deterministic orchestration over the sealed M66 structural-job protocol while preserving structural neutrality.
 
 Implemented contract:
 
-- manifest grammar: `analysis "recurrence"`, required `model`, optional model-space `max-states`, `max-transitions`, and `max-depth`;
-- property, fairness, and product-limit directives fail closed;
-- manifest-relative model resolution and direct delegation to the sealed `analyze_recurrence_with_limits` authority;
-- versioned neutral JSON outcomes `cycle_found`, `acyclic`, `inconclusive`, and `error`;
-- exact accounting and cutoff provenance, including conclusive retained cycles found before a later cutoff;
-- complete SCC partitions only after complete capture; incomplete prefixes expose no fake exhaustive partition;
-- deterministic stem-plus-cycle evidence;
-- `fvlab scc job <manifest> [--format json]` with exits 0 / 3 / 2 for conclusive structural result / inconclusive / error;
-- canonical manifest round trips, schema regressions, external-file execution, malformed-input coverage, and historical integration gates.
+- dedicated structural-suite manifests with declaration-order execution, manifest-relative job paths, duplicate rejection, and a 128-job limit;
+- raw suites preserve each complete M66 result envelope and aggregate only operational completion as `complete`, `inconclusive`, or `error`;
+- raw execution never maps `cycle_found` / `acyclic` into verification-style pass/fail states;
+- a separate expectation mode requires explicit expected structural outcomes and reports deterministic per-job matches/mismatches;
+- versioned raw and regression JSON envelopes with deterministic ordering, missing/malformed-job preservation, aggregate precedence, and dedicated mismatch exit 13;
+- built `fvlab-structural-suite` binary differential coverage against the library runner plus semantic parser/execution regressions.
 
-Exact pre-closure candidate `a4dbcdad32223718c9983f6e7ac4f616d5f9b773` passed CI #563 (format, build, Clippy with `-D warnings`, full tests, all historical CLI gates) and Bounded state-property CLI #413. Closure metadata changes must pass the same exact-head gates before merge.
+Implementation candidate `b04fd6b4d571186a8668cb94bade61785b1e456c` passed CI #573 (format, all-target build, Clippy with `-D warnings`, full tests, and historical CLI gates) and Bounded state-property CLI #423. Closure metadata changes must pass the same exact-head gates before merge.
 
-M66 adds no second SCC implementation, fairness interpretation, symbolic engine, wall-clock proof bound, or performance claim.
+M67 adds no second recurrence/SCC traversal, fairness interpretation, wall-clock proof bound, or performance claim.
 
-## Next frontier — Milestone 67: deterministic structural-analysis suites and expectations
+## Next frontier — Milestone 68: validated partial-order reduction foundation
 
-M66 stabilizes one neutral structural job and its result envelope. The next architectural gap is reproducible multi-job orchestration that preserves structural neutrality while allowing explicit regression expectations as a separate contract.
+The long-standing M5 sleep-set reduction remains deliberately experimental because caller-supplied action independence is not itself proof evidence and the reduced search is only trusted after exhaustive differential comparison. The next architectural phase is to turn that old experiment into a validation-first reduction substrate without weakening the canonical exhaustive checker.
 
 Acceptance criteria:
 
-- define a dedicated structural-suite manifest with deterministic job order, manifest-relative job paths, and a bounded suite size;
-- run each entry through the sealed M66 job runner and preserve its raw neutral envelope;
-- keep raw suite execution neutral; do not turn `cycle_found` or `acyclic` into verification pass/fail states;
-- add a separate expectation mode with explicit expected structural outcomes and deterministic mismatch reporting;
-- define stable aggregate JSON, exit behavior, malformed/missing-job handling, and outcome precedence;
-- validate ordered mixed-outcome suites, relative paths, matching/mismatching expectations, raw-vs-CLI equivalence, and fail-closed invalid manifests;
-- preserve the existing property-verification suite protocol byte/behavior compatibility and add no new graph traversal, fairness semantics, wall-clock proof bound, or performance claim.
+- add an explicit reachable-graph independence validator for exact action-label pairs instead of trusting declarations;
+- validate conservative local conditions needed by the supported safety use case, including enabledness preservation, commuting diamonds, deterministic handling of ambiguous same-label successors, and invariant-observation preservation; unsupported or ambiguous cases fail closed;
+- introduce a validated/certified independence type that cannot be constructed from unchecked declarations and keep the historical audited API behavior-compatible;
+- make reduced exploration safe under state revisitation by preserving the sleep-set context required for completeness rather than treating one visited state as equivalent to every sleep context;
+- expose a standalone reduced safety path only through validated independence evidence; do not claim reduction correctness for raw declarations;
+- add generated differential coverage over small finite graphs/declarations against exhaustive safety, plus focused invalid-declaration, commuting-diamond, invariant-visibility, revisit-context, and deterministic-witness regressions;
+- report actual exploration/pruning counts as observations only; make no performance claim from CI timing;
+- preserve every existing verification/structural API and all historical CI gates.
