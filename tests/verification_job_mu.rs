@@ -294,7 +294,7 @@ fn mu_jobs_fail_closed_on_formula_metadata_limits_and_temporal_only_configuratio
         .error
         .as_deref()
         .unwrap()
-        .contains("unknown modal mu-calculus proposition 'missing'"));
+        .contains("unknown mu-calculus proposition 'missing'"));
 
     fs::write(root.join("portable/property.mu"), "mu X. not $X").unwrap();
     let non_monotone = run_verification_job_json(&manifest);
