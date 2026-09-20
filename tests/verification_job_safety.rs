@@ -74,10 +74,9 @@ fn explicit_analysis_round_trips_and_unknown_or_duplicate_family_fails_closed() 
         );
     }
 
-    let unknown = parse_verification_job(
-        "analysis \"symbolic-ctl\"\nmodel \"m.fvl\"\nproperty \"p.fvp\"\n",
-    )
-    .unwrap_err();
+    let unknown =
+        parse_verification_job("analysis \"symbolic-ctl\"\nmodel \"m.fvl\"\nproperty \"p.fvp\"\n")
+            .unwrap_err();
     assert_eq!(unknown.line(), 1);
     assert_eq!(
         unknown.kind(),
