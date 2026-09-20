@@ -52,9 +52,16 @@ pub struct DeclarativeMuParityCertificate {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MuParityCertificateParseError {
-    Line { line: usize, message: String },
-    Missing { directive: &'static str },
-    UnsupportedVersion { version: u32 },
+    Line {
+        line: usize,
+        message: String,
+    },
+    Missing {
+        directive: &'static str,
+    },
+    UnsupportedVersion {
+        version: u32,
+    },
     CountMismatch {
         section: &'static str,
         expected: usize,
@@ -186,11 +193,7 @@ pub fn create_declarative_mu_parity_certificate(
                     state_index: entry.state_index,
                     satisfied: entry.satisfied,
                     winner: entry.winner,
-                    root_vertex: canonical_vertex(
-                        evaluation,
-                        &entry.root_position,
-                        node_count,
-                    )?,
+                    root_vertex: canonical_vertex(evaluation, &entry.root_position, node_count)?,
                 })
             })
             .collect::<Result<Vec<_>, DeclarativeMuParityCertificateError>>()?,
@@ -218,10 +221,12 @@ pub fn verify_declarative_mu_parity_certificate(
     validate_declarative_mu_formula(document, &formula)?;
     let requested_formula = render_mu_formula(&formula);
     if certificate.formula != requested_formula {
-        return Err(DeclarativeMuParityCertificateError::FormulaBindingMismatch {
-            certificate: certificate.formula.clone(),
-            requested: requested_formula,
-        });
+        return Err(
+            DeclarativeMuParityCertificateError::FormulaBindingMismatch {
+                certificate: certificate.formula.clone(),
+                requested: requested_formula,
+            },
+        );
     }
 
     let captured = capture_reachable_graph(document.model())
@@ -252,11 +257,14 @@ pub fn verify_declarative_mu_parity_certificate(
     let mut initial = Vec::with_capacity(certificate.initial.len());
     let mut initial_evidence = Vec::with_capacity(certificate.initial.len());
     for entry in &certificate.initial {
-        let state = captured.graph.states.get(entry.state_index).cloned().ok_or_else(|| {
-            DeclarativeMuParityCertificateError::MalformedEvidence {
+        let state = captured
+            .graph
+            .states
+            .get(entry.state_index)
+            .cloned()
+            .ok_or_else(|| DeclarativeMuParityCertificateError::MalformedEvidence {
                 message: format!("initial state index {} is out of range", entry.state_index),
-            }
-        })?;
+            })?;
         let root_position = certificate
             .positions
             .get(entry.root_vertex)
@@ -356,16 +364,8 @@ pub fn render_declarative_mu_parity_certificate(
         ParityPlayer::Odd,
         &certificate.odd_winning_vertices,
     );
-    write_choices(
-        &mut output,
-        ParityPlayer::Even,
-        &certificate.even_choices,
-    );
-    write_choices(
-        &mut output,
-        ParityPlayer::Odd,
-        &certificate.odd_choices,
-    );
+    write_choices(&mut output, ParityPlayer::Even, &certificate.even_choices);
+    write_choices(&mut output, ParityPlayer::Odd, &certificate.odd_choices);
     writeln!(&mut output, "initials {}", certificate.initial.len())
         .expect("writing to String cannot fail");
     for entry in &certificate.initial {
@@ -460,12 +460,11 @@ pub fn parse_declarative_mu_parity_certificate(
             }
             "position" => {
                 require_arity(&tokens, 7, line)?;
-                let expected = expected_positions.ok_or_else(|| {
-                    MuParityCertificateParseError::Line {
+                let expected =
+                    expected_positions.ok_or_else(|| MuParityCertificateParseError::Line {
                         line,
                         message: "position appears before positions count".to_owned(),
-                    }
-                })?;
+                    })?;
                 let vertex = parse_usize(tokens[1], line, "position vertex")?;
                 if vertex >= expected {
                     return line_error(line, format!("position vertex {vertex} is out of range"));
@@ -551,10 +550,9 @@ pub fn parse_declarative_mu_parity_certificate(
     if !saw_end {
         return Err(MuParityCertificateParseError::Missing { directive: "end" });
     }
-    let schema_version =
-        schema_version.ok_or(MuParityCertificateParseError::Missing {
-            directive: "fvlab-mu-parity-certificate",
-        })?;
+    let schema_version = schema_version.ok_or(MuParityCertificateParseError::Missing {
+        directive: "fvlab-mu-parity-certificate",
+    })?;
     let model_binding = model_binding.ok_or(MuParityCertificateParseError::Missing {
         directive: "model-binding",
     })?;
@@ -570,14 +568,12 @@ pub fn parse_declarative_mu_parity_certificate(
     ) = accounting.ok_or(MuParityCertificateParseError::Missing {
         directive: "accounting",
     })?;
-    let satisfying_state_indices =
-        satisfying.ok_or(MuParityCertificateParseError::Missing {
-            directive: "satisfying",
-        })?;
-    let expected_positions =
-        expected_positions.ok_or(MuParityCertificateParseError::Missing {
-            directive: "positions",
-        })?;
+    let satisfying_state_indices = satisfying.ok_or(MuParityCertificateParseError::Missing {
+        directive: "satisfying",
+    })?;
+    let expected_positions = expected_positions.ok_or(MuParityCertificateParseError::Missing {
+        directive: "positions",
+    })?;
     let actual_positions = positions.iter().filter(|entry| entry.is_some()).count();
     if actual_positions != expected_positions {
         return Err(MuParityCertificateParseError::CountMismatch {
@@ -591,14 +587,12 @@ pub fn parse_declarative_mu_parity_certificate(
         .map(|entry| entry.expect("position count was validated"))
         .collect();
 
-    let even_winning_vertices =
-        winning_even.ok_or(MuParityCertificateParseError::Missing {
-            directive: "winning even",
-        })?;
-    let odd_winning_vertices =
-        winning_odd.ok_or(MuParityCertificateParseError::Missing {
-            directive: "winning odd",
-        })?;
+    let even_winning_vertices = winning_even.ok_or(MuParityCertificateParseError::Missing {
+        directive: "winning even",
+    })?;
+    let odd_winning_vertices = winning_odd.ok_or(MuParityCertificateParseError::Missing {
+        directive: "winning odd",
+    })?;
     validate_count(
         "even choices",
         expected_even_choices.ok_or(MuParityCertificateParseError::Missing {
@@ -868,10 +862,7 @@ fn render_player(player: ParityPlayer) -> &'static str {
     }
 }
 
-fn parse_player(
-    token: &str,
-    line: usize,
-) -> Result<ParityPlayer, MuParityCertificateParseError> {
+fn parse_player(token: &str, line: usize) -> Result<ParityPlayer, MuParityCertificateParseError> {
     match token {
         "even" => Ok(ParityPlayer::Even),
         "odd" => Ok(ParityPlayer::Odd),
@@ -909,7 +900,10 @@ fn parse_quoted_directive(
         })?
         .trim_start();
     if !rest.starts_with('"') {
-        return line_error(line, format!("directive '{directive}' expects one quoted string"));
+        return line_error(
+            line,
+            format!("directive '{directive}' expects one quoted string"),
+        );
     }
 
     let mut chars = rest.char_indices();
@@ -961,24 +955,15 @@ fn write_index_list(output: &mut String, directive: &str, values: &[usize]) {
 }
 
 fn write_winning(output: &mut String, player: ParityPlayer, values: &[usize]) {
-    write!(
-        output,
-        "winning {} {}",
-        render_player(player),
-        values.len()
-    )
-    .expect("writing to String cannot fail");
+    write!(output, "winning {} {}", render_player(player), values.len())
+        .expect("writing to String cannot fail");
     for value in values {
         write!(output, " {value}").expect("writing to String cannot fail");
     }
     output.push('\n');
 }
 
-fn write_choices(
-    output: &mut String,
-    player: ParityPlayer,
-    choices: &[MuParityCertificateChoice],
-) {
+fn write_choices(output: &mut String, player: ParityPlayer, choices: &[MuParityCertificateChoice]) {
     writeln!(
         output,
         "choices {} {}",
@@ -1044,21 +1029,21 @@ fn parse_usize(
     line: usize,
     field: &str,
 ) -> Result<usize, MuParityCertificateParseError> {
-    token.parse::<usize>().map_err(|_| MuParityCertificateParseError::Line {
-        line,
-        message: format!("{field} must be a non-negative integer"),
-    })
+    token
+        .parse::<usize>()
+        .map_err(|_| MuParityCertificateParseError::Line {
+            line,
+            message: format!("{field} must be a non-negative integer"),
+        })
 }
 
-fn parse_u32(
-    token: &str,
-    line: usize,
-    field: &str,
-) -> Result<u32, MuParityCertificateParseError> {
-    token.parse::<u32>().map_err(|_| MuParityCertificateParseError::Line {
-        line,
-        message: format!("{field} must be a non-negative integer"),
-    })
+fn parse_u32(token: &str, line: usize, field: &str) -> Result<u32, MuParityCertificateParseError> {
+    token
+        .parse::<u32>()
+        .map_err(|_| MuParityCertificateParseError::Line {
+            line,
+            message: format!("{field} must be a non-negative integer"),
+        })
 }
 
 fn parse_optional_usize(
