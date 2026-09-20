@@ -186,10 +186,7 @@ fn retained_cycle_can_conclusively_prove_eg_and_refute_af() {
         vec![0u8],
         |state| {
             Ok(match *state {
-                0 => vec![
-                    Transition::new("stay", 0),
-                    Transition::new("branch", 1),
-                ],
+                0 => vec![Transition::new("stay", 0), Transition::new("branch", 1)],
                 _ => Vec::new(),
             })
         },
