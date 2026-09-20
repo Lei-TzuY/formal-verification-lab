@@ -1,7 +1,5 @@
 use crate::ctl::{evaluate_ctl, CtlError, CtlEvaluation, CtlFormula};
-use crate::ctl_parse::{
-    collect_ctl_atoms, parse_ctl_formula, render_ctl_formula, CtlParseError,
-};
+use crate::ctl_parse::{collect_ctl_atoms, parse_ctl_formula, render_ctl_formula, CtlParseError};
 use crate::declarative::DeclarativeDocument;
 use std::collections::HashSet;
 use std::fmt;
