@@ -1470,11 +1470,7 @@ fn ctl_command(args: &[String]) -> Result<ExitCode, String> {
     }
 }
 
-fn run_ctl_file(
-    path: &str,
-    expression: &str,
-    option_args: &[String],
-) -> Result<ExitCode, String> {
+fn run_ctl_file(path: &str, expression: &str, option_args: &[String]) -> Result<ExitCode, String> {
     let input = fs::read_to_string(path)
         .map_err(|error| format!("failed to read declarative model '{path}': {error}"))?;
     let document = parse_declarative_document(&input).map_err(|error| error.to_string())?;
