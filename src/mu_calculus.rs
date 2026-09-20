@@ -172,9 +172,7 @@ impl<V> From<ModelError> for MuError<V> {
 /// A variable occurrence is positive when the negation parity at the
 /// occurrence matches the parity at its nearest binder. Shadowing is lexical:
 /// the nearest binder with the same variable name wins.
-pub fn validate_mu_formula<A, V>(
-    formula: &MuFormula<A, V>,
-) -> Result<(), MuValidationError<V>>
+pub fn validate_mu_formula<A, V>(formula: &MuFormula<A, V>) -> Result<(), MuValidationError<V>>
 where
     V: Clone + Eq,
 {
@@ -193,10 +191,8 @@ where
     match formula {
         MuFormula::True | MuFormula::False | MuFormula::Atom(_) => Ok(()),
         MuFormula::Var(variable) => {
-            let Some((_, binder_polarity)) = bindings
-                .iter()
-                .rev()
-                .find(|(bound, _)| bound == variable)
+            let Some((_, binder_polarity)) =
+                bindings.iter().rev().find(|(bound, _)| bound == variable)
             else {
                 return Err(MuValidationError::UnboundVariable {
                     variable: variable.clone(),
@@ -346,12 +342,7 @@ where
         }
     }
 
-    fn eval_fixpoint(
-        &mut self,
-        variable: &V,
-        body: &MuFormula<A, V>,
-        greatest: bool,
-    ) -> Vec<bool> {
+    fn eval_fixpoint(&mut self, variable: &V, body: &MuFormula<A, V>, greatest: bool) -> Vec<bool> {
         let previous_binding = self.environment.get(variable).cloned();
         let mut current = vec![greatest; self.graph.states.len()];
 
@@ -435,9 +426,7 @@ fn compile_ctl_inner<A: Clone>(
         CtlFormula::True => MuFormula::True,
         CtlFormula::False => MuFormula::False,
         CtlFormula::Atom(atom) => MuFormula::Atom(atom.clone()),
-        CtlFormula::Not(inner) => {
-            MuFormula::negate(compile_ctl_inner(inner, next_variable))
-        }
+        CtlFormula::Not(inner) => MuFormula::negate(compile_ctl_inner(inner, next_variable)),
         CtlFormula::And(left, right) => MuFormula::and(
             compile_ctl_inner(left, next_variable),
             compile_ctl_inner(right, next_variable),
@@ -446,12 +435,8 @@ fn compile_ctl_inner<A: Clone>(
             compile_ctl_inner(left, next_variable),
             compile_ctl_inner(right, next_variable),
         ),
-        CtlFormula::Ex(inner) => {
-            MuFormula::diamond(compile_ctl_inner(inner, next_variable))
-        }
-        CtlFormula::Ax(inner) => {
-            MuFormula::boxed(compile_ctl_inner(inner, next_variable))
-        }
+        CtlFormula::Ex(inner) => MuFormula::diamond(compile_ctl_inner(inner, next_variable)),
+        CtlFormula::Ax(inner) => MuFormula::boxed(compile_ctl_inner(inner, next_variable)),
         CtlFormula::Ef(inner) => {
             let variable = fresh_variable(next_variable);
             MuFormula::mu(
