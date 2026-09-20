@@ -41,9 +41,7 @@ fn write_job(root: &Path, model: &str, property: &str, tail: &str) -> PathBuf {
     let manifest = root.join("portable/job.fvj");
     fs::write(
         &manifest,
-        format!(
-            "analysis \"ctl\"\nmodel \"model.fvl\"\nproperty \"property.ctl\"\n{tail}"
-        ),
+        format!("analysis \"ctl\"\nmodel \"model.fvl\"\nproperty \"property.ctl\"\n{tail}"),
     )
     .unwrap();
     manifest
@@ -73,7 +71,10 @@ fn ctl_analysis_round_trips_canonically() {
     assert_eq!(job.analysis(), VerificationJobAnalysis::Ctl);
     assert_eq!(job.declared_analysis(), Some(VerificationJobAnalysis::Ctl));
     assert_eq!(job.canonical_document(), source);
-    assert_eq!(parse_verification_job(&job.canonical_document()).unwrap(), job);
+    assert_eq!(
+        parse_verification_job(&job.canonical_document()).unwrap(),
+        job
+    );
 }
 
 #[test]
@@ -82,10 +83,16 @@ fn complete_ctl_jobs_match_direct_frontend_for_satisfaction_and_violation() {
     let satisfied_manifest = write_job(&root, BRANCHING_MODEL, r#"EF "complete""#, "");
     let satisfied = run_verification_job_json(&satisfied_manifest);
     assert_eq!(satisfied.exit_code, 0);
-    assert_eq!(satisfied.envelope.schema_version, VERIFICATION_JOB_CTL_RESULT_SCHEMA_VERSION);
+    assert_eq!(
+        satisfied.envelope.schema_version,
+        VERIFICATION_JOB_CTL_RESULT_SCHEMA_VERSION
+    );
     assert_eq!(satisfied.envelope.analysis.as_deref(), Some("ctl"));
     assert_eq!(satisfied.envelope.backend.as_deref(), Some("ctl-fixpoint"));
-    assert_eq!(satisfied.envelope.outcome, VerificationJobOutcome::Satisfied);
+    assert_eq!(
+        satisfied.envelope.outcome,
+        VerificationJobOutcome::Satisfied
+    );
     assert_eq!(satisfied.envelope.model.as_deref(), Some("ctl-job"));
     assert_eq!(satisfied.envelope.cutoff, None);
     assert_eq!(satisfied.envelope.evidence, None);
@@ -94,7 +101,10 @@ fn complete_ctl_jobs_match_direct_frontend_for_satisfaction_and_violation() {
     let direct = check_declarative_ctl_text(&document, r#"EF "complete""#).unwrap();
     let ctl = satisfied.envelope.ctl.as_ref().unwrap();
     assert!(ctl.initial_states_complete);
-    assert_eq!(ctl.retained_states, direct.evaluation.reachable_states.len());
+    assert_eq!(
+        ctl.retained_states,
+        direct.evaluation.reachable_states.len()
+    );
     assert_eq!(
         ctl.definitely_satisfying_states,
         direct.evaluation.satisfying_state_indices.len()
@@ -267,7 +277,10 @@ label "done" "complete"
         panic!("expected finite CTL evidence");
     };
     assert_eq!(trace.len(), 2);
-    assert_eq!(trace[1].action, Some(VerificationJobCtlAction::TerminalSelfLoop));
+    assert_eq!(
+        trace[1].action,
+        Some(VerificationJobCtlAction::TerminalSelfLoop)
+    );
 
     let json = run.to_json();
     assert!(json.contains("\"schema_version\":3"));
@@ -286,10 +299,21 @@ fn ctl_jobs_fail_closed_on_formula_metadata_and_temporal_only_configuration() {
     let malformed = write_job(&malformed_root, BRANCHING_MODEL, "EF (", "");
     let malformed_run = run_verification_job_json(&malformed);
     assert_eq!(malformed_run.exit_code, 2);
-    assert_eq!(malformed_run.envelope.outcome, VerificationJobOutcome::Error);
+    assert_eq!(
+        malformed_run.envelope.outcome,
+        VerificationJobOutcome::Error
+    );
     assert_eq!(malformed_run.envelope.analysis.as_deref(), Some("ctl"));
-    assert_eq!(malformed_run.envelope.schema_version, VERIFICATION_JOB_CTL_RESULT_SCHEMA_VERSION);
-    assert!(malformed_run.envelope.error.as_deref().unwrap().contains("CTL parse error"));
+    assert_eq!(
+        malformed_run.envelope.schema_version,
+        VERIFICATION_JOB_CTL_RESULT_SCHEMA_VERSION
+    );
+    assert!(malformed_run
+        .envelope
+        .error
+        .as_deref()
+        .unwrap()
+        .contains("CTL parse error"));
 
     fs::write(
         malformed_root.join("portable/property.ctl"),
@@ -321,9 +345,7 @@ fn ctl_jobs_fail_closed_on_formula_metadata_and_temporal_only_configuration() {
         let manifest = root.join("job.fvj");
         fs::write(
             &manifest,
-            format!(
-                "analysis \"ctl\"\nmodel \"missing.fvl\"\nproperty \"missing.ctl\"\n{tail}"
-            ),
+            format!("analysis \"ctl\"\nmodel \"missing.fvl\"\nproperty \"missing.ctl\"\n{tail}"),
         )
         .unwrap();
         let run = run_verification_job_json(&manifest);
