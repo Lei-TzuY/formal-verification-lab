@@ -33,8 +33,8 @@ pub(crate) fn run_ctl_job_json_from_text(
         );
         (envelope, exit_code)
     } else {
-        let result =
-            check_declarative_ctl_text(&document, property_input).map_err(|error| error.to_string())?;
+        let result = check_declarative_ctl_text(&document, property_input)
+            .map_err(|error| error.to_string())?;
         let exit_code = match result.status {
             DeclarativeCtlStatus::Satisfied => 0,
             DeclarativeCtlStatus::Violated => 14,
