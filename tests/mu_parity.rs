@@ -81,6 +81,44 @@ fn parity_backend_preserves_terminal_totalization_and_fixpoint_polarity() {
 }
 
 #[test]
+fn outer_fixpoint_priority_dominates_dependent_inner_alternation() {
+    let model = TransitionSystem::new(
+        "mu-parity-priority-regression",
+        vec![StateVariable::new("state", "single terminal state")],
+        vec![0u8],
+        |_state| Ok(Vec::new()),
+        vec![Invariant::new("always", |_state: &u8| true)],
+    )
+    .unwrap();
+
+    let formula = MuFormula::mu(
+        0,
+        MuFormula::or(
+            MuFormula::atom(Atom::P),
+            MuFormula::diamond(MuFormula::nu(
+                1,
+                MuFormula::or(
+                    MuFormula::and(
+                        MuFormula::atom(Atom::Q),
+                        MuFormula::diamond(MuFormula::var(1)),
+                    ),
+                    MuFormula::diamond(MuFormula::var(0)),
+                ),
+            )),
+        ),
+    );
+
+    let direct = evaluate_mu(&model, &formula, |_atom, _state| false).unwrap();
+    let parity = evaluate_mu_via_parity(&model, &formula, |_atom, _state| false).unwrap();
+    assert!(direct.satisfying_state_indices.is_empty());
+    assert_eq!(
+        parity.satisfying_state_indices,
+        direct.satisfying_state_indices
+    );
+    assert!(!parity.all_initial_states_satisfy());
+}
+
+#[test]
 fn generated_parity_backend_matches_m75_on_all_two_state_graphs() {
     let formulas = representative_formulas();
     let mut comparisons = 0usize;
