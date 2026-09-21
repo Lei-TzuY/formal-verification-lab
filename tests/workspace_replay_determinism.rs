@@ -72,7 +72,10 @@ fn invalid_attempt_counts_fail_before_any_baseline_result_is_recorded() {
 
     let zero = audit_workspace_replay_determinism(&snapshot, WorkspaceReplayMode::Raw, 0);
     assert_eq!(zero.exit_code, 2);
-    assert_eq!(zero.envelope.status, WorkspaceReplayDeterminismStatus::Error);
+    assert_eq!(
+        zero.envelope.status,
+        WorkspaceReplayDeterminismStatus::Error
+    );
     assert_eq!(zero.envelope.completed_attempts, 0);
     assert_eq!(zero.envelope.baseline_exit_code, None);
     assert!(zero
@@ -125,9 +128,7 @@ fn deterministic_json_is_repeatable_for_identical_audits() {
 
     assert_eq!(first, second);
     assert_eq!(first.to_json(), second.to_json());
-    assert!(first
-        .to_json()
-        .contains("\"status\":\"deterministic\""));
+    assert!(first.to_json().contains("\"status\":\"deterministic\""));
     assert!(first
         .to_json()
         .contains("\"requested_additional_attempts\":2"));
