@@ -411,7 +411,7 @@ pub use workspace_replay_lock::{
     WorkspaceReplayLockVerificationEnvelope, WorkspaceReplayLockVerificationStatus,
     WorkspaceReplayMode, MAX_WORKSPACE_REPLAY_LOCK_RESULT_BYTES,
     MAX_WORKSPACE_REPLAY_LOCK_SNAPSHOT_BYTES, WORKSPACE_REPLAY_LOCK_MISMATCH_EXIT_CODE,
-    WORKSPACE_REPLAY_LOCK_SCHEMA_VERSION,
+    WORKSPACE_REPLAY_LOCK_SCHEMA_VERSION, WORKSPACE_REPLAY_LOCK_VERIFICATION_SCHEMA_VERSION,
 };
 pub use workspace_snapshot::{
     create_workspace_snapshot, parse_workspace_snapshot, render_workspace_snapshot,
