@@ -37,9 +37,7 @@ fn main() -> ExitCode {
             verify_lock(lock_path)
         }
         [command, snapshot_path, mode, additional_attempts, flag, format]
-            if command == "determinism-check"
-                && flag == "--format"
-                && format == "json" =>
+            if command == "determinism-check" && flag == "--format" && format == "json" =>
         {
             audit_determinism(snapshot_path, mode, additional_attempts)
         }
@@ -151,11 +149,7 @@ fn verify_lock(lock_path: &str) -> ExitCode {
     ExitCode::from(run.exit_code)
 }
 
-fn audit_determinism(
-    snapshot_path: &str,
-    mode: &str,
-    additional_attempts: &str,
-) -> ExitCode {
+fn audit_determinism(snapshot_path: &str, mode: &str, additional_attempts: &str) -> ExitCode {
     let input = match fs::read_to_string(snapshot_path) {
         Ok(input) => input,
         Err(error) => {
@@ -176,9 +170,7 @@ fn audit_determinism(
     let additional_attempts = match additional_attempts.parse::<usize>() {
         Ok(value) => value,
         Err(_) => {
-            eprintln!(
-                "error: additional attempts must be a non-negative decimal integer"
-            );
+            eprintln!("error: additional attempts must be a non-negative decimal integer");
             return ExitCode::from(2);
         }
     };
