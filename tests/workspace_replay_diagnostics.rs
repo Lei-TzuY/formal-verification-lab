@@ -20,18 +20,15 @@ initial "s"
 
 #[test]
 fn bounded_json_diagnostics_report_stable_structural_paths_and_kinds() {
-    let nested = diagnose_replay_json_drift(
-        r#"{"a":{"items":[1,2,3]}}"#,
-        r#"{"a":{"items":[1,9,3]}}"#,
-    )
-    .unwrap();
+    let nested =
+        diagnose_replay_json_drift(r#"{"a":{"items":[1,2,3]}}"#, r#"{"a":{"items":[1,9,3]}}"#)
+            .unwrap();
     assert_eq!(nested.kind, WorkspaceReplayJsonDifferenceKind::ScalarValue);
     assert_eq!(nested.path.as_deref(), Some("/a/items/1"));
     assert_eq!(nested.expected_preview.as_deref(), Some("2"));
     assert_eq!(nested.actual_preview.as_deref(), Some("9"));
 
-    let missing =
-        diagnose_replay_json_drift(r#"{"a":1,"b":2}"#, r#"{"a":1}"#).unwrap();
+    let missing = diagnose_replay_json_drift(r#"{"a":1,"b":2}"#, r#"{"a":1}"#).unwrap();
     assert_eq!(
         missing.kind,
         WorkspaceReplayJsonDifferenceKind::MissingMember
@@ -40,8 +37,7 @@ fn bounded_json_diagnostics_report_stable_structural_paths_and_kinds() {
     assert_eq!(missing.expected_preview.as_deref(), Some("2"));
     assert_eq!(missing.actual_preview, None);
 
-    let unexpected =
-        diagnose_replay_json_drift(r#"{"a":1}"#, r#"{"a":1,"b":2}"#).unwrap();
+    let unexpected = diagnose_replay_json_drift(r#"{"a":1}"#, r#"{"a":1,"b":2}"#).unwrap();
     assert_eq!(
         unexpected.kind,
         WorkspaceReplayJsonDifferenceKind::UnexpectedMember
@@ -63,8 +59,7 @@ fn bounded_json_diagnostics_report_stable_structural_paths_and_kinds() {
     assert_eq!(length.expected_preview.as_deref(), Some("2"));
     assert_eq!(length.actual_preview.as_deref(), Some("3"));
 
-    let escaped_key =
-        diagnose_replay_json_drift(r#"{"a/b~c":1}"#, r#"{"a/b~c":2}"#).unwrap();
+    let escaped_key = diagnose_replay_json_drift(r#"{"a/b~c":1}"#, r#"{"a/b~c":2}"#).unwrap();
     assert_eq!(escaped_key.path.as_deref(), Some("/a~1b~0c"));
 }
 
@@ -101,15 +96,11 @@ fn replay_lock_reports_precise_accounting_path_without_changing_match_authority(
     assert_ne!(mutated_json, lock.expected_json());
     assert!(mutated_json.contains("\"outcome\":\"satisfied\""));
 
-    let mutated_text =
-        replace_result_frame(&rendered, lock.expected_json(), &mutated_json);
+    let mutated_text = replace_result_frame(&rendered, lock.expected_json(), &mutated_json);
     let mutated = parse_workspace_replay_lock(&mutated_text).unwrap();
     let run = verify_workspace_replay_lock(&mutated);
 
-    assert_eq!(
-        run.exit_code,
-        WORKSPACE_REPLAY_LOCK_MISMATCH_EXIT_CODE
-    );
+    assert_eq!(run.exit_code, WORKSPACE_REPLAY_LOCK_MISMATCH_EXIT_CODE);
     assert_eq!(
         run.envelope.status,
         WorkspaceReplayLockVerificationStatus::Mismatched
@@ -156,12 +147,8 @@ fn matched_and_exit_only_drift_do_not_invent_json_differences() {
     let rendered = render_workspace_replay_lock(&lock);
     let exit_drift = rendered.replacen("exit 0\n", "exit 1\n", 1);
     assert_ne!(exit_drift, rendered);
-    let exit_run =
-        verify_workspace_replay_lock(&parse_workspace_replay_lock(&exit_drift).unwrap());
-    assert_eq!(
-        exit_run.exit_code,
-        WORKSPACE_REPLAY_LOCK_MISMATCH_EXIT_CODE
-    );
+    let exit_run = verify_workspace_replay_lock(&parse_workspace_replay_lock(&exit_drift).unwrap());
+    assert_eq!(exit_run.exit_code, WORKSPACE_REPLAY_LOCK_MISMATCH_EXIT_CODE);
     assert_eq!(exit_run.envelope.exit_code_matches, Some(false));
     assert_eq!(exit_run.envelope.json_matches, Some(true));
     assert_eq!(exit_run.envelope.json_difference, None);
@@ -175,9 +162,8 @@ fn replay_lock_keeps_mismatch_for_structurally_equal_and_invalid_expected_json()
     let structural_equal_json = format!(" {} ", lock.expected_json());
     let byte_only_text =
         replace_result_frame(&rendered, lock.expected_json(), &structural_equal_json);
-    let byte_only = verify_workspace_replay_lock(
-        &parse_workspace_replay_lock(&byte_only_text).unwrap(),
-    );
+    let byte_only =
+        verify_workspace_replay_lock(&parse_workspace_replay_lock(&byte_only_text).unwrap());
     assert_eq!(
         byte_only.envelope.status,
         WorkspaceReplayLockVerificationStatus::Mismatched
@@ -192,9 +178,8 @@ fn replay_lock_keeps_mismatch_for_structurally_equal_and_invalid_expected_json()
     invalid_json.replace_range(0..1, "[");
     assert_eq!(invalid_json.len(), lock.expected_json().len());
     let invalid_text = replace_result_frame(&rendered, lock.expected_json(), &invalid_json);
-    let invalid = verify_workspace_replay_lock(
-        &parse_workspace_replay_lock(&invalid_text).unwrap(),
-    );
+    let invalid =
+        verify_workspace_replay_lock(&parse_workspace_replay_lock(&invalid_text).unwrap());
     assert_eq!(
         invalid.envelope.status,
         WorkspaceReplayLockVerificationStatus::Mismatched
@@ -222,12 +207,7 @@ fn built_lock_verify_json_matches_library_structured_diagnostic() {
     fs::write(&path, mutated_text).unwrap();
 
     let output = Command::new(env!("CARGO_BIN_EXE_fvlab-workspace"))
-        .args([
-            "lock-verify",
-            path.to_str().unwrap(),
-            "--format",
-            "json",
-        ])
+        .args(["lock-verify", path.to_str().unwrap(), "--format", "json"])
         .output()
         .unwrap();
 
