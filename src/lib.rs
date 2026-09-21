@@ -64,6 +64,7 @@ pub mod proposition_expr_report;
 pub mod proposition_report;
 pub mod recurrence;
 pub mod reduction;
+pub mod replay_json_diagnostic;
 pub mod report;
 pub mod response;
 pub mod response_examples;
@@ -294,6 +295,11 @@ pub use reduction::{
     IndependenceError, IndependenceRelation, IndependenceValidationError, ReducedExploration,
     ReductionAudit, ReductionAuditError, ValidatedIndependenceRelation,
 };
+pub use replay_json_diagnostic::{
+    diagnose_replay_json_drift, WorkspaceReplayJsonDifference, WorkspaceReplayJsonDifferenceKind,
+    MAX_REPLAY_JSON_DIAGNOSTIC_BYTES, MAX_REPLAY_JSON_DIAGNOSTIC_DEPTH,
+    MAX_REPLAY_JSON_DIAGNOSTIC_NODES, MAX_REPLAY_JSON_DIAGNOSTIC_PREVIEW_BYTES,
+};
 pub use response::{
     check_response, check_response_with_fairness_profile,
     check_response_with_fairness_profile_and_limits,
@@ -405,7 +411,7 @@ pub use workspace_replay_lock::{
     WorkspaceReplayLockVerificationEnvelope, WorkspaceReplayLockVerificationStatus,
     WorkspaceReplayMode, MAX_WORKSPACE_REPLAY_LOCK_RESULT_BYTES,
     MAX_WORKSPACE_REPLAY_LOCK_SNAPSHOT_BYTES, WORKSPACE_REPLAY_LOCK_MISMATCH_EXIT_CODE,
-    WORKSPACE_REPLAY_LOCK_SCHEMA_VERSION,
+    WORKSPACE_REPLAY_LOCK_SCHEMA_VERSION, WORKSPACE_REPLAY_LOCK_VERIFICATION_SCHEMA_VERSION,
 };
 pub use workspace_snapshot::{
     create_workspace_snapshot, parse_workspace_snapshot, render_workspace_snapshot,

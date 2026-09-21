@@ -1,3 +1,4 @@
+use crate::replay_json_diagnostic::{diagnose_replay_json_drift, WorkspaceReplayJsonDifference};
 use crate::workspace_snapshot::{
     parse_workspace_snapshot, render_workspace_snapshot,
     replay_workspace_snapshot_expectations_json, replay_workspace_snapshot_json, WorkspaceSnapshot,
@@ -8,6 +9,7 @@ use std::fmt;
 use std::str;
 
 pub const WORKSPACE_REPLAY_LOCK_SCHEMA_VERSION: u32 = 1;
+pub const WORKSPACE_REPLAY_LOCK_VERIFICATION_SCHEMA_VERSION: u32 = 2;
 pub const WORKSPACE_REPLAY_LOCK_MISMATCH_EXIT_CODE: u8 = 13;
 pub const MAX_WORKSPACE_REPLAY_LOCK_SNAPSHOT_BYTES: usize = MAX_WORKSPACE_SNAPSHOT_SOURCE_BYTES
     + MAX_WORKSPACE_SNAPSHOT_ENTRIES * MAX_WORKSPACE_SNAPSHOT_SOURCE_ID_BYTES
@@ -181,6 +183,7 @@ pub struct WorkspaceReplayLockVerificationEnvelope {
     pub json_matches: Option<bool>,
     pub expected_exit_code: Option<u8>,
     pub actual_exit_code: Option<u8>,
+    pub json_difference: Option<WorkspaceReplayJsonDifference>,
     pub error: Option<String>,
 }
 
@@ -191,9 +194,11 @@ impl WorkspaceReplayLockVerificationEnvelope {
         actual_exit_code: u8,
         exit_code_matches: bool,
         json_matches: bool,
+        expected_json: &str,
+        actual_json: &str,
     ) -> Self {
         Self {
-            schema_version: WORKSPACE_REPLAY_LOCK_SCHEMA_VERSION,
+            schema_version: WORKSPACE_REPLAY_LOCK_VERIFICATION_SCHEMA_VERSION,
             status: if exit_code_matches && json_matches {
                 WorkspaceReplayLockVerificationStatus::Matched
             } else {
@@ -204,19 +209,25 @@ impl WorkspaceReplayLockVerificationEnvelope {
             json_matches: Some(json_matches),
             expected_exit_code: Some(expected_exit_code),
             actual_exit_code: Some(actual_exit_code),
+            json_difference: if json_matches {
+                None
+            } else {
+                diagnose_replay_json_drift(expected_json, actual_json)
+            },
             error: None,
         }
     }
 
     fn error(message: impl Into<String>) -> Self {
         Self {
-            schema_version: WORKSPACE_REPLAY_LOCK_SCHEMA_VERSION,
+            schema_version: WORKSPACE_REPLAY_LOCK_VERIFICATION_SCHEMA_VERSION,
             status: WorkspaceReplayLockVerificationStatus::Error,
             mode: None,
             exit_code_matches: None,
             json_matches: None,
             expected_exit_code: None,
             actual_exit_code: None,
+            json_difference: None,
             error: Some(message.into()),
         }
     }
@@ -244,6 +255,12 @@ impl WorkspaceReplayLockVerificationEnvelope {
             &mut out,
             "actual_exit_code",
             self.actual_exit_code.map(u64::from),
+            false,
+        );
+        field_json_difference(
+            &mut out,
+            "json_difference",
+            self.json_difference.as_ref(),
             false,
         );
         field_optional_string(&mut out, "error", self.error.as_deref(), false);
@@ -491,6 +508,8 @@ pub fn verify_workspace_replay_lock(lock: &WorkspaceReplayLock) -> WorkspaceRepl
         actual_exit_code,
         exit_code_matches,
         json_matches,
+        &lock.expected_json,
+        &actual_json,
     );
     let exit_code = match envelope.status {
         WorkspaceReplayLockVerificationStatus::Matched => 0,
@@ -694,6 +713,42 @@ impl<'a> ReplayLockCursor<'a> {
         self.position += 1;
         Ok(frame)
     }
+}
+
+fn field_json_difference(
+    out: &mut String,
+    name: &str,
+    value: Option<&WorkspaceReplayJsonDifference>,
+    first: bool,
+) {
+    field_name(out, name, first);
+    let Some(value) = value else {
+        out.push_str("null");
+        return;
+    };
+
+    out.push('{');
+    field_string(out, "kind", value.kind.as_str(), true);
+    field_optional_string(out, "path", value.path.as_deref(), false);
+    field_u64(
+        out,
+        "first_byte_offset",
+        value.first_byte_offset as u64,
+        false,
+    );
+    field_optional_string(
+        out,
+        "expected_preview",
+        value.expected_preview.as_deref(),
+        false,
+    );
+    field_optional_string(
+        out,
+        "actual_preview",
+        value.actual_preview.as_deref(),
+        false,
+    );
+    out.push('}');
 }
 
 fn field_name(out: &mut String, name: &str, first: bool) {
