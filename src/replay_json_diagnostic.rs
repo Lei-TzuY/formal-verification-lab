@@ -350,7 +350,7 @@ impl<'a> DiagnosticJsonParser<'a> {
             Some(b'"') => self.parse_string().map(DiagnosticJsonValue::String),
             Some(b'[') => self.parse_array(depth + 1),
             Some(b'{') => self.parse_object(depth + 1),
-            Some(b'-' | b'0'..=b'9') => {
+            Some(b'-') | Some(b'0'..=b'9') => {
                 self.parse_number().map(DiagnosticJsonValue::Number)
             }
             _ => Err(DiagnosticJsonParseError::Syntax),
