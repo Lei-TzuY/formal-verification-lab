@@ -27,6 +27,15 @@ impl WorkspaceReplayDeterminismStatus {
     }
 }
 
+struct ReplayMismatch<'a> {
+    baseline_exit_code: u8,
+    actual_exit_code: u8,
+    exit_code_matches: bool,
+    json_matches: bool,
+    baseline_json: &'a str,
+    actual_json: &'a str,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WorkspaceReplayDeterminismEnvelope {
     pub schema_version: u32,
@@ -70,12 +79,7 @@ impl WorkspaceReplayDeterminismEnvelope {
         mode: WorkspaceReplayMode,
         requested_additional_attempts: usize,
         completed_attempts: usize,
-        baseline_exit_code: u8,
-        actual_exit_code: u8,
-        exit_code_matches: bool,
-        json_matches: bool,
-        baseline_json: &str,
-        actual_json: &str,
+        mismatch: ReplayMismatch<'_>,
     ) -> Self {
         Self {
             schema_version: WORKSPACE_REPLAY_DETERMINISM_SCHEMA_VERSION,
@@ -83,15 +87,15 @@ impl WorkspaceReplayDeterminismEnvelope {
             mode,
             requested_additional_attempts,
             completed_attempts,
-            baseline_exit_code: Some(baseline_exit_code),
+            baseline_exit_code: Some(mismatch.baseline_exit_code),
             divergent_attempt_index: Some(completed_attempts),
-            actual_exit_code: Some(actual_exit_code),
-            exit_code_matches: Some(exit_code_matches),
-            json_matches: Some(json_matches),
-            json_difference: if json_matches {
+            actual_exit_code: Some(mismatch.actual_exit_code),
+            exit_code_matches: Some(mismatch.exit_code_matches),
+            json_matches: Some(mismatch.json_matches),
+            json_difference: if mismatch.json_matches {
                 None
             } else {
-                diagnose_replay_json_drift(baseline_json, actual_json)
+                diagnose_replay_json_drift(mismatch.baseline_json, mismatch.actual_json)
             },
             error: None,
         }
@@ -230,12 +234,14 @@ where
                     mode,
                     additional_attempts,
                     attempt_index,
-                    baseline_exit_code,
-                    actual_exit_code,
-                    exit_code_matches,
-                    json_matches,
-                    &baseline_json,
-                    &actual_json,
+                    ReplayMismatch {
+                        baseline_exit_code,
+                        actual_exit_code,
+                        exit_code_matches,
+                        json_matches,
+                        baseline_json: &baseline_json,
+                        actual_json: &actual_json,
+                    },
                 ),
                 exit_code: WORKSPACE_REPLAY_NONDETERMINISTIC_EXIT_CODE,
             };
