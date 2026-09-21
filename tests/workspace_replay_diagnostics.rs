@@ -199,8 +199,7 @@ fn built_lock_verify_json_matches_library_structured_diagnostic() {
         lock.expected_json()
             .replacen("\"model_states\":1", "\"model_states\":2", 1);
     assert_ne!(mutated_json, lock.expected_json());
-    let mutated_text =
-        replace_result_frame(&rendered, lock.expected_json(), &mutated_json);
+    let mutated_text = replace_result_frame(&rendered, lock.expected_json(), &mutated_json);
 
     let direct = verify_workspace_replay_lock_text(&mutated_text);
     let path = temp_file("cli-diagnostic");
