@@ -1,7 +1,8 @@
 use formal_verification_lab::{
-    create_workspace_snapshot, parse_workspace_snapshot, render_workspace_snapshot,
+    create_workspace_replay_lock_from_text, create_workspace_snapshot, parse_workspace_snapshot,
+    render_workspace_replay_lock, render_workspace_snapshot,
     replay_workspace_snapshot_expectations_json, replay_workspace_snapshot_json,
-    RootedFileSystemTextSourceProvider,
+    verify_workspace_replay_lock_text, RootedFileSystemTextSourceProvider, WorkspaceReplayMode,
 };
 use std::env;
 use std::fs;
@@ -26,13 +27,23 @@ fn main() -> ExitCode {
         {
             replay_snapshot(snapshot_path, true)
         }
-        [command, _, flag, format] if command == "replay" && flag == "--format" => {
-            eprintln!("error: unsupported workspace replay format '{format}'; expected json");
+        [command, snapshot_path, mode, lock_path] if command == "lock-create" => {
+            create_lock(snapshot_path, mode, lock_path)
+        }
+        [command, lock_path, flag, format]
+            if command == "lock-verify" && flag == "--format" && format == "json" =>
+        {
+            verify_lock(lock_path)
+        }
+        [command, _, flag, format]
+            if (command == "replay" || command == "lock-verify") && flag == "--format" =>
+        {
+            eprintln!("error: unsupported workspace format '{format}'; expected json");
             ExitCode::from(2)
         }
         _ => {
             eprintln!(
-                "usage: fvlab-workspace create <workspace-root> <orchestration-source-id> <snapshot-path>\n       fvlab-workspace replay <snapshot-path> [--check-expectations] --format json"
+                "usage: fvlab-workspace create <workspace-root> <orchestration-source-id> <snapshot-path>\n       fvlab-workspace replay <snapshot-path> [--check-expectations] --format json\n       fvlab-workspace lock-create <snapshot-path> <raw|expectations> <lock-path>\n       fvlab-workspace lock-verify <lock-path> --format json"
             );
             ExitCode::from(2)
         }
@@ -81,4 +92,47 @@ fn replay_snapshot(snapshot_path: &str, check_expectations: bool) -> ExitCode {
         println!("{}", run.to_json());
         ExitCode::from(run.exit_code)
     }
+}
+
+fn create_lock(snapshot_path: &str, mode: &str, lock_path: &str) -> ExitCode {
+    let snapshot_text = match fs::read_to_string(snapshot_path) {
+        Ok(input) => input,
+        Err(error) => {
+            eprintln!("error: failed to read workspace snapshot '{snapshot_path}': {error}");
+            return ExitCode::from(2);
+        }
+    };
+    let mode = match mode {
+        "raw" => WorkspaceReplayMode::Raw,
+        "expectations" => WorkspaceReplayMode::Expectations,
+        other => {
+            eprintln!("error: unsupported workspace replay lock mode '{other}'; expected raw or expectations");
+            return ExitCode::from(2);
+        }
+    };
+    let lock = match create_workspace_replay_lock_from_text(&snapshot_text, mode) {
+        Ok(lock) => lock,
+        Err(error) => {
+            eprintln!("error: {error}");
+            return ExitCode::from(2);
+        }
+    };
+    if let Err(error) = fs::write(lock_path, render_workspace_replay_lock(&lock)) {
+        eprintln!("error: failed to write workspace replay lock '{lock_path}': {error}");
+        return ExitCode::from(2);
+    }
+    ExitCode::SUCCESS
+}
+
+fn verify_lock(lock_path: &str) -> ExitCode {
+    let input = match fs::read_to_string(lock_path) {
+        Ok(input) => input,
+        Err(error) => {
+            eprintln!("error: failed to read workspace replay lock '{lock_path}': {error}");
+            return ExitCode::from(2);
+        }
+    };
+    let run = verify_workspace_replay_lock_text(&input);
+    println!("{}", run.to_json());
+    ExitCode::from(run.exit_code)
 }

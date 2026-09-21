@@ -89,6 +89,7 @@ mod verification_mu;
 pub mod verification_result;
 pub mod verification_suite;
 pub mod verification_suite_run;
+pub mod workspace_replay_lock;
 pub mod workspace_snapshot;
 
 pub use bounded::{
@@ -395,6 +396,16 @@ pub use verification_suite_run::{
     VerificationSuiteOutcome, VerificationSuiteResultEnvelope,
     VERIFICATION_REGRESSION_MISMATCH_EXIT_CODE,
     VERIFICATION_REGRESSION_SUITE_RESULT_SCHEMA_VERSION, VERIFICATION_SUITE_RESULT_SCHEMA_VERSION,
+};
+pub use workspace_replay_lock::{
+    create_workspace_replay_lock, create_workspace_replay_lock_from_text,
+    parse_workspace_replay_lock, render_workspace_replay_lock, verify_workspace_replay_lock,
+    verify_workspace_replay_lock_text, WorkspaceReplayLock, WorkspaceReplayLockJsonRun,
+    WorkspaceReplayLockParseError, WorkspaceReplayLockParseErrorKind,
+    WorkspaceReplayLockVerificationEnvelope, WorkspaceReplayLockVerificationStatus,
+    WorkspaceReplayMode, MAX_WORKSPACE_REPLAY_LOCK_RESULT_BYTES,
+    MAX_WORKSPACE_REPLAY_LOCK_SNAPSHOT_BYTES, WORKSPACE_REPLAY_LOCK_MISMATCH_EXIT_CODE,
+    WORKSPACE_REPLAY_LOCK_SCHEMA_VERSION,
 };
 pub use workspace_snapshot::{
     create_workspace_snapshot, parse_workspace_snapshot, render_workspace_snapshot,

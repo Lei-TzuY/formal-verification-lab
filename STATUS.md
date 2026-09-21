@@ -186,48 +186,55 @@ M89 intentionally makes no archive/bundle, digest/hash, signature, cryptographic
 
 ## Milestone 90 — versioned portable workspace snapshot and replay
 
-**Status: implementation candidate complete on PR #89.**
+**Status: sealed in `main` at `b4828f340c0777d47c65564cf8325116245b72f1`.**
 
-M90 packages one sealed M88 orchestration root plus its exact transitive M89 logical text-source closure into a deterministic standalone schema-v1 artifact and replays it without the original host workspace.
-
-Implemented contract:
-
-- snapshot creation accepts any M89 `TextSourceProvider`, normalizes one orchestration root id, parses the explicit M88 family tags, parses each referenced family manifest, and follows only declared model/property/certificate dependencies;
-- no directory walking, wildcard capture, or family inference is performed;
-- sources are stored in deterministic `BTreeMap` logical-id order and rendered with explicit byte-length framing for root ids, source ids and exact UTF-8 source text;
-- embedded newlines, quotes, backslashes and Unicode are preserved exactly without serde/base64/dependency churn;
-- schema-v1 parsing checks header/version, frame boundaries, UTF-8 boundary validity, required newline terminators, declared entry/source-byte totals, canonical logical ids, duplicates, required root/dependency closure and unrelated extra sources;
-- build/parser resource limits bound source count, aggregate embedded source bytes and source-id length before unbounded internal allocation;
-- parsed artifacts are reverse-validated against the embedded orchestration/family manifests so the source set must equal the explicit dependency closure;
-- replay reconstructs an M89 `MapTextSourceProvider` and runs raw or expectation M88 orchestration exclusively from embedded texts;
-- snapshot creation from two different rooted physical workspaces and from an in-memory map containing the same logical workspace produces byte-identical artifacts;
-- removing the original host workspace after snapshot creation does not change raw or expectation replay results;
-- regressions cover satisfied, violated, recurrence-cycle and verified results, loaded-certificate rejection, setup error, exact render/parse roundtrip, noncanonical ids, root escape, duplicate/missing/unrelated sources, truncation, trailing payload, resource caps and UTF-8 frame splits;
-- one built surface, `fvlab-workspace`, creates snapshots and replays raw or expectation orchestration; built CLI stdout/exit is differential-checked against direct library replay.
-
-Initial CI exposed only rustfmt differences plus one Rust type-inference ambiguity in the dependency-parser error prefix. The latter was fixed by making the existing `String` error type explicit; no closure, resource-limit, replay or test semantics changed.
-
-Exact implementation candidate `ec92e910c54481859b9135842eecd1616ac77935` passed CI #741 (format, all-target build, Clippy with `-D warnings`, full tests including M90 snapshot/replay/built-CLI regressions plus every historical CTL/μ/parity/certificate/job/suite/orchestration/virtual-workspace gate and historical CLI smoke tests) and Bounded state-property CLI #591. Closure metadata changes must pass the same exact-head gates before merge.
+M90 freezes one explicit M88 orchestration root plus its exact transitive M89 logical text-source closure into a deterministic bounded schema-v1 UTF-8 artifact. Closure discovery follows only explicit family-tagged manifests and declared model/property/certificate dependencies; parsing reverse-validates that exact closure, rejects unrelated or missing sources, and replays raw or expectation orchestration entirely through the sealed map-backed provider after host files disappear. Cross-root and map-provider creation is byte-identical. Exact closure candidate `07f196f95e48e0aa7654bac3b3069f80c9f17976` passed CI #743 and Bounded state-property CLI #593 before squash integration.
 
 M90 makes no digest/hash, signature, tamper-authentication, cryptographic-authenticity, compression, performance or filesystem-sandbox claim.
 
-## Next frontier — Milestone 91: versioned exact replay result lock
+## Milestone 91 — versioned exact replay result lock
 
-M90 freezes all execution inputs, but M88 expectation mode intentionally compares only each family-native outcome. A replay can therefore preserve `satisfied`/`violated`/`cycle_found`/`verified` while deterministic evidence, accounting, backend metadata or nested result-schema details drift. M91 should add a portable exact-result regression artifact above M90 without pretending that byte equality is cryptographic authenticity.
+**Status: implementation candidate complete on PR #90.**
+
+M91 adds a portable exact-result regression artifact above the sealed M90 input snapshot so deterministic output drift is observable even when coarse family-native outcomes do not change.
+
+Implemented contract:
+
+- schema-v1 replay locks embed one exact M90 snapshot, explicit `raw` or `expectations` replay mode, expected process exit code, and the exact deterministic replay JSON bytes produced by the sealed M90 replay API;
+- lock creation parses/validates and executes the submitted M90 snapshot; it does not synthesize or independently normalize expected JSON;
+- deterministic length framing preserves exact embedded snapshot/result bytes and enforces bounded snapshot/result payload sizes;
+- parser rejects unsupported versions/modes, invalid numeric headers, truncation, missing frame terminators, UTF-8 frame splits, oversized payloads, malformed embedded snapshots and trailing payload fail-closed;
+- verification replays only the embedded snapshot, compares both exit code and JSON byte-for-byte, and exposes explicit `matched / mismatched / error` semantics;
+- mismatch evidence independently records `exit_code_matches` and `json_matches` without claiming why execution changed;
+- mismatch exit code is 13; malformed lock/snapshot verification exits 2;
+- raw and expectation modes are both supported;
+- lock creation is byte-identical across equal M90 snapshots created under different rooted providers/map providers;
+- verification remains fully offline after the original workspace and standalone snapshot file are removed;
+- an outcome-preserving accounting mutation is required to produce `json_matches=false` while the nested verification outcome remains `satisfied`;
+- `fvlab-workspace lock-create` and `lock-verify --format json` extend the existing M90 binary and are differential-checked against direct library creation/verification.
+
+Initial CI #747 reached full tests with format/build/Clippy green and exposed three M91 regression failures: the tests attempted to mutate obsolete/nonexistent `discovered_states` JSON rather than the current schema-v4 `accounting.model_states` field, so the mutation was a no-op. The regressions were corrected to target the canonical accounting field and explicitly assert that mutation changes the lock text; no replay-lock verification semantics or expected mismatch behavior were weakened. CI #748 then exposed only one rustfmt line break.
+
+Exact implementation candidate `0e7cc29905a5704220deb6b2788706cbb1a0735f` passed CI #749 (format, all-target build, Clippy with `-D warnings`, full tests including M91 raw/expectation/offline/mismatch/built-CLI coverage plus every historical CTL/μ/parity/certificate/job/suite/orchestration/workspace gate and historical CLI smoke test) and Bounded state-property CLI #599. Closure metadata changes must pass the same exact-head gates before merge.
+
+M91 makes no hash, signature, cryptographic-integrity/authenticity, compression, performance or sandbox claim.
+
+## Next frontier — Milestone 92: structured exact-replay drift diagnostics
+
+M91 deliberately treats exit-code and JSON byte equality as the regression authority, but a mismatch currently says only that bytes differ. M92 should make exact replay drift actionable without weakening M91's byte-level contract or introducing a crypto trust boundary.
 
 Acceptance criteria:
 
-- define a versioned standalone replay-lock artifact containing one exact M90 snapshot, an explicit execution mode (`raw` or `expectations`), the expected process exit code, and the exact deterministic JSON produced by that snapshot in that mode;
-- create a lock only by successfully parsing/validating the M90 snapshot and executing it through the sealed M90 replay API; do not synthesize or normalize the expected JSON independently;
-- use explicit length framing and bounded parser limits for embedded snapshot/result payloads; preserve their bytes exactly and reject truncation, trailing payload, unsupported versions, invalid mode, count/length overflow and malformed embedded snapshots fail-closed;
-- lock verification must replay the embedded snapshot through the current engine and compare both exit code and JSON byte-for-byte, without parsing/re-serializing the expected JSON;
-- expose explicit `matched / mismatched / error` verification semantics; a valid lock whose current replay differs is a mismatch, while malformed lock/snapshot material is an error;
-- mismatch evidence must identify whether exit code, JSON, or both differ without claiming why the engine changed;
-- creating the same lock from byte-identical M90 snapshots produced under different host roots/providers must yield byte-identical lock artifacts;
-- lock verification must remain fully offline after the original workspace is removed;
-- regressions must prove that outcome-preserving mutations to expected full JSON (for example accounting/evidence fields) are detected even when the family-native outcome string is unchanged;
-- support both raw and expectation M90 replay modes and preserve the complete nested result JSON rather than inventing another domain-outcome abstraction;
-- add direct library APIs first, then extend the existing `fvlab-workspace` binary with lock create/verify commands and direct-library vs built-binary differentials;
-- preserve M90 snapshot schema/replay behavior, M89 provider APIs, M88 orchestration schemas/exits and all family result schemas;
-- make no hash, signature, cryptographic-integrity/authenticity, compression, performance or sandbox claim.
+- preserve M91 exit-code + byte-for-byte JSON equality as the sole match/mismatch authority; diagnostics must never normalize two byte-different payloads into a match;
+- add a bounded deterministic JSON diagnostic parser for M91 expected/current result payloads without adding external dependencies;
+- when both payloads parse within limits, report the first stable structural divergence with a JSON-Pointer-style path and a typed difference kind covering scalar value/type changes, missing/unexpected object members, array element differences and array-length differences;
+- when byte-different JSON parses to structurally equal values (for example formatting or object-order drift), retain mismatch and report that structural equality does not erase byte drift;
+- when either payload is invalid JSON or diagnostic resource limits are reached, retain the M91 mismatch result and fall back to bounded first-byte-offset diagnostics rather than converting drift into verification `error`;
+- report exit-code drift independently from JSON drift exactly as M91 does;
+- bound diagnostic parse depth, node count and rendered scalar/context preview sizes; diagnostics must not echo unbounded expected/current payloads;
+- make object/key traversal deterministic and fail closed on malformed diagnostic syntax without changing lock-parser acceptance or exact comparison behavior;
+- regressions must identify the M91 accounting mutation at its precise nested path while the family-native outcome remains unchanged, plus nested-array, missing-field, type-change, structurally-equal-but-byte-different and invalid-JSON fallback cases;
+- expose the same diagnostics through direct library verification and `fvlab-workspace lock-verify --format json`, with built-binary equality to library output;
+- preserve M91 lock schema-v1 bytes, M90 snapshot schema/replay, M89 provider APIs, M88 orchestration semantics and all family result schemas;
+- make no digest/hash, signature, cryptographic-authenticity, performance or sandbox claim.
 
