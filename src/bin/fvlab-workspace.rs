@@ -1,8 +1,9 @@
 use formal_verification_lab::{
-    create_workspace_replay_lock_from_text, create_workspace_snapshot, parse_workspace_snapshot,
-    render_workspace_replay_lock, render_workspace_snapshot,
-    replay_workspace_snapshot_expectations_json, replay_workspace_snapshot_json,
-    verify_workspace_replay_lock_text, RootedFileSystemTextSourceProvider, WorkspaceReplayMode,
+    audit_workspace_replay_determinism_text, create_workspace_replay_lock_from_text,
+    create_workspace_snapshot, parse_workspace_snapshot, render_workspace_replay_lock,
+    render_workspace_snapshot, replay_workspace_snapshot_expectations_json,
+    replay_workspace_snapshot_json, verify_workspace_replay_lock_text,
+    RootedFileSystemTextSourceProvider, WorkspaceReplayMode,
 };
 use std::env;
 use std::fs;
@@ -35,15 +36,28 @@ fn main() -> ExitCode {
         {
             verify_lock(lock_path)
         }
+        [command, snapshot_path, mode, additional_attempts, flag, format]
+            if command == "determinism-check"
+                && flag == "--format"
+                && format == "json" =>
+        {
+            audit_determinism(snapshot_path, mode, additional_attempts)
+        }
         [command, _, flag, format]
             if (command == "replay" || command == "lock-verify") && flag == "--format" =>
         {
             eprintln!("error: unsupported workspace format '{format}'; expected json");
             ExitCode::from(2)
         }
+        [command, _, _, _, flag, format]
+            if command == "determinism-check" && flag == "--format" =>
+        {
+            eprintln!("error: unsupported workspace format '{format}'; expected json");
+            ExitCode::from(2)
+        }
         _ => {
             eprintln!(
-                "usage: fvlab-workspace create <workspace-root> <orchestration-source-id> <snapshot-path>\n       fvlab-workspace replay <snapshot-path> [--check-expectations] --format json\n       fvlab-workspace lock-create <snapshot-path> <raw|expectations> <lock-path>\n       fvlab-workspace lock-verify <lock-path> --format json"
+                "usage: fvlab-workspace create <workspace-root> <orchestration-source-id> <snapshot-path>\n       fvlab-workspace replay <snapshot-path> [--check-expectations] --format json\n       fvlab-workspace lock-create <snapshot-path> <raw|expectations> <lock-path>\n       fvlab-workspace lock-verify <lock-path> --format json\n       fvlab-workspace determinism-check <snapshot-path> <raw|expectations> <additional-attempts> --format json"
             );
             ExitCode::from(2)
         }
@@ -133,6 +147,43 @@ fn verify_lock(lock_path: &str) -> ExitCode {
         }
     };
     let run = verify_workspace_replay_lock_text(&input);
+    println!("{}", run.to_json());
+    ExitCode::from(run.exit_code)
+}
+
+fn audit_determinism(
+    snapshot_path: &str,
+    mode: &str,
+    additional_attempts: &str,
+) -> ExitCode {
+    let input = match fs::read_to_string(snapshot_path) {
+        Ok(input) => input,
+        Err(error) => {
+            eprintln!("error: failed to read workspace snapshot '{snapshot_path}': {error}");
+            return ExitCode::from(2);
+        }
+    };
+    let mode = match mode {
+        "raw" => WorkspaceReplayMode::Raw,
+        "expectations" => WorkspaceReplayMode::Expectations,
+        other => {
+            eprintln!(
+                "error: unsupported workspace replay determinism mode '{other}'; expected raw or expectations"
+            );
+            return ExitCode::from(2);
+        }
+    };
+    let additional_attempts = match additional_attempts.parse::<usize>() {
+        Ok(value) => value,
+        Err(_) => {
+            eprintln!(
+                "error: additional attempts must be a non-negative decimal integer"
+            );
+            return ExitCode::from(2);
+        }
+    };
+
+    let run = audit_workspace_replay_determinism_text(&input, mode, additional_attempts);
     println!("{}", run.to_json());
     ExitCode::from(run.exit_code)
 }
