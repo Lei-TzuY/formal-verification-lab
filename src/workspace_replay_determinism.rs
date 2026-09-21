@@ -1,6 +1,4 @@
-use crate::replay_json_diagnostic::{
-    diagnose_replay_json_drift, WorkspaceReplayJsonDifference,
-};
+use crate::replay_json_diagnostic::{diagnose_replay_json_drift, WorkspaceReplayJsonDifference};
 use crate::workspace_replay_lock::WorkspaceReplayMode;
 use crate::workspace_snapshot::{
     parse_workspace_snapshot, replay_workspace_snapshot_expectations_json,
@@ -257,8 +255,10 @@ where
 
 fn validate_additional_attempts(additional_attempts: usize) -> Result<(), String> {
     if additional_attempts == 0 {
-        return Err("workspace replay determinism audit requires at least one additional attempt"
-            .to_owned());
+        return Err(
+            "workspace replay determinism audit requires at least one additional attempt"
+                .to_owned(),
+        );
     }
     if additional_attempts > MAX_WORKSPACE_REPLAY_DETERMINISM_ADDITIONAL_ATTEMPTS {
         return Err(format!(
@@ -275,11 +275,7 @@ fn error_run(
     message: impl Into<String>,
 ) -> WorkspaceReplayDeterminismJsonRun {
     WorkspaceReplayDeterminismJsonRun {
-        envelope: WorkspaceReplayDeterminismEnvelope::error(
-            mode,
-            additional_attempts,
-            message,
-        ),
+        envelope: WorkspaceReplayDeterminismEnvelope::error(mode, additional_attempts, message),
         exit_code: 2,
     }
 }
@@ -406,9 +402,15 @@ mod tests {
         let run = audit_replay_runs(WorkspaceReplayMode::Raw, 5, || {
             attempt += 1;
             if attempt == 1 {
-                (0, r#"{"jobs":[{"result":{"accounting":{"model_states":1}}}]}"#.to_owned())
+                (
+                    0,
+                    r#"{"jobs":[{"result":{"accounting":{"model_states":1}}}]}"#.to_owned(),
+                )
             } else {
-                (0, r#"{"jobs":[{"result":{"accounting":{"model_states":2}}}]}"#.to_owned())
+                (
+                    0,
+                    r#"{"jobs":[{"result":{"accounting":{"model_states":2}}}]}"#.to_owned(),
+                )
             }
         });
 
@@ -459,7 +461,10 @@ mod tests {
             (0, "{}".to_owned())
         });
         assert_eq!(calls, 0);
-        assert_eq!(zero.envelope.status, WorkspaceReplayDeterminismStatus::Error);
+        assert_eq!(
+            zero.envelope.status,
+            WorkspaceReplayDeterminismStatus::Error
+        );
 
         let excessive = audit_replay_runs(
             WorkspaceReplayMode::Raw,
