@@ -1,6 +1,4 @@
-use crate::replay_json_diagnostic::{
-    diagnose_replay_json_drift, WorkspaceReplayJsonDifference,
-};
+use crate::replay_json_diagnostic::{diagnose_replay_json_drift, WorkspaceReplayJsonDifference};
 use crate::workspace_snapshot::{
     parse_workspace_snapshot, render_workspace_snapshot,
     replay_workspace_snapshot_expectations_json, replay_workspace_snapshot_json, WorkspaceSnapshot,
