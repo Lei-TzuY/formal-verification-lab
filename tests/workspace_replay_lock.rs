@@ -45,7 +45,7 @@ fn exact_replay_lock_is_deterministic_across_providers_and_round_trips() {
     assert!(!rendered.contains(root_a.to_str().unwrap()));
     assert!(!rendered.contains(root_b.to_str().unwrap()));
     assert!(raw_a.expected_json().contains("\"outcome\":\"satisfied\""));
-    assert!(raw_a.expected_json().contains("\"discovered_states\":1"));
+    assert!(raw_a.expected_json().contains("\"model_states\":1"));
 
     let parsed = parse_workspace_replay_lock(&rendered).unwrap();
     assert_eq!(parsed, raw_a);
@@ -71,8 +71,8 @@ fn lock_verification_detects_outcome_preserving_full_json_and_exit_drift() {
     let lock = create_workspace_replay_lock(&snapshot, WorkspaceReplayMode::Raw);
     let rendered = render_workspace_replay_lock(&lock);
 
-    assert!(rendered.contains("\"discovered_states\":1"));
-    let json_drift = rendered.replacen("\"discovered_states\":1", "\"discovered_states\":2", 1);
+    assert!(rendered.contains("\"model_states\":1"));
+    let json_drift = rendered.replacen("\"model_states\":1", "\"model_states\":2", 1);
     assert_ne!(json_drift, rendered);
     let json_lock = parse_workspace_replay_lock(&json_drift).unwrap();
     assert!(json_lock
@@ -255,8 +255,10 @@ fn built_cli_creates_identical_lock_and_verifies_offline_after_sources_are_remov
     );
     assert!(verify.stderr.is_empty());
 
-    let mut mismatch_text = fs::read_to_string(&lock_path).unwrap();
-    mismatch_text = mismatch_text.replacen("\"discovered_states\":1", "\"discovered_states\":2", 1);
+    let original_lock_text = fs::read_to_string(&lock_path).unwrap();
+    let mismatch_text =
+        original_lock_text.replacen("\"model_states\":1", "\"model_states\":2", 1);
+    assert_ne!(mismatch_text, original_lock_text);
     fs::write(&lock_path, &mismatch_text).unwrap();
     let mismatch_direct = verify_workspace_replay_lock_text(&mismatch_text);
     let mismatch = run_binary(&[
