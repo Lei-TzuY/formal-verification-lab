@@ -90,9 +90,9 @@ fn replay_lock_reports_precise_accounting_path_without_changing_match_authority(
     assert!(lock.expected_json().contains("\"outcome\":\"satisfied\""));
     assert!(lock.expected_json().contains("\"model_states\":1"));
 
-    let mutated_json =
-        lock.expected_json()
-            .replacen("\"model_states\":1", "\"model_states\":2", 1);
+    let mutated_json = lock
+        .expected_json()
+        .replacen("\"model_states\":1", "\"model_states\":2", 1);
     assert_ne!(mutated_json, lock.expected_json());
     assert!(mutated_json.contains("\"outcome\":\"satisfied\""));
 
@@ -126,9 +126,7 @@ fn replay_lock_reports_precise_accounting_path_without_changing_match_authority(
 
     let json = run.to_json();
     assert!(json.contains("\"json_difference\":{"));
-    assert!(json.contains(
-        "\"path\":\"/jobs/0/result/accounting/model_states\""
-    ));
+    assert!(json.contains("\"path\":\"/jobs/0/result/accounting/model_states\""));
 }
 
 #[test]
@@ -195,9 +193,9 @@ fn replay_lock_keeps_mismatch_for_structurally_equal_and_invalid_expected_json()
 fn built_lock_verify_json_matches_library_structured_diagnostic() {
     let lock = fixture_lock();
     let rendered = render_workspace_replay_lock(&lock);
-    let mutated_json =
-        lock.expected_json()
-            .replacen("\"model_states\":1", "\"model_states\":2", 1);
+    let mutated_json = lock
+        .expected_json()
+        .replacen("\"model_states\":1", "\"model_states\":2", 1);
     assert_ne!(mutated_json, lock.expected_json());
     let mutated_text = replace_result_frame(&rendered, lock.expected_json(), &mutated_json);
 
@@ -216,9 +214,9 @@ fn built_lock_verify_json_matches_library_structured_diagnostic() {
         format!("{}\n", direct.to_json())
     );
     assert!(output.stderr.is_empty());
-    assert!(direct.to_json().contains(
-        "\"path\":\"/jobs/0/result/accounting/model_states\""
-    ));
+    assert!(direct
+        .to_json()
+        .contains("\"path\":\"/jobs/0/result/accounting/model_states\""));
 
     fs::remove_file(path).unwrap();
 }
