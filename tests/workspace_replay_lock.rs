@@ -256,8 +256,7 @@ fn built_cli_creates_identical_lock_and_verifies_offline_after_sources_are_remov
     assert!(verify.stderr.is_empty());
 
     let original_lock_text = fs::read_to_string(&lock_path).unwrap();
-    let mismatch_text =
-        original_lock_text.replacen("\"model_states\":1", "\"model_states\":2", 1);
+    let mismatch_text = original_lock_text.replacen("\"model_states\":1", "\"model_states\":2", 1);
     assert_ne!(mismatch_text, original_lock_text);
     fs::write(&lock_path, &mismatch_text).unwrap();
     let mismatch_direct = verify_workspace_replay_lock_text(&mismatch_text);
