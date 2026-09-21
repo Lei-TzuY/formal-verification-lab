@@ -64,6 +64,7 @@ pub mod proposition_expr_report;
 pub mod proposition_report;
 pub mod recurrence;
 pub mod reduction;
+pub mod replay_json_diagnostic;
 pub mod report;
 pub mod response;
 pub mod response_examples;
@@ -293,6 +294,11 @@ pub use reduction::{
     audit_sleep_set_reduction, check_validated_sleep_set_reduction, validate_independence,
     IndependenceError, IndependenceRelation, IndependenceValidationError, ReducedExploration,
     ReductionAudit, ReductionAuditError, ValidatedIndependenceRelation,
+};
+pub use replay_json_diagnostic::{
+    diagnose_replay_json_drift, WorkspaceReplayJsonDifference, WorkspaceReplayJsonDifferenceKind,
+    MAX_REPLAY_JSON_DIAGNOSTIC_BYTES, MAX_REPLAY_JSON_DIAGNOSTIC_DEPTH,
+    MAX_REPLAY_JSON_DIAGNOSTIC_NODES, MAX_REPLAY_JSON_DIAGNOSTIC_PREVIEW_BYTES,
 };
 pub use response::{
     check_response, check_response_with_fairness_profile,
