@@ -194,47 +194,52 @@ M90 makes no digest/hash, signature, tamper-authentication, cryptographic-authen
 
 ## Milestone 91 — versioned exact replay result lock
 
-**Status: implementation candidate complete on PR #90.**
+**Status: sealed in `main` at `c70ef3584f1975efc76084e29db0f0540a9bb1d3`.**
 
-M91 adds a portable exact-result regression artifact above the sealed M90 input snapshot so deterministic output drift is observable even when coarse family-native outcomes do not change.
-
-Implemented contract:
-
-- schema-v1 replay locks embed one exact M90 snapshot, explicit `raw` or `expectations` replay mode, expected process exit code, and the exact deterministic replay JSON bytes produced by the sealed M90 replay API;
-- lock creation parses/validates and executes the submitted M90 snapshot; it does not synthesize or independently normalize expected JSON;
-- deterministic length framing preserves exact embedded snapshot/result bytes and enforces bounded snapshot/result payload sizes;
-- parser rejects unsupported versions/modes, invalid numeric headers, truncation, missing frame terminators, UTF-8 frame splits, oversized payloads, malformed embedded snapshots and trailing payload fail-closed;
-- verification replays only the embedded snapshot, compares both exit code and JSON byte-for-byte, and exposes explicit `matched / mismatched / error` semantics;
-- mismatch evidence independently records `exit_code_matches` and `json_matches` without claiming why execution changed;
-- mismatch exit code is 13; malformed lock/snapshot verification exits 2;
-- raw and expectation modes are both supported;
-- lock creation is byte-identical across equal M90 snapshots created under different rooted providers/map providers;
-- verification remains fully offline after the original workspace and standalone snapshot file are removed;
-- an outcome-preserving accounting mutation is required to produce `json_matches=false` while the nested verification outcome remains `satisfied`;
-- `fvlab-workspace lock-create` and `lock-verify --format json` extend the existing M90 binary and are differential-checked against direct library creation/verification.
-
-Initial CI #747 reached full tests with format/build/Clippy green and exposed three M91 regression failures: the tests attempted to mutate obsolete/nonexistent `discovered_states` JSON rather than the current schema-v4 `accounting.model_states` field, so the mutation was a no-op. The regressions were corrected to target the canonical accounting field and explicitly assert that mutation changes the lock text; no replay-lock verification semantics or expected mismatch behavior were weakened. CI #748 then exposed only one rustfmt line break.
-
-Exact implementation candidate `0e7cc29905a5704220deb6b2788706cbb1a0735f` passed CI #749 (format, all-target build, Clippy with `-D warnings`, full tests including M91 raw/expectation/offline/mismatch/built-CLI coverage plus every historical CTL/μ/parity/certificate/job/suite/orchestration/workspace gate and historical CLI smoke test) and Bounded state-property CLI #599. Closure metadata changes must pass the same exact-head gates before merge.
+M91 adds a portable exact-result regression artifact above the sealed M90 input snapshot. Schema-v1 replay locks embed the exact M90 snapshot, replay mode, expected process exit code and exact deterministic replay JSON. Verification replays only the embedded snapshot and compares exit code plus JSON bytes without normalizing family outcomes. Raw and expectation modes, offline replay, deterministic framing/resource limits, outcome-preserving accounting drift and direct-library/built-CLI parity are covered. Exact closure candidate `c461c9de80324ef3e11fbb99c9276d321baa5191` passed CI #751 and Bounded state-property CLI #601 before squash integration.
 
 M91 makes no hash, signature, cryptographic-integrity/authenticity, compression, performance or sandbox claim.
 
-## Next frontier — Milestone 92: structured exact-replay drift diagnostics
+## Milestone 92 — structured exact-replay drift diagnostics
 
-M91 deliberately treats exit-code and JSON byte equality as the regression authority, but a mismatch currently says only that bytes differ. M92 should make exact replay drift actionable without weakening M91's byte-level contract or introducing a crypto trust boundary.
+**Status: implementation candidate complete on PR #91.**
+
+M92 makes M91 byte-level replay mismatches actionable without weakening exact comparison authority.
+
+Implemented contract:
+
+- M91 exit-code equality plus byte-for-byte replay JSON equality remain the sole match/mismatch authority;
+- `json_difference` is diagnostic-only and is emitted only when `json_matches=false`; a diagnostic parser failure never converts a mismatch into a match or verification error;
+- a bounded dependency-free JSON parser enforces maximum input bytes, recursion depth, node count and preview size;
+- deterministic structural comparison reports the first stable JSON-Pointer-style path using ordered object/key traversal;
+- typed drift kinds cover scalar value changes, type changes, missing/unexpected object members, array length changes, structurally-equal-but-byte-different JSON and invalid/resource-limited byte fallback;
+- JSON Pointer keys escape `~` and `/` as `~0` / `~1`;
+- malformed or diagnostic-resource-limited JSON retains M91 mismatch semantics and falls back to the first byte offset;
+- exit-code drift remains independently visible and does not invent a JSON difference when JSON bytes still match;
+- the M91 accounting mutation is diagnosed at `/jobs/0/result/accounting/model_states` while the nested verification outcome remains `satisfied`;
+- regressions cover nested-array value drift, missing/unexpected members, type changes, array length, pointer escaping, structurally-equal byte drift, invalid JSON fallback, matched runs, exit-only drift and direct-library/built-`fvlab-workspace lock-verify --format json` equality;
+- M91 lock schema-v1 bytes, M90 snapshot schema/replay, M89 providers, M88 orchestration and all family result schemas remain unchanged.
+
+The adopted pre-existing M92 branch initially failed CI #753/#755/#756 only on rustfmt while Bounded CLI builds remained healthy; formatter output was applied without changing semantics. Exact implementation candidate `eb7b629b001761b29d058a007cf18aed7808c5d9` passed CI #757 (format, all-target build, Clippy with `-D warnings`, full M92 diagnostics coverage plus every historical CTL/μ/parity/certificate/job/suite/orchestration/workspace/replay-lock gate and historical CLI smoke test) and Bounded state-property CLI #607. Closure metadata changes must pass the same exact-head gates before merge.
+
+M92 makes no digest/hash, signature, cryptographic-authenticity, performance, compression or sandbox claim.
+
+## Next frontier — Milestone 93: bounded deterministic replay audit
+
+M91/M92 assume the frozen M90 workspace replay itself is deterministic when interpreting exact-result drift, but replay-lock verification currently performs only one fresh replay. Lower-level engines have many determinism regressions; the portable workspace/replay boundary does not yet expose an executable repeatability audit.
 
 Acceptance criteria:
 
-- preserve M91 exit-code + byte-for-byte JSON equality as the sole match/mismatch authority; diagnostics must never normalize two byte-different payloads into a match;
-- add a bounded deterministic JSON diagnostic parser for M91 expected/current result payloads without adding external dependencies;
-- when both payloads parse within limits, report the first stable structural divergence with a JSON-Pointer-style path and a typed difference kind covering scalar value/type changes, missing/unexpected object members, array element differences and array-length differences;
-- when byte-different JSON parses to structurally equal values (for example formatting or object-order drift), retain mismatch and report that structural equality does not erase byte drift;
-- when either payload is invalid JSON or diagnostic resource limits are reached, retain the M91 mismatch result and fall back to bounded first-byte-offset diagnostics rather than converting drift into verification `error`;
-- report exit-code drift independently from JSON drift exactly as M91 does;
-- bound diagnostic parse depth, node count and rendered scalar/context preview sizes; diagnostics must not echo unbounded expected/current payloads;
-- make object/key traversal deterministic and fail closed on malformed diagnostic syntax without changing lock-parser acceptance or exact comparison behavior;
-- regressions must identify the M91 accounting mutation at its precise nested path while the family-native outcome remains unchanged, plus nested-array, missing-field, type-change, structurally-equal-but-byte-different and invalid-JSON fallback cases;
-- expose the same diagnostics through direct library verification and `fvlab-workspace lock-verify --format json`, with built-binary equality to library output;
-- preserve M91 lock schema-v1 bytes, M90 snapshot schema/replay, M89 provider APIs, M88 orchestration semantics and all family result schemas;
-- make no digest/hash, signature, cryptographic-authenticity, performance or sandbox claim.
+- add a bounded repeatability API over one parsed M90 `WorkspaceSnapshot` and explicit replay mode (`raw` or `expectations`);
+- execute one canonical baseline replay plus a caller-specified bounded number of additional attempts; reject zero/overflow/excessive attempt counts before execution;
+- compare every attempt against the first using the same exit-code + exact JSON-byte authority as M91, with no normalization of family-native outcomes;
+- report `deterministic / nondeterministic / error` independently from M91 lock match/mismatch semantics;
+- on the first nondeterministic attempt, preserve baseline/current exit codes and byte-equality flags and attach the sealed M92 structured JSON diagnostic when JSON differs;
+- stop at the first observed mismatch rather than farming later repetitions, and report the 1-based attempt index deterministically;
+- support both raw and expectation replay modes entirely from the sealed snapshot/map provider, with no host filesystem dependency after parsing;
+- add explicit resource bounds on repeat count; do not use wall-clock timing, CI duration or repeated execution as a performance benchmark;
+- add direct library and `fvlab-workspace` CLI JSON surfaces with byte-identical output/exit behavior;
+- regressions must cover stable raw/expectation snapshots, an injected deterministic test provider/hook that produces a known second-attempt JSON or exit drift, M92 diagnostic reuse, invalid attempt counts, and built-binary equality;
+- preserve M92 diagnostics, M91 lock schema-v1/verification, M90 snapshot schema/replay, M89 providers, M88 orchestration and all family result schemas;
+- make no performance, probabilistic-guarantee, digest/hash, signature, cryptographic-authenticity or sandbox claim.
 
