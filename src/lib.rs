@@ -90,6 +90,7 @@ mod verification_mu;
 pub mod verification_result;
 pub mod verification_suite;
 pub mod verification_suite_run;
+pub mod workspace_replay_determinism;
 pub mod workspace_replay_lock;
 pub mod workspace_snapshot;
 
@@ -402,6 +403,12 @@ pub use verification_suite_run::{
     VerificationSuiteOutcome, VerificationSuiteResultEnvelope,
     VERIFICATION_REGRESSION_MISMATCH_EXIT_CODE,
     VERIFICATION_REGRESSION_SUITE_RESULT_SCHEMA_VERSION, VERIFICATION_SUITE_RESULT_SCHEMA_VERSION,
+};
+pub use workspace_replay_determinism::{
+    audit_workspace_replay_determinism, audit_workspace_replay_determinism_text,
+    WorkspaceReplayDeterminismEnvelope, WorkspaceReplayDeterminismJsonRun,
+    WorkspaceReplayDeterminismStatus, MAX_WORKSPACE_REPLAY_DETERMINISM_ADDITIONAL_ATTEMPTS,
+    WORKSPACE_REPLAY_DETERMINISM_SCHEMA_VERSION, WORKSPACE_REPLAY_NONDETERMINISTIC_EXIT_CODE,
 };
 pub use workspace_replay_lock::{
     create_workspace_replay_lock, create_workspace_replay_lock_from_text,
