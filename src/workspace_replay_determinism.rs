@@ -460,6 +460,113 @@ mod tests {
     }
 
     #[test]
+    fn stable_nonzero_results_replay_exactly_at_both_attempt_bounds() {
+        for mode in [WorkspaceReplayMode::Raw, WorkspaceReplayMode::Expectations] {
+            for additional in [1, MAX_WORKSPACE_REPLAY_DETERMINISM_ADDITIONAL_ATTEMPTS] {
+                for baseline_exit in [2, 13] {
+                    let mut calls = 0;
+                    let run = audit_replay_runs(mode, additional, || {
+                        calls += 1;
+                        (baseline_exit, r#"{"status":"error"}"#.to_owned())
+                    });
+
+                    assert_eq!(calls, additional + 1);
+                    assert_eq!(run.envelope.completed_attempts, calls);
+                    assert_eq!(run.envelope.requested_additional_attempts, additional);
+                    assert_eq!(run.envelope.baseline_exit_code, Some(baseline_exit));
+                    assert_eq!(
+                        run.envelope.status,
+                        WorkspaceReplayDeterminismStatus::Deterministic
+                    );
+                    assert_eq!(run.exit_code, 0);
+                    assert_eq!(run.envelope.divergent_attempt_index, None);
+                    assert_eq!(run.envelope.error, None);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn drift_on_the_last_permitted_attempt_is_not_skipped() {
+        let additional = MAX_WORKSPACE_REPLAY_DETERMINISM_ADDITIONAL_ATTEMPTS;
+        let total = additional + 1;
+        let baseline_json = r#"{"value":1}"#;
+        for mode in [WorkspaceReplayMode::Raw, WorkspaceReplayMode::Expectations] {
+            for (actual_exit, actual_json) in [
+                (0, r#"{"value":2}"#),
+                (13, baseline_json),
+                (13, r#"{"value":2}"#),
+            ] {
+                let mut calls = 0;
+                let run = audit_replay_runs(mode, additional, || {
+                    calls += 1;
+                    if calls == total {
+                        (actual_exit, actual_json.to_owned())
+                    } else {
+                        (0, baseline_json.to_owned())
+                    }
+                });
+
+                assert_eq!(calls, total);
+                assert_eq!(run.envelope.completed_attempts, total);
+                assert_eq!(run.envelope.divergent_attempt_index, Some(total));
+                assert_eq!(
+                    run.envelope.status,
+                    WorkspaceReplayDeterminismStatus::Nondeterministic
+                );
+                assert_eq!(run.exit_code, WORKSPACE_REPLAY_NONDETERMINISTIC_EXIT_CODE);
+                assert_eq!(run.envelope.baseline_exit_code, Some(0));
+                assert_eq!(run.envelope.actual_exit_code, Some(actual_exit));
+                assert_eq!(run.envelope.exit_code_matches, Some(actual_exit == 0));
+                assert_eq!(
+                    run.envelope.json_matches,
+                    Some(actual_json == baseline_json)
+                );
+                if actual_json == baseline_json {
+                    assert_eq!(run.envelope.json_difference, None);
+                } else {
+                    assert_eq!(
+                        run.envelope.json_difference.unwrap().path.as_deref(),
+                        Some("/value")
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn equivalent_json_with_different_bytes_is_still_nondeterministic() {
+        for mode in [WorkspaceReplayMode::Raw, WorkspaceReplayMode::Expectations] {
+            let mut calls = 0;
+            let run = audit_replay_runs(mode, 1, || {
+                calls += 1;
+                let json = if calls == 1 {
+                    r#"{"value":1}"#
+                } else {
+                    r#" {"value":1} "#
+                };
+                (0, json.to_owned())
+            });
+
+            assert_eq!(calls, 2);
+            assert_eq!(
+                run.envelope.status,
+                WorkspaceReplayDeterminismStatus::Nondeterministic
+            );
+            assert_eq!(run.exit_code, WORKSPACE_REPLAY_NONDETERMINISTIC_EXIT_CODE);
+            assert_eq!(run.envelope.exit_code_matches, Some(true));
+            assert_eq!(run.envelope.json_matches, Some(false));
+            let difference = run.envelope.json_difference.unwrap();
+            assert_eq!(
+                difference.kind,
+                crate::replay_json_diagnostic::WorkspaceReplayJsonDifferenceKind::ByteOnly
+            );
+            assert_eq!(difference.first_byte_offset, 0);
+            assert_eq!(difference.path, None);
+        }
+    }
+
+    #[test]
     fn invalid_attempt_counts_fail_before_replay() {
         let mut calls = 0usize;
         let zero = audit_replay_runs(WorkspaceReplayMode::Raw, 0, || {
